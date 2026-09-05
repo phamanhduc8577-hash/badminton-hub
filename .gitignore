@@ -1,6 +1,16 @@
+# Root Gitignore
 .idea/
 .vscode/
-node_modules/
-target/
 *.log
-.env
+.DS_Store
+Thumbs.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# Backend
+backend/.gradle/
+backend/build/
+backend/out/

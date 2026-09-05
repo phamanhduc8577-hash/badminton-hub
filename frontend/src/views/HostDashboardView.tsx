@@ -1,0 +1,1676 @@
+import React, { useState, useMemo } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '../lib/api'
+import { SessionItem, Participant, Match, HostReport } from '../types'
+import { QRCodeSVG } from 'qrcode.react'
+import { DuckMascot } from '../components/DuckMascot'
+import { getLolRank } from '../lib/ranks'
+import {
+  Users,
+  Swords,
+  DollarSign,
+  Edit2,
+  RefreshCw,
+  Maximize2,
+  X,
+  Shield,
+  ArrowLeft,
+  Receipt,
+  UserCheck,
+  Zap,
+  Sparkles,
+  Layers,
+  BarChart3,
+  MapPin,
+  CheckCircle2,
+  Plus,
+  Trash2,
+  Square,
+  CheckSquare,
+} from 'lucide-react'
+
+interface CourtDraft {
+  teamAP1: string
+  teamAP2: string
+  teamBP1: string
+  teamBP2: string
+}
+
+export const HostDashboardView: React.FC = () => {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  // State tabs: 'roster' | 'matchmaker' | 'settle'
+  const [activeTab, setActiveTab] = useState<'roster' | 'matchmaker' | 'settle'>('roster')
+
+  // Fullscreen Dynamic QR Modal
+  const [showQrModal, setShowQrModal] = useState(false)
+
+  // Override Bill Modal State
+  const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null)
+  const [adjustmentAmount, setAdjustmentAmount] = useState<number>(0)
+  const [adjustmentReason, setAdjustmentReason] = useState<string>('')
+
+  // Settle Payment Modal State (Replaces buggy window.confirm)
+  const [settlingParticipant, setSettlingParticipant] = useState<Participant | null>(null)
+
+  // Active Court Selected for Multi-Court Matchmaking
+  const [activeCourtIndex, setActiveCourtIndex] = useState<number>(0)
+
+  // Multi-court drafts: Court Name -> CourtDraft
+  const [courtDrafts, setCourtDrafts] = useState<Record<string, CourtDraft>>({})
+
+  const { data: session, isLoading } = useQuery<SessionItem>({
+    queryKey: ['session', id],
+    queryFn: async () => {
+      const res = await api.get(`/sessions/${id}`)
+      return res.data
+    },
+    refetchInterval: 3000,
+  })
+
+  const { data: matches } = useQuery<Match[]>({
+    queryKey: ['matches', id],
+    queryFn: async () => {
+      const res = await api.get(`/matches/session/${id}`)
+      return res.data
+    },
+    enabled: !!id,
+  })
+
+  const { data: report } = useQuery<HostReport>({
+    queryKey: ['report', id],
+    queryFn: async () => {
+      const res = await api.get(`/reports/session/${id}`)
+      return res.data
+    },
+    enabled: true,
+  })
+
+  // Parse court list from session
+  const courtList = useMemo(() => {
+    if (!session) return ['Sân 1', 'Sân 2']
+    if (session.courtNames && session.courtNames.trim().length > 0) {
+      const list = session.courtNames
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      if (list.length > 0) return list
+    }
+    const count = session.courtCount || 2
+    return Array.from({ length: count }, (_, i) => `Sân ${i + 1}`)
+  }, [session])
+
+  const currentCourtName = courtList[activeCourtIndex] || courtList[0] || 'Sân 1'
+
+  // Current draft for the selected court
+  const currentDraft = useMemo<CourtDraft>(() => {
+    return (
+      courtDrafts[currentCourtName] || {
+        teamAP1: '',
+        teamAP2: '',
+        teamBP1: '',
+        teamBP2: '',
+      }
+    )
+  }, [courtDrafts, currentCourtName])
+
+  const updateCurrentDraft = (field: keyof CourtDraft, value: string) => {
+    setCourtDrafts((prev) => ({
+      ...prev,
+      [currentCourtName]: {
+        ...(prev[currentCourtName] || {
+          teamAP1: '',
+          teamAP2: '',
+          teamBP1: '',
+          teamBP2: '',
+        }),
+        [field]: value,
+      },
+    }))
+  }
+
+  // Calculate stats for Fair-Play Sets Distribution in this session (with audit logs of courts)
+  const playerStatsMap = useMemo(() => {
+    const stats: Record<
+      string,
+      {
+        totalSets: number
+        wins: number
+        losses: number
+        lastCourt?: string
+        courtHistory: string[]
+      }
+    > = {}
+
+    if (!session?.participants) return stats
+
+    // Initialize all roster players with 0 sets
+    session.participants.forEach((p) => {
+      const uid = String(p.userId || p.id)
+      stats[uid] = { totalSets: 0, wins: 0, losses: 0, courtHistory: [] }
+    })
+
+    if (!matches) return stats
+
+    matches.forEach((m) => {
+      const pA1 = String(m.teamAPlayer1Id)
+      const pA2 = m.teamAPlayer2Id ? String(m.teamAPlayer2Id) : null
+      const pB1 = String(m.teamBPlayer1Id)
+      const pB2 = m.teamBPlayer2Id ? String(m.teamBPlayer2Id) : null
+
+      const teamAWon = m.winningTeam === 'A'
+      const courtUsed = m.courtName || 'Sân 1'
+
+      const recordPlayer = (id: string, isWinner: boolean) => {
+        if (!stats[id]) {
+          stats[id] = { totalSets: 0, wins: 0, losses: 0, courtHistory: [] }
+        }
+        stats[id].totalSets += 1
+        stats[id].courtHistory.push(courtUsed)
+        stats[id].lastCourt = courtUsed
+
+        if (isWinner) {
+          stats[id].wins += 1
+        } else {
+          stats[id].losses += 1
+        }
+      }
+
+      recordPlayer(pA1, teamAWon)
+      if (pA2) recordPlayer(pA2, teamAWon)
+      recordPlayer(pB1, !teamAWon)
+      if (pB2) recordPlayer(pB2, !teamAWon)
+    })
+
+    return stats
+  }, [session, matches])
+
+  // Fixed minimum target sets per player (Standard 6 sets per player for a regular badminton session)
+  const minTargetSets = 6
+
+  // Manual Checkin Mutation
+  const manualCheckinMutation = useMutation({
+    mutationFn: async (participantId: number) => {
+      const res = await api.post(`/sessions/participants/${participantId}/manual-checkin`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+    },
+  })
+
+  // Confirm Deposit Mutation
+  const confirmDepositMutation = useMutation({
+    mutationFn: async (participantId: number) => {
+      const res = await api.post(`/sessions/participants/${participantId}/confirm-deposit`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+    },
+  })
+
+  // Override Bill Mutation
+  const overrideBillMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedParticipant) return
+      const res = await api.post('/sessions/participants/override-bill', {
+        participantId: selectedParticipant.id,
+        adjustmentAmount,
+        adjustmentReason,
+      })
+      return res.data
+    },
+    onSuccess: () => {
+      setSelectedParticipant(null)
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+    },
+  })
+
+  // Settle Payment Mutation
+  const settlePaymentMutation = useMutation({
+    mutationFn: async ({ participantId, method }: { participantId: number; method: 'CASH' | 'VIETQR' }) => {
+      const res = await api.post('/sessions/participants/settle', {
+        participantId,
+        paymentMethod: method,
+      })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+    },
+  })
+
+  // Dynamic Courts Mutation (Add, Edit, Delete Courts, Update Slots)
+  const updateCourtsMutation = useMutation({
+    mutationFn: async ({ newCourtNames, newMaxSlots }: { newCourtNames: string; newMaxSlots?: number }) => {
+      const res = await api.put(`/sessions/${id}/courts`, {
+        courtNames: newCourtNames,
+        maxSlots: newMaxSlots,
+      })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể cập nhật danh sách sân!')
+    },
+  })
+
+  // Remove / Cancel Participant Mutation
+  const removeParticipantMutation = useMutation({
+    mutationFn: async ({ participantId, forfeitDeposit }: { participantId: number; forfeitDeposit: boolean }) => {
+      const res = await api.delete(`/sessions/participants/${participantId}?forfeitDeposit=${forfeitDeposit}`)
+      return res.data
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+      alert(data.message || 'Đã xử lý thành công!')
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể xóa người tham gia!')
+    },
+  })
+
+  // Auto-seed Full Simulation Mutation (8 players, GPS check-ins, 6 balanced matches)
+  const autoSeedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(`/sessions/${id}/auto-seed-matches`)
+      return res.data
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['matches', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+      alert(data.message || 'Mô phỏng 8 người & 6 trận đấu thành công!')
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể chạy mô phỏng!')
+    },
+  })
+
+  const handleAddCourt = () => {
+    const nextNum = courtList.length + 1
+    const courtNameInput = window.prompt(`Nhập tên sân muốn mở thêm (ví dụ: Sân ${nextNum}):`, `Sân ${nextNum}`)
+    if (!courtNameInput || !courtNameInput.trim()) return
+
+    const newCourt = courtNameInput.trim()
+    if (courtList.includes(newCourt)) {
+      alert('Tên sân này đã tồn tại trong ca!')
+      return
+    }
+
+    const newCourtCount = courtList.length + 1
+    const currentMaxSlots = session?.maxSlots || 8
+    // Tự động gợi ý tăng slot (mỗi sân thêm tương ứng ~6-8 slots)
+    const suggestedSlots = Math.max(currentMaxSlots, newCourtCount * 8)
+    const slotsInput = window.prompt(
+      `Mở thêm sân thành công (${newCourtCount} sân).\nBạn có muốn nâng tổng số Slot tối đa của ca không? (Gợi ý: ${suggestedSlots} slots)`,
+      String(suggestedSlots)
+    )
+    const newMaxSlots = slotsInput && !isNaN(Number(slotsInput)) ? Number(slotsInput) : currentMaxSlots
+
+    const updatedList = [...courtList, newCourt].join(', ')
+    updateCourtsMutation.mutate({ newCourtNames: updatedList, newMaxSlots })
+  }
+
+  const handleRemoveCourt = (courtToRemove: string) => {
+    if (courtList.length <= 1) {
+      alert('Phải giữ lại tối thiểu 1 sân để tổ chức ca đánh!')
+      return
+    }
+
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa [${courtToRemove}] khỏi ca đánh này không?`)) {
+      return
+    }
+
+    const updatedList = courtList.filter((c) => c !== courtToRemove).join(', ')
+    setActiveCourtIndex(0)
+    updateCourtsMutation.mutate({ newCourtNames: updatedList })
+  }
+
+  const handleRemoveParticipant = (p: Participant) => {
+    if (p.checkinStatus === 'CHECKED_IN') {
+      alert('Người chơi này đã tới sân và điểm danh thành công, không thể xóa khỏi ca!')
+      return
+    }
+
+    if (p.isGuest && p.depositStatus === 'PAID') {
+      const choice = window.confirm(
+        `Người này đã cọc ${p.depositAmount.toLocaleString()}đ và không tới sân (Bỏ kèo).\n\n` +
+          `• Nhấn [OK] để: Hủy slot cho người khác đăng ký & GIỮ TIỀN CỌC TÍNH VÀO DOANH THU CA.\n` +
+          `• Nhấn [Cancel] để: Hoàn tiền và xóa hoàn toàn slot.`
+      )
+      removeParticipantMutation.mutate({
+        participantId: p.id,
+        forfeitDeposit: choice,
+      })
+    } else {
+      if (window.confirm(`Bạn có chắc chắn muốn hủy lượt đăng ký của [${p.name}] để nhường slot cho người khác?`)) {
+        removeParticipantMutation.mutate({
+          participantId: p.id,
+          forfeitDeposit: false,
+        })
+      }
+    }
+  }
+
+  // Record Match Result Mutation
+  const recordMatchMutation = useMutation({
+    mutationFn: async ({ winningTeam, court }: { winningTeam: 'A' | 'B'; court: string }) => {
+      const draft = courtDrafts[court] || currentDraft
+      const res = await api.post('/matches', {
+        sessionId: Number(id),
+        teamAPlayer1Id: Number(draft.teamAP1),
+        teamAPlayer2Id: draft.teamAP2 ? Number(draft.teamAP2) : null,
+        teamBPlayer1Id: Number(draft.teamBP1),
+        teamBPlayer2Id: draft.teamBP2 ? Number(draft.teamBP2) : null,
+        winningTeam,
+        courtName: court,
+      })
+      return res.data
+    },
+    onSuccess: (_, vars) => {
+      // Clear the draft for this court
+      setCourtDrafts((prev) => ({
+        ...prev,
+        [vars.court]: {
+          teamAP1: '',
+          teamAP2: '',
+          teamBP1: '',
+          teamBP2: '',
+        },
+      }))
+      queryClient.invalidateQueries({ queryKey: ['matches', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+      alert(`Đã ghi nhận kết quả trận đấu cho [${vars.court}] thành công!`)
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể ghi nhận trận đấu!')
+    },
+  })
+
+  if (isLoading || !session) {
+    return (
+      <div className="text-center py-24 text-slate-600 text-sm animate-pulse space-y-3">
+        <DuckMascot size={56} rounded="2xl" className="mx-auto" />
+        <p className="font-semibold">Đang tải trung tâm điều khiển Host...</p>
+      </div>
+    )
+  }
+
+  const rosterUsers = session.participants || []
+
+  // Helper to get available users for a specific court dropdown
+  const getAvailableUsersForCourt = (courtName: string, currentSelection: string) => {
+    const draft = courtDrafts[courtName] || currentDraft
+    const selectedInThisCourt = new Set(
+      [draft.teamAP1, draft.teamAP2, draft.teamBP1, draft.teamBP2].filter(
+        (pid) => pid && pid !== currentSelection
+      )
+    )
+
+    // Sort by lowest sets played first to promote fair-play rotation
+    return [...rosterUsers]
+      .filter((u) => {
+        const idKey = String(u.userId || u.id)
+        return !selectedInThisCourt.has(idKey)
+      })
+      .sort((a, b) => {
+        const statsA = playerStatsMap[String(a.userId || a.id)]?.totalSets || 0
+        const statsB = playerStatsMap[String(b.userId || b.id)]?.totalSets || 0
+        if (statsA !== statsB) return statsA - statsB
+        return (a.eloScore || 0) - (b.eloScore || 0)
+      })
+  }
+
+  // Auto Fair-Play Match Suggestion for the current court
+  const handleAutoSuggestFairMatch = (courtName: string) => {
+    const assignedInOtherCourters = new Set<string>()
+    Object.entries(courtDrafts).forEach(([cName, d]) => {
+      if (cName !== courtName) {
+        if (d.teamAP1) assignedInOtherCourters.add(d.teamAP1)
+        if (d.teamAP2) assignedInOtherCourters.add(d.teamAP2)
+        if (d.teamBP1) assignedInOtherCourters.add(d.teamBP1)
+        if (d.teamBP2) assignedInOtherCourters.add(d.teamBP2)
+      }
+    })
+
+    const pool = [...rosterUsers]
+      .filter((u) => !assignedInOtherCourters.has(String(u.userId || u.id)))
+      .sort((a, b) => {
+        const setsA = playerStatsMap[String(a.userId || a.id)]?.totalSets || 0
+        const setsB = playerStatsMap[String(b.userId || b.id)]?.totalSets || 0
+        if (setsA !== setsB) return setsA - setsB
+        return (a.eloScore || 0) - (b.eloScore || 0)
+      })
+
+    if (pool.length < 2) {
+      alert('Không đủ người chơi rảnh để tự động xếp cặp!')
+      return
+    }
+
+    if (pool.length >= 4) {
+      const p1 = String(pool[0].userId || pool[0].id)
+      const p2 = String(pool[3].userId || pool[3].id)
+      const p3 = String(pool[1].userId || pool[1].id)
+      const p4 = String(pool[2].userId || pool[2].id)
+
+      setCourtDrafts((prev) => ({
+        ...prev,
+        [courtName]: {
+          teamAP1: p1,
+          teamAP2: p2,
+          teamBP1: p3,
+          teamBP2: p4,
+        },
+      }))
+    } else {
+      const p1 = String(pool[0].userId || pool[0].id)
+      const p2 = String(pool[1].userId || pool[1].id)
+
+      setCourtDrafts((prev) => ({
+        ...prev,
+        [courtName]: {
+          teamAP1: p1,
+          teamAP2: '',
+          teamBP1: p2,
+          teamBP2: '',
+        },
+      }))
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Top Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition bg-white px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-sm w-fit"
+        >
+          <ArrowLeft size={15} />
+          <span>Quay lại trang chủ</span>
+        </button>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            disabled={autoSeedMutation.isPending}
+            onClick={() => autoSeedMutation.mutate()}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-sm active:scale-95 disabled:opacity-50"
+            title="Tự động nạp 8 thành viên ảo, điểm danh và xếp 6 set đấu"
+          >
+            <Sparkles size={13} className="text-amber-300" />
+            <span>{autoSeedMutation.isPending ? 'Đang mô phỏng...' : '⚡ Test nhanh 8 người & 6 set'}</span>
+          </button>
+
+          <button
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['session', id] })}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition shadow-sm"
+          >
+            <RefreshCw size={13} />
+            <span>Làm mới dữ liệu</span>
+          </button>
+
+          <button
+            onClick={() => navigate(`/sessions/${id}`)}
+            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition border border-slate-200"
+          >
+            Xem giao diện thành viên
+          </button>
+        </div>
+      </div>
+
+      {/* Host Command Center Banner */}
+      <div className="saas-card rounded-3xl p-6 sm:p-8 md:p-10 space-y-6 relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
+          <div className="space-y-3 max-w-2xl">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-full flex items-center gap-1.5">
+                <Shield size={14} className="text-slate-950" />
+                <span>Host Control Center</span>
+              </span>
+              <span className="text-xs text-slate-600 font-semibold">Sân: {session.venueName}</span>
+              <button
+                onClick={() => {
+                  const newCourts = window.prompt(
+                    'Cập nhật danh sách sân (phân tách bằng dấu phẩy):',
+                    session.courtNames || 'Sân 1, Sân 2'
+                  )
+                  if (!newCourts || !newCourts.trim()) return
+
+                  const newSlots = window.prompt(
+                    'Cập nhật số Slot tối đa (Max Slots) của ca:',
+                    String(session.maxSlots || 8)
+                  )
+                  const parsedSlots = newSlots ? Number(newSlots) : session.maxSlots
+
+                  updateCourtsMutation.mutate({
+                    newCourtNames: newCourts.trim(),
+                    newMaxSlots: parsedSlots,
+                  })
+                }}
+                className="text-xs font-bold px-3 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-white shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                title="Nhấn để sửa tên sân hoặc nâng/giảm slot nhanh"
+              >
+                <span>🏸 {session.courtNames || 'Sân 1, Sân 2'} ({courtList.length} Sân)</span>
+                <Edit2 size={11} className="text-slate-300" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <DuckMascot src="/duck-mascot.png" size={56} rounded="2xl" className="shadow-md border border-slate-200" />
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{session.title}</h1>
+                <p className="text-xs sm:text-sm text-slate-600 font-normal">
+                  {new Date(session.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} -{' '}
+                  {new Date(session.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}{' '}
+                  • Mục tiêu: <b>Tối thiểu {minTargetSets} set/người</b> • Định vị GPS: &le; 150m
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic Token Quick Box */}
+          <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div
+              onClick={() => setShowQrModal(true)}
+              className="w-16 h-16 bg-white p-1.5 rounded-xl flex items-center justify-center cursor-pointer shadow border border-slate-200 hover:scale-105 transition"
+              title="Nhấn để phóng to QR cho thành viên quét"
+            >
+              <QRCodeSVG value={session.checkinToken || 'NONE'} size={56} />
+            </div>
+
+            <div>
+              <span className="text-[11px] text-slate-500 block font-bold">Mã Token điểm danh (15p):</span>
+              <span className="text-2xl font-mono font-black text-slate-900 tracking-wider">
+                {session.checkinToken}
+              </span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-slate-500 font-medium">
+                  Hết hạn: {new Date(session.tokenExpiresAt!).toLocaleTimeString()}
+                </span>
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="text-[11px] text-slate-900 hover:underline font-bold flex items-center gap-0.5"
+                >
+                  <Maximize2 size={12} />
+                  <span>Phóng to</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Executive Metrics Dashboard */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-slate-200 text-xs relative z-10">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <span className="text-slate-500 font-bold block text-[11px]">Quân số hiện tại</span>
+            <span className="text-xl font-black text-slate-900 mt-1 block">
+              {session.bookedSlots} / {session.maxSlots} Người
+            </span>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <span className="text-slate-500 font-bold block text-[11px]">Đã điểm danh tại sân</span>
+            <span className="text-xl font-black text-emerald-700 mt-1 block">{session.checkedInSlots} Đã Đến</span>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <span className="text-slate-500 font-bold block text-[11px]">Doanh thu đã thu</span>
+            <span className="text-xl font-black text-slate-900 mt-1 block">
+              {Number(report?.totalRevenue || 0).toLocaleString()}đ
+            </span>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <span className="text-slate-500 font-bold block text-[11px]">Tổng số trận đã đánh</span>
+            <span className="text-xl font-black text-slate-900 mt-1 block">
+              {matches?.length || 0} Trận ({courtList.length} Sân)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+        <button
+          onClick={() => setActiveTab('roster')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+            activeTab === 'roster'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Users size={15} />
+          <span>1. Danh sách & Điểm danh ({session.participants?.length || 0})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('matchmaker')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+            activeTab === 'matchmaker'
+              ? 'bg-slate-950 text-white shadow-md shadow-slate-900/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Swords size={15} />
+          <span>2. Bắt kèo Đa Sân & Điều Tiết Set Cầu ({courtList.length} Sân)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('settle')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+            activeTab === 'settle'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <DollarSign size={15} />
+          <span>3. Quyết toán tài chính & MVP</span>
+        </button>
+      </div>
+
+      {/* TAB 1: LIVE ROSTER DASHBOARD TABLE */}
+      {activeTab === 'roster' && (
+        <div className="space-y-4">
+          <div className="saas-card rounded-2xl p-6 sm:p-8 space-y-4">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-200">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <UserCheck size={16} className="text-slate-900" />
+                <span>Quản lý danh sách người chơi & Hóa đơn</span>
+              </h2>
+              <span className="text-xs text-slate-600 font-medium">Duyệt vào sân, xác nhận cọc và thu tiền</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                    <th className="py-3 px-3 whitespace-nowrap">#</th>
+                    <th className="py-3 px-3 whitespace-nowrap">Người chơi</th>
+                    <th className="py-3 px-3 whitespace-nowrap">Phân loại</th>
+                    <th className="py-3 px-3 whitespace-nowrap">Số set & Sân vừa đánh</th>
+                    <th className="py-3 px-3 whitespace-nowrap">Điểm danh</th>
+                    <th className="py-3 px-3 whitespace-nowrap">Cọc giữ chỗ</th>
+                    <th className="py-3 px-3 whitespace-nowrap">Hóa đơn</th>
+                    <th className="py-3 px-3 whitespace-nowrap">Trạng thái thu</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap">Thao tác Host</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {session.participants?.map((p, idx) => {
+                    const isCheckedIn = p.checkinStatus === 'CHECKED_IN'
+                    const isPaid = p.paymentStatus === 'PAID'
+                    const pUid = String(p.userId || p.id)
+                    const stats = playerStatsMap[pUid] || { totalSets: 0, wins: 0, losses: 0, courtHistory: [] }
+
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50 transition">
+                        <td className="py-3.5 px-3 font-bold text-slate-400">{idx + 1}</td>
+
+                        <td className="py-3.5 px-3">
+                          <div className="flex items-center gap-2.5">
+                            <DuckMascot
+                              src={p.avatarUrl || '/duck-mascot.png'}
+                              size={34}
+                              rounded="xl"
+                              className="shrink-0 border border-slate-200 shadow-xs"
+                            />
+                            <div>
+                              <span className="font-bold text-slate-900 block text-sm">
+                                {p.name && p.name !== 'N/A' ? p.name : (p.phone || `Tay vợt #${idx + 1}`)}
+                              </span>
+                              <span className="text-[10px] text-slate-500">{p.phone || 'Chưa có SĐT'}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-3">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`text-[9px] px-2 py-0.5 rounded font-bold ${
+                                p.gender === 'FEMALE'
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                              }`}
+                            >
+                              {p.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
+                            </span>
+                            {p.isGuest ? (
+                              <span className="text-[9px] px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded font-bold">
+                                Vãng lai
+                              </span>
+                            ) : (
+                              <span className="text-[9px] px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-bold">
+                                Cố định
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`text-xs font-black px-2 py-0.5 rounded-lg border ${
+                                  stats.totalSets === 0
+                                    ? 'bg-rose-50 text-rose-700 border-rose-300 animate-pulse'
+                                    : stats.totalSets < minTargetSets
+                                    ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                }`}
+                              >
+                                🏸 {stats.totalSets} set
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-semibold">
+                                ({stats.wins}W - {stats.losses}L)
+                              </span>
+                            </div>
+                            {stats.lastCourt && (
+                              <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
+                                <MapPin size={10} className="text-slate-400" />
+                                <span>Vừa đánh: <b>{stats.lastCourt}</b></span>
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-3">
+                          {isCheckedIn ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 size={11} className="text-emerald-600" />
+                              <span>Đã điểm danh</span>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => manualCheckinMutation.mutate(p.id)}
+                              disabled={manualCheckinMutation.isPending}
+                              className="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-800 border border-dashed border-slate-300 hover:border-emerald-400 shadow-2xs hover:shadow-xs transition active:scale-95 cursor-pointer"
+                              title="Nhấp vào đây để duyệt điểm danh thủ công cho người này"
+                            >
+                              <Square size={13} className="text-slate-400 group-hover:text-emerald-600 transition" />
+                              <span>Chưa đến (Click duyệt)</span>
+                            </button>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-3">
+                          {p.checkinStatus === 'ABSENT' ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                              Đã hủy (Giữ cọc)
+                            </span>
+                          ) : !p.isGuest ? (
+                            <span className="text-slate-400 text-[10px] whitespace-nowrap font-medium">Cố định</span>
+                          ) : Number(p.depositAmount) === 0 || p.depositStatus === 'NONE' ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
+                              Miễn cọc
+                            </span>
+                          ) : (
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-lg whitespace-nowrap ${
+                                p.depositStatus === 'PAID'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                  : p.depositStatus === 'FORFEITED'
+                                  ? 'bg-purple-50 text-purple-800 border border-purple-200'
+                                  : 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse'
+                              }`}
+                            >
+                              {p.depositStatus === 'PAID'
+                                ? 'Đã nhận cọc'
+                                : p.depositStatus === 'FORFEITED'
+                                ? 'Cọc đã vào quỹ'
+                                : 'Chờ duyệt cọc'}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-3">
+                          <span className="font-mono font-bold text-slate-900 block text-xs whitespace-nowrap">
+                            {p.finalFee?.toLocaleString()}đ
+                          </span>
+                          {p.durationHours && (
+                            <span className="text-[10px] text-indigo-700 font-bold block whitespace-nowrap">
+                              ⏱️ Đánh {p.durationHours}h
+                            </span>
+                          )}
+                          {p.adjustmentAmount !== 0 && (
+                            <span className="text-[10px] text-amber-600 block whitespace-nowrap">
+                              Điều chỉnh: {p.adjustmentAmount > 0 ? '+' : ''}
+                              {p.adjustmentAmount?.toLocaleString()}đ
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-3">
+                          <span
+                            className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${
+                              isPaid
+                                ? p.paymentMethod === 'CASH'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                                  : 'bg-indigo-50 text-indigo-800 border border-indigo-300'
+                                : p.paymentMethod === 'CASH'
+                                ? 'bg-amber-50 text-amber-900 border border-amber-300'
+                                : p.paymentMethod === 'VIETQR'
+                                ? 'bg-blue-50 text-blue-900 border border-blue-300'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}
+                          >
+                            {isPaid
+                              ? p.paymentMethod === 'CASH'
+                                ? 'Đã thanh toán (Tiền mặt)'
+                                : 'Đã thanh toán (VietQR)'
+                              : p.paymentMethod === 'CASH'
+                              ? 'Chưa thanh toán (Tiền mặt)'
+                              : p.paymentMethod === 'VIETQR'
+                              ? 'Chưa thanh toán (Chuyển khoản)'
+                              : 'Chưa thanh toán'}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                            {!isCheckedIn && (
+                              <button
+                                onClick={() => manualCheckinMutation.mutate(p.id)}
+                                disabled={manualCheckinMutation.isPending}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black shadow-xs transition active:scale-95 whitespace-nowrap flex items-center gap-1"
+                                title="Host điểm danh thủ công (Duyệt người này đã có mặt tại sân)"
+                              >
+                                <CheckCircle2 size={12} />
+                                <span>Duyệt đến</span>
+                              </button>
+                            )}
+
+                            {p.isGuest && Number(p.depositAmount) > 0 && p.depositStatus !== 'PAID' && (
+                              <button
+                                onClick={() => confirmDepositMutation.mutate(p.id)}
+                                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-bold transition"
+                                title="Xác nhận đã nhận cọc vãng lai"
+                              >
+                                Đã nhận cọc
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                setSelectedParticipant(p)
+                                setAdjustmentAmount(p.adjustmentAmount || 0)
+                                setAdjustmentReason(p.adjustmentReason || '')
+                              }}
+                              className="p-1 text-slate-500 hover:text-slate-900 rounded-md hover:bg-slate-100 transition"
+                              title="Điều chỉnh tiền (về sớm, sự cố...)"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+
+                            {!isPaid && (
+                              <button
+                                onClick={() => setSettlingParticipant(p)}
+                                className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-[11px] shadow transition active:scale-95"
+                              >
+                                Thu tiền
+                              </button>
+                            )}
+
+                            {/* Delete / Cancel Registration Slot Button */}
+                            {!isCheckedIn && p.checkinStatus !== 'ABSENT' && (
+                              <button
+                                onClick={() => handleRemoveParticipant(p)}
+                                className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
+                                title="Hủy đăng ký / Xóa slot nhường cho người khác"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: MULTI-COURT MATCHMAKER & FAIR-PLAY SETS ROTATION */}
+      {activeTab === 'matchmaker' && (
+        <div className="space-y-6">
+          {/* FAIR-PLAY SETS DISTRIBUTION MONITOR */}
+          <div className="saas-card rounded-2xl p-5 sm:p-6 space-y-4 border border-slate-200/90 shadow-sm bg-gradient-to-r from-slate-50/50 via-white to-slate-50/30">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={18} className="text-slate-900" />
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    Bảng Điều Tiết Set Cầu Công Bằng (Mục tiêu: Tối thiểu {minTargetSets} set/người)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Theo dõi số set đã đánh và đối chứng sân cụ thể của từng thành viên
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="inline-flex items-center gap-1 font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 text-[10px]">
+                  🔴 Cần ưu tiên (&le;1 set)
+                </span>
+                <span className="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 text-[10px]">
+                  🟡 Đang xoay tua
+                </span>
+                <span className="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 text-[10px]">
+                  🟢 Đạt chỉ tiêu ({minTargetSets}+ set)
+                </span>
+              </div>
+            </div>
+
+            {/* Player Sets Grid with Avatar & Court History Badge */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {rosterUsers
+                .map((u) => {
+                  const uid = String(u.userId || u.id)
+                  const stats = playerStatsMap[uid] || { totalSets: 0, wins: 0, losses: 0, courtHistory: [] }
+                  const rank = getLolRank(u.eloScore || 0)
+                  return { ...u, stats, rank }
+                })
+                .sort((a, b) => a.stats.totalSets - b.stats.totalSets)
+                .map((u) => {
+                  const isLow = u.stats.totalSets <= 1
+                  const isEnough = u.stats.totalSets >= minTargetSets
+
+                  return (
+                    <div
+                      key={u.id}
+                      className={`p-3 rounded-2xl border transition relative overflow-hidden ${
+                        isLow
+                          ? 'bg-rose-50/70 border-rose-300 ring-1 ring-rose-400/20'
+                          : isEnough
+                          ? 'bg-emerald-50/60 border-emerald-200'
+                          : 'bg-white border-slate-200 shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <DuckMascot
+                          src={u.avatarUrl || '/duck-mascot.png'}
+                          size={40}
+                          rounded="xl"
+                          className="shrink-0 border border-slate-200 shadow-xs"
+                        />
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-bold text-slate-900 text-xs truncate block" title={u.name}>
+                              {u.name}
+                            </span>
+                            <span
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-md shrink-0 ${
+                                isLow
+                                  ? 'bg-rose-600 text-white'
+                                  : isEnough
+                                  ? 'bg-emerald-700 text-white'
+                                  : 'bg-slate-900 text-white'
+                              }`}
+                            >
+                              {u.stats.totalSets} set
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between mt-1 text-[10px] text-slate-500">
+                            <span className="font-semibold">{u.rank.badge} ({u.eloScore || 0} LP)</span>
+                            <span className="font-mono">
+                              {u.stats.wins}W - {u.stats.losses}L
+                            </span>
+                          </div>
+
+                          {/* Court audit proof */}
+                          <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[10px]">
+                            <span className="text-slate-400 text-[9px] uppercase font-bold">Vừa đánh:</span>
+                            <span className="font-bold text-slate-700 truncate max-w-[110px]">
+                              {u.stats.lastCourt ? `🏸 ${u.stats.lastCourt}` : 'Chưa vào sân'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+
+          {/* MULTI-COURT PARALLEL MANAGEMENT TABS */}
+          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0 mr-1">
+                <Layers size={14} /> Chọn sân bắt kèo:
+              </span>
+              {courtList.map((cName, idx) => {
+                const draft = courtDrafts[cName]
+                const hasDraft = draft && (draft.teamAP1 || draft.teamBP1)
+                const isActive = activeCourtIndex === idx
+
+                return (
+                  <div key={cName} className="flex items-center gap-1">
+                    <button
+                      onClick={() => setActiveCourtIndex(idx)}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 shrink-0 border ${
+                        isActive
+                          ? 'bg-slate-950 text-white border-slate-950 shadow-md scale-102'
+                          : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <span>🏸 {cName}</span>
+                      {hasDraft && (
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" title="Đang xếp cặp" />
+                      )}
+                    </button>
+                    {isActive && courtList.length > 1 && (
+                      <button
+                        onClick={() => handleRemoveCourt(cName)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                        title={`Xóa ${cName}`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Add Court Button for Flexible Multi-court expansion */}
+            <button
+              onClick={handleAddCourt}
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 rounded-xl text-xs font-black transition flex items-center gap-1.5 shrink-0 shadow-xs active:scale-95"
+              title="Mở thêm sân song song cho ca đấu này"
+            >
+              <Plus size={14} className="text-rose-600 font-bold" />
+              <span>Thêm Sân (+Sân N)</span>
+            </button>
+          </div>
+
+          {/* HIGH-END SPORTS MATCHMAKER ARENA */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left: Court Match Setup for Selected Court (7 cols) */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="saas-card rounded-3xl p-6 sm:p-8 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+                  <div>
+                    <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                      <Swords size={18} className="text-slate-950" />
+                      <span>Sàn đấu: {currentCourtName}</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Bắt cặp đối đầu cân bằng • Tự động tính Elo & Lưu vết sân đã đánh
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleAutoSuggestFairMatch(currentCourtName)}
+                    className="px-3.5 py-2 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-xl text-xs shadow-md flex items-center gap-1.5 transition active:scale-95 shrink-0"
+                  >
+                    <Sparkles size={14} className="text-amber-400" />
+                    <span>Ghép Kèo Công Bằng (Ưu tiên người ít set)</span>
+                  </button>
+                </div>
+
+                {/* Light & Clean Sports Arena Layout */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* TEAM BLUE CARD */}
+                  <div className="bg-blue-50/40 rounded-2xl p-5 border border-blue-200/80 space-y-4 shadow-xs relative overflow-hidden">
+                    <div className="flex items-center justify-between pb-2.5 border-b border-blue-200/60">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shadow-xs" />
+                        <span className="font-black text-xs text-blue-700 tracking-wider uppercase">TEAM BLUE</span>
+                      </div>
+                      <span className="text-[10px] text-blue-600/80 font-bold uppercase tracking-wider bg-blue-100/60 px-2 py-0.5 rounded-md">Cặp đấu 1</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">Player 1</label>
+                      <select
+                        value={currentDraft.teamAP1}
+                        onChange={(e) => updateCurrentDraft('teamAP1', e.target.value)}
+                        className="w-full bg-white border border-slate-200 hover:border-blue-400 rounded-xl p-2.5 text-slate-900 font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-none text-xs shadow-xs transition"
+                      >
+                        <option value="">Chọn tay vợt...</option>
+                        {getAvailableUsersForCourt(currentCourtName, currentDraft.teamAP1).map((u) => {
+                          const rank = getLolRank(u.eloScore || 0)
+                          const stats = playerStatsMap[String(u.userId || u.id)]
+                          return (
+                            <option key={u.id} value={String(u.userId || u.id)}>
+                              {u.name} • {rank.badge} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
+                              {u.isGuest ? '[Vãng lai]' : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">Player 2 (Đánh đôi)</label>
+                      <select
+                        value={currentDraft.teamAP2}
+                        onChange={(e) => updateCurrentDraft('teamAP2', e.target.value)}
+                        className="w-full bg-white border border-slate-200 hover:border-blue-400 rounded-xl p-2.5 text-slate-900 font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-none text-xs shadow-xs transition"
+                      >
+                        <option value="">(Không có - Đánh đơn)</option>
+                        {getAvailableUsersForCourt(currentCourtName, currentDraft.teamAP2).map((u) => {
+                          const rank = getLolRank(u.eloScore || 0)
+                          const stats = playerStatsMap[String(u.userId || u.id)]
+                          return (
+                            <option key={u.id} value={String(u.userId || u.id)}>
+                              {u.name} • {rank.badge} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
+                              {u.isGuest ? '[Vãng lai]' : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* TEAM RED CARD */}
+                  <div className="bg-rose-50/40 rounded-2xl p-5 border border-rose-200/80 space-y-4 shadow-xs relative overflow-hidden">
+                    <div className="flex items-center justify-between pb-2.5 border-b border-rose-200/60">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-600 shadow-xs" />
+                        <span className="font-black text-xs text-rose-700 tracking-wider uppercase">TEAM RED</span>
+                      </div>
+                      <span className="text-[10px] text-rose-600/80 font-bold uppercase tracking-wider bg-rose-100/60 px-2 py-0.5 rounded-md">Cặp đấu 2</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">Player 1</label>
+                      <select
+                        value={currentDraft.teamBP1}
+                        onChange={(e) => updateCurrentDraft('teamBP1', e.target.value)}
+                        className="w-full bg-white border border-slate-200 hover:border-rose-400 rounded-xl p-2.5 text-slate-900 font-bold focus:border-rose-600 focus:ring-2 focus:ring-rose-100 focus:outline-none text-xs shadow-xs transition"
+                      >
+                        <option value="">Chọn tay vợt...</option>
+                        {getAvailableUsersForCourt(currentCourtName, currentDraft.teamBP1).map((u) => {
+                          const rank = getLolRank(u.eloScore || 0)
+                          const stats = playerStatsMap[String(u.userId || u.id)]
+                          return (
+                            <option key={u.id} value={String(u.userId || u.id)}>
+                              {u.name} • {rank.badge} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
+                              {u.isGuest ? '[Vãng lai]' : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">Player 2 (Đánh đôi)</label>
+                      <select
+                        value={currentDraft.teamBP2}
+                        onChange={(e) => updateCurrentDraft('teamBP2', e.target.value)}
+                        className="w-full bg-white border border-slate-200 hover:border-rose-400 rounded-xl p-2.5 text-slate-900 font-bold focus:border-rose-600 focus:ring-2 focus:ring-rose-100 focus:outline-none text-xs shadow-xs transition"
+                      >
+                        <option value="">(Không có - Đánh đơn)</option>
+                        {getAvailableUsersForCourt(currentCourtName, currentDraft.teamBP2).map((u) => {
+                          const rank = getLolRank(u.eloScore || 0)
+                          const stats = playerStatsMap[String(u.userId || u.id)]
+                          return (
+                            <option key={u.id} value={String(u.userId || u.id)}>
+                              {u.name} • {rank.badge} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
+                              {u.isGuest ? '[Vãng lai]' : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 1-Touch Record Buttons for Current Court */}
+                <div className="space-y-2.5 pt-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
+                    <span>Ghi nhận kết quả trận đấu trên [{currentCourtName}]:</span>
+                    <span>1 chạm (+1 Win / -1 Loss / +1 Set cho cả cặp)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <button
+                      disabled={
+                        !currentDraft.teamAP1 || !currentDraft.teamBP1 || recordMatchMutation.isPending
+                      }
+                      onClick={() =>
+                        recordMatchMutation.mutate({ winningTeam: 'A', court: currentCourtName })
+                      }
+                      className="py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-black rounded-2xl text-xs shadow-md shadow-blue-500/20 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-white" />
+                      <span>Team Blue Thắng (+1 Win)</span>
+                    </button>
+
+                    <button
+                      disabled={
+                        !currentDraft.teamAP1 || !currentDraft.teamBP1 || recordMatchMutation.isPending
+                      }
+                      onClick={() =>
+                        recordMatchMutation.mutate({ winningTeam: 'B', court: currentCourtName })
+                      }
+                      className="py-3.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-black rounded-2xl text-xs shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-white" />
+                      <span>Team Red Thắng (+1 Win)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Matches Feed with Court Indicators (5 cols) */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="saas-card rounded-3xl p-6 sm:p-8 space-y-4">
+                <h3 className="text-base font-bold text-slate-900 flex items-center justify-between pb-3.5 border-b border-slate-200">
+                  <span>Lịch sử các trận đấu theo Sân</span>
+                  <span className="text-xs text-slate-500 font-medium">{matches?.length || 0} trận</span>
+                </h3>
+
+                <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
+                  {matches?.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-xs">
+                      Chưa có trận nào được ghi nhận
+                    </div>
+                  ) : (
+                    matches?.map((m) => (
+                      <div
+                        key={m.id}
+                        className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2 hover:border-slate-300 transition shadow-sm text-xs"
+                      >
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                          <span className="font-bold px-2.5 py-0.5 bg-slate-100 text-slate-900 rounded-md text-[11px] border border-slate-200">
+                            🏸 {m.courtName || 'Sân chính'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {new Date(m.createdAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div
+                            className={`font-bold flex items-center justify-between ${
+                              m.winningTeam === 'A' ? 'text-slate-950' : 'text-slate-400'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                              <span>{m.teamAPlayer1Name} {m.teamAPlayer2Name && `+ ${m.teamAPlayer2Name}`}</span>
+                            </span>
+                            {m.winningTeam === 'A' && (
+                              <span className="text-[10px] bg-cyan-50 text-cyan-800 border border-cyan-200 px-2 py-0.5 rounded-md font-black">
+                                👑 THẮNG
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className={`font-bold flex items-center justify-between ${
+                              m.winningTeam === 'B' ? 'text-slate-950' : 'text-slate-400'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                              <span>{m.teamBPlayer1Name} {m.teamBPlayer2Name && `+ ${m.teamBPlayer2Name}`}</span>
+                            </span>
+                            {m.winningTeam === 'B' && (
+                              <span className="text-[10px] bg-rose-50 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-md font-black">
+                                👑 THẮNG
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: FINANCIAL SETTLEMENT DASHBOARD */}
+      {activeTab === 'settle' && report && (
+        <div className="space-y-6">
+          {/* Session MVP Highlight Box */}
+          {report.mvpUserId && report.mvpWins && report.mvpWins > 0 && (
+            <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 rounded-3xl p-6 sm:p-8 text-slate-950 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
+              <div className="flex items-center gap-4 relative z-10">
+                <div className="w-16 h-16 rounded-2xl bg-slate-950 text-amber-400 flex items-center justify-center font-black text-3xl shadow-lg shrink-0">
+                  🏆
+                </div>
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-950 text-amber-300 text-xs font-black uppercase tracking-wider mb-1">
+                    <span>Vinh danh MVP Ca Đấu</span>
+                  </div>
+                  <h3 className="text-2xl font-black">{report.mvpName}</h3>
+                  <p className="text-xs font-bold text-slate-900 mt-0.5">
+                    Thắng nhiều nhất ca: <b>{report.mvpWins} Trận Thắng</b> (-{report.mvpLosses} Thua)
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-yellow-200 text-center sm:text-right shrink-0 shadow-md relative z-10">
+                <span className="text-[11px] font-black uppercase text-amber-900 block">
+                  Phần thưởng MVP Ca Đấu
+                </span>
+                <span className="font-black text-sm text-slate-950 block mt-0.5">
+                  🥤 Tặng 01 Nước giải khát Revive / Pocari
+                </span>
+                <span className="text-[10px] text-slate-600 block mt-1 font-semibold">
+                  (Host trao tặng trực tiếp tại sân)
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="saas-card rounded-3xl p-6 sm:p-8 md:p-10 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Receipt size={18} className="text-slate-900" />
+                  <span>Báo cáo Quyết toán Doanh thu & Chi phí Ca</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">Báo cáo tài chính minh bạch cho Host</p>
+              </div>
+
+              <span className="text-xs font-bold px-3 py-1 bg-slate-100 text-slate-800 rounded-full">
+                {session.title}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column: Thu */}
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-3.5 text-xs">
+                <span className="font-bold text-slate-900 block text-sm border-b border-slate-200 pb-2">
+                  1. Tổng các khoản THU
+                </span>
+
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Tổng người chơi đăng ký:</span>
+                  <span className="font-bold text-slate-900">{report.totalPlayers} người</span>
+                </div>
+
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Đã thanh toán đủ tiền:</span>
+                  <span className="font-bold text-emerald-700">{report.paidPlayers} người</span>
+                </div>
+
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Chưa hoàn tất thanh toán:</span>
+                  <span className="font-bold text-rose-600">{report.unpaidPlayers} người</span>
+                </div>
+
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Tiền cọc vãng lai đã thu:</span>
+                  <span className="font-bold text-slate-900">
+                    {Number(report.totalDepositCollected).toLocaleString()}đ
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-sm font-black text-slate-900">
+                  <span>Tổng tiền sân THU ĐƯỢC:</span>
+                  <span className="text-emerald-700">{Number(report.totalRevenue).toLocaleString()}đ</span>
+                </div>
+              </div>
+
+              {/* Right Column: Chi & Net Profit */}
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-3.5 text-xs">
+                <span className="font-bold text-slate-900 block text-sm border-b border-slate-200 pb-2">
+                  2. Tổng các khoản CHI & Lợi Nhuận
+                </span>
+
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Tiền thuê sân (Host trả chủ sân):</span>
+                  <span className="font-bold text-slate-900">{Number(report.costCourt).toLocaleString()}đ</span>
+                </div>
+
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Tiền cầu lông (Ống cầu tiêu hao):</span>
+                  <span className="font-bold text-slate-900">
+                    {Number(report.costShuttlecock).toLocaleString()}đ
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Tổng chi phí vận hành:</span>
+                  <span className="font-bold text-rose-600">
+                    {Number(report.totalExpenses).toLocaleString()}đ
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-sm font-black">
+                  <span className="text-slate-900">LỢI NHUẬN RÒNG (Net):</span>
+                  <span
+                    className={`text-base font-black ${
+                      report.netProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                    }`}
+                  >
+                    {Number(report.netProfit).toLocaleString()}đ
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Override Bill Modal */}
+      {selectedParticipant && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-slate-900 text-sm">Điều chỉnh tiền: {selectedParticipant.name}</h3>
+              <button
+                onClick={() => setSelectedParticipant(null)}
+                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Số tiền điều chỉnh (VND) (Nhập số âm nếu giảm, dương nếu tăng):
+                </label>
+                <input
+                  type="number"
+                  step="5000"
+                  value={adjustmentAmount}
+                  onChange={(e) => setAdjustmentAmount(Number(e.target.value))}
+                  placeholder="Ví dụ: -15000"
+                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 font-bold focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Lý do điều chỉnh:</label>
+                <input
+                  type="text"
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                  placeholder="Về sớm 1 tiếng / Sự cố sân..."
+                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-[11px] text-slate-600">
+                <p>Tiền gốc: {selectedParticipant.baseFee?.toLocaleString()}đ</p>
+                <p className="font-bold text-slate-900">
+                  Thành tiền mới:{' '}
+                  {Math.max(0, selectedParticipant.baseFee + adjustmentAmount).toLocaleString()}đ
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+              <button
+                onClick={() => setSelectedParticipant(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={overrideBillMutation.isPending}
+                onClick={() => overrideBillMutation.mutate()}
+                className="px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow active:scale-95"
+              >
+                Lưu điều chỉnh
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen QR Code Modal */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center space-y-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Quét mã để điểm danh
+              </span>
+              <button
+                onClick={() => setShowQrModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl shadow-inner border border-slate-200 inline-block">
+              <QRCodeSVG value={session.checkinToken || 'NONE'} size={240} />
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-3xl font-mono font-black text-slate-900 tracking-wider">
+                {session.checkinToken}
+              </span>
+              <p className="text-xs text-slate-500 font-medium">
+                Mã làm mới mỗi 15 phút. Yêu cầu bật định vị GPS tại sân.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowQrModal(false)}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow active:scale-95"
+            >
+              Đóng cửa sổ QR
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Settle Payment Modal (Thu tiền - Cash vs VietQR) */}
+      {settlingParticipant && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-5 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <DollarSign size={20} className="text-emerald-600" />
+                <h3 className="text-sm font-black text-slate-900">Xác nhận thu tiền sân</h3>
+              </div>
+              <button
+                onClick={() => setSettlingParticipant(null)}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Người chơi:</span>
+                <span className="font-bold text-slate-900 text-sm">{settlingParticipant.name}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Số điện thoại:</span>
+                <span className="font-mono text-slate-700">{settlingParticipant.phone}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>Loại khách:</span>
+                <span className="font-bold text-slate-800">
+                  {settlingParticipant.isGuest ? 'Khách Vãng lai' : 'Thành viên CLB'}
+                </span>
+              </div>
+              {settlingParticipant.paymentMethod && (
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Khách chọn trước:</span>
+                  <span className="font-bold px-2 py-0.5 bg-amber-100 text-amber-900 rounded-md text-[11px]">
+                    {settlingParticipant.paymentMethod === 'CASH' ? '💵 Tiền mặt' : '⚡ Chuyển khoản VietQR'}
+                  </span>
+                </div>
+              )}
+              <div className="pt-2 border-t border-slate-200 flex justify-between items-center font-bold text-slate-900">
+                <span>Số tiền cần thu:</span>
+                <span className="text-base font-black text-emerald-700 font-mono">
+                  {Number(settlingParticipant.remainingAmount).toLocaleString()}đ
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <p className="text-[11px] text-slate-500 font-medium text-center">
+                Chọn hình thức nhận tiền thực tế để hoàn tất quyết toán:
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  disabled={settlePaymentMutation.isPending}
+                  onClick={() => {
+                    settlePaymentMutation.mutate(
+                      { participantId: settlingParticipant.id, method: 'CASH' },
+                      {
+                        onSuccess: () => setSettlingParticipant(null),
+                      }
+                    )
+                  }}
+                  className="py-3 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 transition"
+                >
+                  <span>💵 Thu TIỀN MẶT</span>
+                </button>
+
+                <button
+                  disabled={settlePaymentMutation.isPending}
+                  onClick={() => {
+                    settlePaymentMutation.mutate(
+                      { participantId: settlingParticipant.id, method: 'VIETQR' },
+                      {
+                        onSuccess: () => setSettlingParticipant(null),
+                      }
+                    )
+                  }}
+                  className="py-3 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 active:scale-95 transition"
+                >
+                  <span>⚡ Thu qua VIETQR</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setSettlingParticipant(null)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition"
+              >
+                Đóng / Hủy bỏ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
