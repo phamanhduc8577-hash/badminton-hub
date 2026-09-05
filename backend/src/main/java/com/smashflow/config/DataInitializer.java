@@ -42,10 +42,27 @@ public class DataInitializer {
             }
 
             // Check if host exists
-            if (!userRepository.existsByPhone("0901234567")) {
+            if (!userRepository.existsByPhone("0325872682")) {
                 User host = User.builder()
-                        .phone("0901234567")
+                        .phone("0325872682")
                         .fullName("Phạm Anh Đức")
+                        .password(passwordEncoder.encode("040304"))
+                        .gender(Gender.MALE)
+                        .role(Role.HOST)
+                        .membershipType(MembershipType.FIXED)
+                        .avatarUrl("/duck-host-sassy.png")
+                        .winCount(12)
+                        .lossCount(3)
+                        .eloScore(9)
+                        .sessionsAttended(25)
+                        .build();
+                userRepository.save(host);
+            }
+
+            if (!userRepository.existsByPhone("0901234567")) {
+                User hostBackup = User.builder()
+                        .phone("0901234567")
+                        .fullName("Phạm Anh Đức (Admin)")
                         .password(passwordEncoder.encode("123456"))
                         .gender(Gender.MALE)
                         .role(Role.HOST)
@@ -56,7 +73,7 @@ public class DataInitializer {
                         .eloScore(9)
                         .sessionsAttended(25)
                         .build();
-                userRepository.save(host);
+                userRepository.save(hostBackup);
 
                 // Create comprehensive test roster for full matchmaking & testing
                 String[][] members = {
