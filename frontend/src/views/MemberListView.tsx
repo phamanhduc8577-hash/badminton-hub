@@ -18,6 +18,7 @@ import {
   Award,
   KeyRound,
   Edit2,
+  RotateCcw,
   X,
 } from 'lucide-react'
 
@@ -121,6 +122,23 @@ export const MemberListView: React.FC = () => {
     },
     onError: (err: any) => {
       alert(err.response?.data?.message || 'Không thể cập nhật Rank!')
+    },
+  })
+
+  // Host Clear Database Mutation
+  const resetDbMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post('/members/reset-database-clean')
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
+      alert('Đã dọn sạch database và reset thông số Host về 0 thành công!')
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể dọn dẹp database!')
     },
   })
 
@@ -354,7 +372,7 @@ export const MemberListView: React.FC = () => {
 
                     <td className="py-3.5 px-3">
                       <span className="font-bold text-slate-900 block">
-                        {m.winCount}W - {m.lossCount}L
+                        {m.winCount} Win - {m.lossCount} Lose
                       </span>
                       <span className="text-[10px] text-emerald-600 font-bold">{m.winRate}% Thắng</span>
                     </td>
@@ -389,7 +407,33 @@ export const MemberListView: React.FC = () => {
                     {user?.role === 'HOST' && (
                       <td className="py-3.5 px-3 text-right">
                         {m.role === 'HOST' ? (
-                          <span className="text-[10px] text-slate-400 font-bold italic">Host Mặc định</span>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setEditingRankMember(m)
+                                setManualLpInput(m.eloScore || 0)
+                                setManualPlacementsInput(m.placementMatches ?? 5)
+                                setManualShieldInput(m.shieldMatches ?? 0)
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 rounded-xl transition border border-slate-200"
+                              title="Chỉnh sửa Bậc Rank / LP trực tiếp cho Host"
+                            >
+                              <Award size={13} className="text-amber-600" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm('Bạn có chắc chắn muốn XÓA SẠCH toàn bộ dữ liệu database (ca sân, thành viên test, lịch sử) và reset thông số Host về 0?')) {
+                                  resetDbMutation.mutate()
+                                }
+                              }}
+                              disabled={resetDbMutation.isPending}
+                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-[10px] font-bold transition active:scale-95 flex items-center gap-1"
+                              title="Dọn dẹp sạch toàn bộ database về 0"
+                            >
+                              <RotateCcw size={11} />
+                              <span>{resetDbMutation.isPending ? 'Đang xóa...' : 'Clear về 0'}</span>
+                            </button>
+                          </div>
                         ) : (
                           <div className="flex items-center justify-end gap-1.5">
                             {/* Nút Host Chỉnh Sửa Rank trực tiếp */}

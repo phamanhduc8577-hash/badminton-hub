@@ -63,4 +63,10 @@ public class MemberController {
         String msg = memberManagementService.resetMemberPassword(userId);
         return ResponseEntity.ok(java.util.Map.of("message", msg));
     }
+
+    @PostMapping("/reset-database-clean")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<java.util.Map<String, Object>> resetDatabaseClean() {
+        return ResponseEntity.ok(memberManagementService.resetDatabaseClean());
+    }
 }

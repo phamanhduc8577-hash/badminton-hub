@@ -20,6 +20,7 @@ public class MemberManagementService {
     private final UserRepository userRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final TelegramNotificationService telegramNotificationService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     public List<MemberProfileResponse> getAllMembers(User currentUser) {
         boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
@@ -107,6 +108,39 @@ public class MemberManagementService {
         } catch (Exception ignored) {}
 
         return "Đã đặt lại mật khẩu cho " + user.getFullName() + " về mặc định: " + defaultPass;
+    }
+
+    @Transactional
+    public java.util.Map<String, Object> resetDatabaseClean() {
+        try {
+            jdbcTemplate.execute("DELETE FROM matches;");
+            jdbcTemplate.execute("DELETE FROM session_participants;");
+            jdbcTemplate.execute("DELETE FROM loyalty_rewards;");
+            jdbcTemplate.execute("DELETE FROM sessions;");
+            jdbcTemplate.execute("DELETE FROM venues;");
+            jdbcTemplate.execute("UPDATE users SET win_count = 0, loss_count = 0, elo_score = 0, sessions_attended = 0, placement_matches = 0, current_streak = 0, shield_matches = 0 WHERE phone = '0325872682';");
+            jdbcTemplate.execute("DELETE FROM users WHERE phone != '0325872682';");
+
+            userRepository.findByPhone("0325872682").ifPresent(host -> {
+                host.setRole(Role.HOST);
+                host.setMembershipType(MembershipType.FIXED);
+                host.setPassword(passwordEncoder.encode("040304"));
+                host.setFullName("Phạm Anh Đức");
+                host.setAvatarUrl("/duck-host-sassy.png");
+                host.setWinCount(0);
+                host.setLossCount(0);
+                host.setEloScore(0);
+                host.setSessionsAttended(0);
+                host.setPlacementMatches(0);
+                host.setCurrentStreak(0);
+                host.setShieldMatches(0);
+                userRepository.save(host);
+            });
+
+            return java.util.Map.of("success", true, "message", "Đã dọn dẹp sạch toàn bộ database và reset Host về 0!");
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi dọn dẹp database: " + e.getMessage());
+        }
     }
 
     private MemberProfileResponse toResponse(User u, boolean isHost) {
