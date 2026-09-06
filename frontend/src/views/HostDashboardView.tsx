@@ -6,6 +6,7 @@ import { SessionItem, Participant, Match, HostReport } from '../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { DuckMascot } from '../components/DuckMascot'
 import { getPlayerRankDisplay, getLolRank } from '../lib/ranks'
+import { CurrencyInput } from '../components/CurrencyInput'
 import {
   Users,
   Swords,
@@ -1487,14 +1488,37 @@ export const HostDashboardView: React.FC = () => {
                 <label className="block text-slate-700 font-bold mb-1">
                   Số tiền điều chỉnh (VND) (Nhập số âm nếu giảm, dương nếu tăng):
                 </label>
-                <input
-                  type="number"
-                  step="5000"
-                  value={adjustmentAmount}
-                  onChange={(e) => setAdjustmentAmount(Number(e.target.value))}
-                  placeholder="Ví dụ: -15000"
-                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 font-bold focus:outline-none focus:border-slate-900"
-                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdjustmentAmount((prev) => -Math.abs(prev || 10000))}
+                    className={`px-3 py-2 rounded-xl font-bold text-xs border transition ${
+                      adjustmentAmount < 0
+                        ? 'bg-rose-50 text-rose-700 border-rose-300'
+                        : 'bg-white text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    - Giảm tiền
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustmentAmount((prev) => Math.abs(prev || 10000))}
+                    className={`px-3 py-2 rounded-xl font-bold text-xs border transition ${
+                      adjustmentAmount >= 0
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : 'bg-white text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    + Tăng phụ thu
+                  </button>
+                  <div className="flex-1">
+                    <CurrencyInput
+                      value={Math.abs(adjustmentAmount)}
+                      onChange={(val) => setAdjustmentAmount(adjustmentAmount < 0 ? -val : val)}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
@@ -18,6 +18,10 @@ import {
   DollarSign,
   Shield,
   ArrowLeft,
+  Calendar,
+  Sparkles,
+  Check,
+  X,
 } from 'lucide-react'
 
 export const SessionDetailView: React.FC = () => {
@@ -28,6 +32,9 @@ export const SessionDetailView: React.FC = () => {
 
   // State modals
   const [showMemberDepositModal, setShowMemberDepositModal] = useState(false)
+  const [showJoinOptionModal, setShowJoinOptionModal] = useState(false)
+  const [selectedDurationHours, setSelectedDurationHours] = useState<number | undefined>(undefined)
+  const [selectedSlotWindow, setSelectedSlotWindow] = useState<string>('FULL')
   const [showCheckinModal, setShowCheckinModal] = useState(false)
   const [showCameraScanner, setShowCameraScanner] = useState(false)
   const [showPaymentQrModal, setShowPaymentQrModal] = useState<string | null>(null)
@@ -50,13 +57,76 @@ export const SessionDetailView: React.FC = () => {
     refetchInterval: 3000,
   })
 
+  // Calculate total session hours
+  const totalSessionHours = useMemo(() => {
+    if (!session?.startTime || !session?.endTime) return 2
+    try {
+      const start = new Date(session.startTime).getTime()
+      const end = new Date(session.endTime).getTime()
+      if (start && end && end > start) {
+        return Math.round(((end - start) / (1000 * 60 * 60)) * 10) / 10
+      }
+    } catch (_) {}
+    return 2
+  }, [session?.startTime, session?.endTime])
+
+  // Sub-slot time windows (e.g. 13:00 - 15:00 vs 14:00 - 16:00)
+  const subSlotWindows = useMemo(() => {
+    if (!session?.startTime || !session?.endTime || totalSessionHours <= 2) return []
+    try {
+      const s = new Date(session.startTime)
+      const e = new Date(session.endTime)
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const formatTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+
+      const windows: { key: string; label: string; duration: number; timeRange: string }[] = []
+
+      // Option 1: Full session
+      windows.push({
+        key: 'FULL',
+        label: `Toàn bộ ca (${totalSessionHours} tiếng)`,
+        duration: totalSessionHours,
+        timeRange: `${formatTime(s)} - ${formatTime(e)}`,
+      })
+
+      // Option 2: 2h Early (Ca đầu)
+      const earlyEnd = new Date(s)
+      earlyEnd.setHours(earlyEnd.getHours() + 2)
+      windows.push({
+        key: 'EARLY_2H',
+        label: 'Ca đầu 2 Tiếng (Về sớm)',
+        duration: 2.0,
+        timeRange: `${formatTime(s)} - ${formatTime(earlyEnd)}`,
+      })
+
+      // Option 3: 2h Late (Ca sau)
+      const lateStart = new Date(e)
+      lateStart.setHours(lateStart.getHours() - 2)
+      if (lateStart.getTime() > s.getTime()) {
+        windows.push({
+          key: 'LATE_2H',
+          label: 'Ca sau 2 Tiếng (Đến muộn)',
+          duration: 2.0,
+          timeRange: `${formatTime(lateStart)} - ${formatTime(e)}`,
+        })
+      }
+
+      return windows
+    } catch (_) {
+      return []
+    }
+  }, [session?.startTime, session?.endTime, totalSessionHours])
+
   // Member join mutation
   const memberJoinMutation = useMutation({
-    mutationFn: async () => {
-      const res = await api.post(`/sessions/${id}/join`)
+    mutationFn: async (opts?: { durationHours?: number }) => {
+      const res = await api.post(`/sessions/${id}/join`, {
+        durationHours: opts?.durationHours,
+      })
       return res.data as Participant
     },
     onSuccess: async (participant) => {
+      setShowJoinOptionModal(false)
       // Nếu là thành viên vãng lai lần đầu (có yêu cầu cọc > 0)
       if (Number(participant.depositAmount) > 0) {
         try {
@@ -470,7 +540,13 @@ export const SessionDetailView: React.FC = () => {
               ) : user ? (
                 <button
                   disabled={isFull || memberJoinMutation.isPending}
-                  onClick={() => memberJoinMutation.mutate()}
+                  onClick={() => {
+                    if (totalSessionHours > 2 && subSlotWindows.length > 0) {
+                      setShowJoinOptionModal(true)
+                    } else {
+                      memberJoinMutation.mutate({})
+                    }
+                  }}
                   className="w-full py-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-500 font-bold text-white rounded-xl flex items-center justify-center gap-2 text-sm transition active:scale-95 shadow-sm"
                 >
                   <Users size={18} />
@@ -557,7 +633,7 @@ export const SessionDetailView: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-500 font-medium">{p.phone}</span>
+                        <span className="text-[10px] text-slate-500 font-medium">{user?.role === 'HOST' ? p.phone : p.phone.slice(0, 4) + '***' + p.phone.slice(-3)}</span>
                       </div>
                     </div>
 
@@ -728,6 +804,117 @@ export const SessionDetailView: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Member Time Slot & Duration Selection Modal for >2h Sessions */}
+      {showJoinOptionModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <DuckMascot size={36} rounded="xl" className="border border-slate-200 shadow-2xs" />
+                <div>
+                  <h3 className="font-black text-sm text-slate-900">Chọn Khung Giờ Đánh ({totalSessionHours}h)</h3>
+                  <p className="text-[11px] text-slate-500 font-semibold">Tùy chọn đánh trọn ca hoặc chỉ đánh 2 tiếng</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowJoinOptionModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-slate-700">
+                Bạn muốn tham gia vào khung giờ nào?
+              </label>
+
+              <div className="space-y-2">
+                {subSlotWindows.map((win) => {
+                  const isSelected = selectedSlotWindow === win.key
+                  const is2h = win.duration === 2.0
+                  const isMember = user?.role === 'HOST' || user?.membershipType === 'FIXED'
+                  const price = isMember
+                    ? (is2h
+                        ? (user?.gender === 'FEMALE' ? session.memberFemalePrice2h : session.memberMalePrice2h) || session.memberMalePrice
+                        : (user?.gender === 'FEMALE' ? session.memberFemalePrice : session.memberMalePrice))
+                    : (is2h
+                        ? (user?.gender === 'FEMALE' ? session.guestFemalePrice2h : session.guestMalePrice2h) || session.guestMalePrice
+                        : (user?.gender === 'FEMALE' ? session.guestFemalePrice : session.guestMalePrice))
+
+                  return (
+                    <div
+                      key={win.key}
+                      onClick={() => {
+                        setSelectedSlotWindow(win.key)
+                        setSelectedDurationHours(win.duration === totalSessionHours ? undefined : win.duration)
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex items-center justify-between ${
+                        isSelected
+                          ? 'border-slate-950 bg-slate-900 text-white shadow-md'
+                          : 'border-slate-200 hover:border-slate-300 bg-white text-slate-900'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-black ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                            {win.label}
+                          </span>
+                          {win.key === 'FULL' && (
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isSelected ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                              Full ca
+                            </span>
+                          )}
+                        </div>
+                        <p className={`text-xs font-mono font-bold ${isSelected ? 'text-slate-300' : 'text-slate-600'}`}>
+                          ⏰ {win.timeRange}
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <span className={`text-sm font-black block font-mono ${isSelected ? 'text-rose-300' : 'text-rose-600'}`}>
+                          {Number(price).toLocaleString()}đ
+                        </span>
+                        <span className={`text-[10px] font-semibold ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                          {isMember ? 'Giá Thành viên' : 'Giá Vãng lai'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowJoinOptionModal(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={memberJoinMutation.isPending}
+                onClick={() => {
+                  memberJoinMutation.mutate({ durationHours: selectedDurationHours })
+                }}
+                className="flex-1 py-3 bg-slate-950 hover:bg-slate-800 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2"
+              >
+                {memberJoinMutation.isPending ? (
+                  <span>Đang đăng ký...</span>
+                ) : (
+                  <>
+                    <Check size={16} />
+                    <span>Xác nhận đăng ký</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

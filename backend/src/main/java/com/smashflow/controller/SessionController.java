@@ -53,8 +53,9 @@ public class SessionController {
 
     @PostMapping("/{sessionId}/join")
     public ResponseEntity<ParticipantResponse> joinSession(@PathVariable Long sessionId,
-                                                           @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(sessionService.memberJoinSession(sessionId, user));
+                                                           @AuthenticationPrincipal User user,
+                                                           @RequestBody(required = false) JoinSessionRequest request) {
+        return ResponseEntity.ok(sessionService.memberJoinSession(sessionId, user, request));
     }
 
     @GetMapping("/participants/{participantId}/deposit-qr")

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { DollarSign, Plus, ArrowLeft, Receipt, MapPin } from 'lucide-react'
+import { CurrencyInput } from '../components/CurrencyInput'
 
 export const CreateSessionView: React.FC = () => {
   const navigate = useNavigate()
@@ -291,11 +292,9 @@ export const CreateSessionView: React.FC = () => {
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
                   Vé Nam cố định ({sessionHours}h)
                 </label>
-                <input
-                  type="number"
+                <CurrencyInput
                   value={memberMalePrice}
-                  onChange={(e) => setMemberMalePrice(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold shadow-sm"
+                  onChange={setMemberMalePrice}
                 />
               </div>
 
@@ -303,11 +302,10 @@ export const CreateSessionView: React.FC = () => {
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
                   Vé Nữ cố định ({sessionHours}h - Trợ giá)
                 </label>
-                <input
-                  type="number"
+                <CurrencyInput
                   value={memberFemalePrice}
-                  onChange={(e) => setMemberFemalePrice(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-rose-600 font-bold shadow-sm"
+                  onChange={setMemberFemalePrice}
+                  className="text-rose-600"
                 />
               </div>
 
@@ -315,11 +313,9 @@ export const CreateSessionView: React.FC = () => {
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
                   Vé Nam vãng lai ({sessionHours}h)
                 </label>
-                <input
-                  type="number"
+                <CurrencyInput
                   value={guestMalePrice}
-                  onChange={(e) => setGuestMalePrice(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold shadow-sm"
+                  onChange={setGuestMalePrice}
                 />
               </div>
 
@@ -327,11 +323,10 @@ export const CreateSessionView: React.FC = () => {
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
                   Vé Nữ vãng lai ({sessionHours}h - Trợ giá)
                 </label>
-                <input
-                  type="number"
+                <CurrencyInput
                   value={guestFemalePrice}
-                  onChange={(e) => setGuestFemalePrice(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-rose-600 font-bold shadow-sm"
+                  onChange={setGuestFemalePrice}
+                  className="text-rose-600"
                 />
               </div>
             </div>
@@ -353,11 +348,10 @@ export const CreateSessionView: React.FC = () => {
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">
                       Cố định Nam (2h)
                     </label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={memberMalePrice2h}
-                      onChange={(e) => setMemberMalePrice2h(Number(e.target.value))}
-                      className="w-full bg-white border border-indigo-200 rounded-xl p-2 text-slate-900 font-bold shadow-sm"
+                      onChange={setMemberMalePrice2h}
+                      className="border-indigo-200"
                     />
                   </div>
 
@@ -365,11 +359,10 @@ export const CreateSessionView: React.FC = () => {
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">
                       Cố định Nữ (2h)
                     </label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={memberFemalePrice2h}
-                      onChange={(e) => setMemberFemalePrice2h(Number(e.target.value))}
-                      className="w-full bg-white border border-indigo-200 rounded-xl p-2 text-rose-600 font-bold shadow-sm"
+                      onChange={setMemberFemalePrice2h}
+                      className="border-indigo-200 text-rose-600"
                     />
                   </div>
 
@@ -377,11 +370,10 @@ export const CreateSessionView: React.FC = () => {
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">
                       Vãng lai Nam (2h)
                     </label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={guestMalePrice2h}
-                      onChange={(e) => setGuestMalePrice2h(Number(e.target.value))}
-                      className="w-full bg-white border border-indigo-200 rounded-xl p-2 text-slate-900 font-bold shadow-sm"
+                      onChange={setGuestMalePrice2h}
+                      className="border-indigo-200"
                     />
                   </div>
 
@@ -389,11 +381,10 @@ export const CreateSessionView: React.FC = () => {
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">
                       Vãng lai Nữ (2h)
                     </label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={guestFemalePrice2h}
-                      onChange={(e) => setGuestFemalePrice2h(Number(e.target.value))}
-                      className="w-full bg-white border border-indigo-200 rounded-xl p-2 text-rose-600 font-bold shadow-sm"
+                      onChange={setGuestFemalePrice2h}
+                      className="border-indigo-200 text-rose-600"
                     />
                   </div>
                 </div>
@@ -404,12 +395,12 @@ export const CreateSessionView: React.FC = () => {
               <label className="block text-[11px] font-bold text-slate-600 mb-1">
                 Tiền cọc giữ chỗ vãng lai VietQR (VNĐ)
               </label>
-              <input
-                type="number"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(Number(e.target.value))}
-                className="w-full sm:w-1/2 bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold shadow-sm"
-              />
+              <div className="w-full sm:w-1/2">
+                <CurrencyInput
+                  value={depositAmount}
+                  onChange={setDepositAmount}
+                />
+              </div>
             </div>
           </div>
 
@@ -423,21 +414,17 @@ export const CreateSessionView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">Tiền thuê sân (VNĐ)</label>
-                <input
-                  type="number"
+                <CurrencyInput
                   value={costCourt}
-                  onChange={(e) => setCostCourt(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold shadow-sm"
+                  onChange={setCostCourt}
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">Tiền cầu dự kiến (VNĐ)</label>
-                <input
-                  type="number"
+                <CurrencyInput
                   value={costShuttlecock}
-                  onChange={(e) => setCostShuttlecock(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold shadow-sm"
+                  onChange={setCostShuttlecock}
                 />
               </div>
             </div>

@@ -233,7 +233,7 @@ public class SessionService {
     }
 
     @Transactional
-    public ParticipantResponse memberJoinSession(Long sessionId, User user) {
+    public ParticipantResponse memberJoinSession(Long sessionId, User user, com.smashflow.dto.JoinSessionRequest request) {
         Session session = sessionRepository.findByIdWithLock(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
 
@@ -255,15 +255,31 @@ public class SessionService {
         // Chỉ thành viên chính thức (FIXED hoặc HOST) mới được nhận giá Thành viên CLB, còn PENDING_FIXED / CASUAL nhận giá Vãng lai
         boolean isOfficialFixedMember = user.getRole() == Role.HOST || user.getMembershipType() == com.smashflow.model.MembershipType.FIXED;
 
+        BigDecimal durationHours = (request != null && request.getDurationHours() != null) ? request.getDurationHours() : null;
+
         BigDecimal baseFee;
+        boolean is2hOption = durationHours != null && durationHours.compareTo(new BigDecimal("2.0")) == 0;
+
         if (isOfficialFixedMember) {
-            baseFee = user.getGender() == Gender.FEMALE
-                    ? session.getMemberFemalePrice()
-                    : session.getMemberMalePrice();
+            if (is2hOption && session.getMemberMalePrice2h() != null) {
+                baseFee = user.getGender() == Gender.FEMALE
+                        ? (session.getMemberFemalePrice2h() != null ? session.getMemberFemalePrice2h() : session.getMemberFemalePrice())
+                        : (session.getMemberMalePrice2h() != null ? session.getMemberMalePrice2h() : session.getMemberMalePrice());
+            } else {
+                baseFee = user.getGender() == Gender.FEMALE
+                        ? session.getMemberFemalePrice()
+                        : session.getMemberMalePrice();
+            }
         } else {
-            baseFee = user.getGender() == Gender.FEMALE
-                    ? session.getGuestFemalePrice()
-                    : session.getGuestMalePrice();
+            if (is2hOption && session.getGuestMalePrice2h() != null) {
+                baseFee = user.getGender() == Gender.FEMALE
+                        ? (session.getGuestFemalePrice2h() != null ? session.getGuestFemalePrice2h() : session.getGuestFemalePrice())
+                        : (session.getGuestMalePrice2h() != null ? session.getGuestMalePrice2h() : session.getGuestMalePrice());
+            } else {
+                baseFee = user.getGender() == Gender.FEMALE
+                        ? session.getGuestFemalePrice()
+                        : session.getGuestMalePrice();
+            }
         }
 
         // Logic cọc 20k: Nếu là thành viên vãng lai (hoặc chưa duyệt cố định) và là LẦN ĐẦU tham gia CLB (pastBookings == 0) -> Bắt buộc cọc
@@ -279,6 +295,7 @@ public class SessionService {
                 .user(user)
                 .isGuest(!isOfficialFixedMember)
                 .gender(user.getGender())
+                .durationHours(durationHours)
                 .checkinStatus(CheckinStatus.PENDING)
                 .depositStatus(initialDepositStatus)
                 .depositAmount(effectiveDeposit)
@@ -293,9 +310,10 @@ public class SessionService {
         // Gửi thông báo Telegram tức thì cho Host (Member có tài khoản join)
         try {
             String timeRange = session.getStartTime().toLocalTime() + " - " + session.getEndTime().toLocalTime();
+            String durationText = durationHours != null ? " (" + durationHours + " tiếng)" : " (Full ca)";
             String mTypeName = isOfficialFixedMember
-                    ? "Thành viên Cố định"
-                    : ((user.getSessionsAttended() != null && user.getSessionsAttended() > 0) ? "Thành viên CLB (Miễn cọc)" : "Vãng lai lần 1");
+                    ? "Thành viên Cố định" + durationText
+                    : ((user.getSessionsAttended() != null && user.getSessionsAttended() > 0) ? "Thành viên CLB (Miễn cọc)" + durationText : "Vãng lai lần 1" + durationText);
             String feeNote = needDeposit ? "Cần cọc 20.000đ (Khách lần 1)" : "Miễn cọc (Thành viên CLB)";
 
             telegramNotificationService.notifyNewBooking(
