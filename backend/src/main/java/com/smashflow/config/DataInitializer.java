@@ -44,32 +44,43 @@ public class DataInitializer {
             } catch (Exception ignored) {
             }
 
-            // Check if host exists
-            if (!userRepository.existsByPhone("0325872682")) {
-                User host = User.builder()
-                        .phone("0325872682")
-                        .fullName("Phạm Anh Đức")
-                        .password(passwordEncoder.encode("040304"))
-                        .gender(Gender.MALE)
-                        .role(Role.HOST)
-                        .membershipType(MembershipType.FIXED)
-                        .avatarUrl("/duck-host-sassy.png")
-                        .winCount(0)
-                        .lossCount(0)
-                        .eloScore(0)
-                        .sessionsAttended(0)
-                        .build();
-                userRepository.save(host);
-            } else {
-                userRepository.findByPhone("0325872682").ifPresent(host -> {
-                    host.setRole(Role.HOST);
-                    host.setMembershipType(MembershipType.FIXED);
-                    host.setPassword(passwordEncoder.encode("040304"));
-                    host.setFullName("Phạm Anh Đức");
-                    host.setAvatarUrl("/duck-host-sassy.png");
-                    userRepository.save(host);
-                });
-            }
+            // Ensure host account is clean with 0 stats
+            userRepository.findByPhone("0325872682").ifPresentOrElse(
+                    host -> {
+                        host.setRole(Role.HOST);
+                        host.setMembershipType(MembershipType.FIXED);
+                        host.setPassword(passwordEncoder.encode("040304"));
+                        host.setFullName("Phạm Anh Đức");
+                        host.setAvatarUrl("/duck-host-sassy.png");
+                        host.setWinCount(0);
+                        host.setLossCount(0);
+                        host.setEloScore(0);
+                        host.setSessionsAttended(0);
+                        host.setPlacementMatches(0);
+                        host.setCurrentStreak(0);
+                        host.setShieldMatches(0);
+                        userRepository.save(host);
+                    },
+                    () -> {
+                        User host = User.builder()
+                                .phone("0325872682")
+                                .fullName("Phạm Anh Đức")
+                                .password(passwordEncoder.encode("040304"))
+                                .gender(Gender.MALE)
+                                .role(Role.HOST)
+                                .membershipType(MembershipType.FIXED)
+                                .avatarUrl("/duck-host-sassy.png")
+                                .winCount(0)
+                                .lossCount(0)
+                                .eloScore(0)
+                                .sessionsAttended(0)
+                                .placementMatches(0)
+                                .currentStreak(0)
+                                .shieldMatches(0)
+                                .build();
+                        userRepository.save(host);
+                    }
+            );
 
             // CLEAN UP ALL DUMMY / TEST ACCOUNTS & SESSIONS & VENUES TO START PRODUCTION CLEAN
             try {
@@ -79,6 +90,8 @@ public class DataInitializer {
                 jdbcTemplate.execute("DELETE FROM loyalty_rewards;");
                 jdbcTemplate.execute("DELETE FROM sessions;");
                 jdbcTemplate.execute("DELETE FROM venues;");
+                // Reset stats for Host in DB
+                jdbcTemplate.execute("UPDATE users SET win_count = 0, loss_count = 0, elo_score = 0, sessions_attended = 0, placement_matches = 0, current_streak = 0, shield_matches = 0 WHERE phone = '0325872682';");
                 // Delete all users except Host Phạm Anh Đức (0325872682)
                 jdbcTemplate.execute("DELETE FROM users WHERE phone != '0325872682';");
             } catch (Exception e) {

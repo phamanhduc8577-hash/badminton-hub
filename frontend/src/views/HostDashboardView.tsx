@@ -773,7 +773,7 @@ export const HostDashboardView: React.FC = () => {
                                 🏸 {stats.totalSets} set
                               </span>
                               <span className="text-[10px] text-slate-500 font-semibold">
-                                ({stats.wins}W - {stats.losses}L)
+                                ({stats.wins} Win - {stats.losses} Lose)
                               </span>
                             </div>
                             {stats.lastCourt && (
@@ -1029,7 +1029,7 @@ export const HostDashboardView: React.FC = () => {
                           <div className="flex items-center justify-between mt-1 text-[10px] text-slate-500">
                             <span className="font-semibold">{u.rank.badge} ({u.eloScore || 0} LP)</span>
                             <span className="font-mono">
-                              {u.stats.wins}W - {u.stats.losses}L
+                              {u.stats.wins} Win - {u.stats.losses} Lose
                             </span>
                           </div>
 
@@ -1237,7 +1237,7 @@ export const HostDashboardView: React.FC = () => {
                 <div className="space-y-2.5 pt-2">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
                     <span>Ghi nhận kết quả trận đấu trên [{currentCourtName}]:</span>
-                    <span>1 chạm (+1 Win / -1 Loss / +1 Set cho cả cặp)</span>
+                    <span>1 chạm (+1 Win / -1 Lose / +1 Set cho cả cặp)</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <button
