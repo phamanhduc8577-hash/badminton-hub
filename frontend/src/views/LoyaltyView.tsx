@@ -626,10 +626,14 @@ export const LoyaltyView: React.FC = () => {
 
                   <div className="space-y-1">
                     <h3 className="font-black text-slate-950 text-base leading-snug">
-                      {isReached ? m.gift : `Hộp Quà Bí Ẩn #${m.target}`}
+                      {isClaimed ? m.gift : `Hộp Quà Bí Ẩn #${m.target}`}
                     </h3>
                     <p className="text-xs text-slate-500 font-medium line-clamp-2">
-                      {isReached ? m.desc : 'Đạt mốc này để hé lộ phần quà bí mật từ CLB!'}
+                      {isClaimed
+                        ? m.desc
+                        : isReached
+                        ? 'Đã đủ điều kiện! Nhấn để mở hộp quà bí ẩn ngay.'
+                        : 'Đạt mốc này để hé lộ phần quà bí mật từ CLB!'}
                     </p>
                   </div>
                 </div>
@@ -718,6 +722,8 @@ export const LoyaltyView: React.FC = () => {
                   <GiftGraphic
                     type={unboxingMilestone.type}
                     isReached={true}
+                    isClaimed={true}
+                    forceReveal={true}
                     size="xl"
                     className="shadow-2xl ring-4 ring-amber-400/30"
                   />

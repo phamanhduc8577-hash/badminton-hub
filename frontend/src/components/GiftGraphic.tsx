@@ -4,6 +4,7 @@ interface GiftGraphicProps {
   type: string
   isReached: boolean
   isClaimed?: boolean
+  forceReveal?: boolean
   size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
@@ -12,6 +13,7 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
   type,
   isReached,
   isClaimed = false,
+  forceReveal = false,
   size = 'md',
   className = '',
 }) => {
@@ -22,29 +24,26 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
     xl: 'w-36 h-36',
   }
 
-  // If locked, render Mystery Box
+  // 1. If not reached yet -> Locked Grey Mystery Box
   if (!isReached) {
     return (
       <div
         className={`relative ${sizeClasses[size]} rounded-2xl bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300 flex items-center justify-center border border-slate-300 shadow-inner group-hover:scale-105 transition duration-300 ${className}`}
       >
         <svg viewBox="0 0 100 100" className="w-4/5 h-4/5 drop-shadow-sm opacity-60">
-          {/* Mystery Box Base */}
           <rect x="20" y="38" width="60" height="48" rx="6" fill="#94A3B8" />
           <rect x="16" y="28" width="68" height="14" rx="4" fill="#64748B" />
-          {/* Ribbon */}
-          <rect x="44" y="28" width="12" height="58" fill="#F43F5E" opacity="0.8" />
+          <rect x="44" y="28" width="12" height="58" fill="#F43F5E" opacity="0.7" />
           <path
             d="M 50 28 C 42 16 32 18 36 26 C 40 32 50 28 50 28 Z"
             fill="#F43F5E"
-            opacity="0.85"
+            opacity="0.8"
           />
           <path
             d="M 50 28 C 58 16 68 18 64 26 C 60 32 50 28 50 28 Z"
             fill="#F43F5E"
-            opacity="0.85"
+            opacity="0.8"
           />
-          {/* Lock icon */}
           <circle cx="50" cy="62" r="10" fill="#1E293B" />
           <rect x="47" y="59" width="6" height="7" fill="#F8FAFC" rx="1" />
           <path
@@ -58,7 +57,63 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
     )
   }
 
-  // Render Realistic Visuals based on Gift Type
+  // 2. If reached but NOT claimed yet (and not force-revealed in modal) -> Vibrant Golden Mystery Box (Ready to open!)
+  if (!isClaimed && !forceReveal) {
+    return (
+      <div
+        className={`relative ${sizeClasses[size]} rounded-2xl bg-gradient-to-br from-amber-400 via-rose-500 to-amber-500 p-0.5 shadow-xl shadow-rose-500/20 group-hover:scale-110 transition duration-300 ${className}`}
+      >
+        <div className="w-full h-full rounded-[14px] bg-gradient-to-br from-amber-50 via-yellow-100 to-amber-200 flex items-center justify-center p-2 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-amber-300/40 via-transparent to-transparent pointer-events-none animate-pulse" />
+          <svg viewBox="0 0 100 100" className="w-4/5 h-4/5 drop-shadow-md">
+            <defs>
+              <linearGradient id="boxBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#F59E0B" />
+                <stop offset="50%" stopColor="#EA580C" />
+                <stop offset="100%" stopColor="#E11D48" />
+              </linearGradient>
+              <linearGradient id="boxLidGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#FBBF24" />
+                <stop offset="100%" stopColor="#F59E0B" />
+              </linearGradient>
+              <linearGradient id="goldRibbon" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FEF08A" />
+                <stop offset="50%" stopColor="#FDE047" />
+                <stop offset="100%" stopColor="#EAB308" />
+              </linearGradient>
+            </defs>
+
+            {/* Box Body */}
+            <rect x="20" y="38" width="60" height="48" rx="7" fill="url(#boxBodyGrad)" />
+            {/* Box Lid */}
+            <rect x="15" y="28" width="70" height="14" rx="4" fill="url(#boxLidGrad)" stroke="#D97706" strokeWidth="0.8" />
+            {/* Vertical Ribbon */}
+            <rect x="44" y="28" width="12" height="58" fill="url(#goldRibbon)" />
+            {/* Horizontal Ribbon on Body */}
+            <rect x="20" y="56" width="60" height="10" fill="url(#goldRibbon)" opacity="0.9" />
+
+            {/* Ribbon Bow */}
+            <path
+              d="M 50 28 C 38 12 24 16 32 26 C 38 32 50 28 50 28 Z"
+              fill="url(#goldRibbon)"
+            />
+            <path
+              d="M 50 28 C 62 12 76 16 68 26 C 62 32 50 28 50 28 Z"
+              fill="url(#goldRibbon)"
+            />
+            {/* Center Bow Knot */}
+            <circle cx="50" cy="28" r="4.5" fill="#FEF08A" stroke="#CA8A04" strokeWidth="1" />
+
+            {/* Sparkles */}
+            <polygon points="26,22 28,17 30,22 35,24 30,26 28,31 26,26 21,24" fill="#FEF08A" />
+            <polygon points="76,68 77.5,64 79,68 83,69.5 79,71 77.5,75 76,71 72,69.5" fill="#FEF08A" />
+          </svg>
+        </div>
+      </div>
+    )
+  }
+
+  // 3. Render Realistic Visuals ONLY AFTER CLAIMED or Force-Revealed in Modal
   switch (type) {
     case 'REVIVE':
     case 'REVIVE_2':
@@ -168,13 +223,10 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
 
             {/* Grip Roll 1 */}
             <g transform={gripCount === 1 ? 'translate(25, 20)' : gripCount === 2 ? 'translate(10, 20)' : 'translate(0, 25)'}>
-              {/* Main Roll Body */}
               <rect x="15" y="15" width="40" height="48" rx="8" fill="url(#gripGrad1)" stroke="#065F46" strokeWidth="1.5" />
-              {/* Winding Layers */}
               <line x1="15" y1="26" x2="55" y2="26" stroke="#047857" strokeWidth="2" />
               <line x1="15" y1="38" x2="55" y2="38" stroke="#047857" strokeWidth="2" />
               <line x1="15" y1="50" x2="55" y2="50" stroke="#047857" strokeWidth="2" />
-              {/* Grip Logo Tape */}
               <rect x="12" y="32" width="46" height="12" rx="3" fill="url(#tapeGrad)" stroke="#64748B" strokeWidth="0.8" />
               <text x="35" y="41" fill="#F8FAFC" fontSize="5.5" fontWeight="900" textAnchor="middle" letterSpacing="0.8">
                 SUPER GRIP
@@ -242,7 +294,6 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
               </linearGradient>
             </defs>
 
-            {/* Ticket Shape with side notches */}
             <path
               d="M 15 25 Q 15 20 20 20 L 100 20 Q 105 20 105 25 L 105 50 A 10 10 0 0 0 105 70 L 105 95 Q 105 100 100 100 L 20 100 Q 15 100 15 95 L 15 70 A 10 10 0 0 0 15 50 Z"
               fill="url(#voucherGrad)"
@@ -250,25 +301,20 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
               strokeWidth="2"
             />
 
-            {/* Ticket Dashed Perforation */}
             <line x1="80" y1="22" x2="80" y2="98" stroke="#64748B" strokeWidth="1.5" strokeDasharray="3 3" />
 
-            {/* Header / Brand */}
             <text x="24" y="36" fill="#94A3B8" fontSize="7" fontWeight="900" letterSpacing="0.8">
               SMASHFLOW VOUCHER
             </text>
 
-            {/* Big Discount Value */}
             <text x="48" y="70" fill="url(#goldText)" fontSize="30" fontWeight="900" textAnchor="middle" letterSpacing="-1">
               -{discountPct}%
             </text>
 
-            {/* Subtext */}
             <text x="48" y="85" fill="#E2E8F0" fontSize="7" fontWeight="800" textAnchor="middle">
               GIẢM TIỀN SÂN
             </text>
 
-            {/* Right Stub Info */}
             <g transform="translate(86, 32)">
               <text x="5" y="16" fill="#FDE047" fontSize="7" fontWeight="900">
                 VIP
@@ -308,7 +354,6 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
               </linearGradient>
             </defs>
 
-            {/* Shadow Sock */}
             <g transform="translate(14, -4) scale(0.95)" opacity="0.7">
               <path
                 d="M 35 15 L 65 15 L 65 65 Q 65 75 75 85 L 95 95 Q 102 99 98 106 Q 92 112 80 108 L 50 88 Q 35 78 35 60 Z"
@@ -318,9 +363,7 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
               />
             </g>
 
-            {/* Main Yonex Sock */}
             <g transform="translate(0, 0)">
-              {/* Sock Body */}
               <path
                 d="M 35 15 L 65 15 L 65 65 Q 65 75 75 85 L 95 95 Q 104 99 100 107 Q 94 113 80 108 L 50 88 Q 35 78 35 60 Z"
                 fill="url(#sockGrad)"
@@ -328,7 +371,6 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
                 strokeWidth="2.5"
               />
 
-              {/* Top Elastic Ribbed Cuff */}
               <rect x="35" y="15" width="30" height="8" fill="#0F172A" />
               <line x1="40" y1="15" x2="40" y2="23" stroke="#94A3B8" strokeWidth="1" />
               <line x1="45" y1="15" x2="45" y2="23" stroke="#94A3B8" strokeWidth="1" />
@@ -336,21 +378,17 @@ export const GiftGraphic: React.FC<GiftGraphicProps> = ({
               <line x1="55" y1="15" x2="55" y2="23" stroke="#94A3B8" strokeWidth="1" />
               <line x1="60" y1="15" x2="60" y2="23" stroke="#94A3B8" strokeWidth="1" />
 
-              {/* Yonex Iconic Double Stripes (Blue & Green) */}
               <rect x="35" y="27" width="30" height="5" fill="url(#yonexBlue)" />
               <rect x="35" y="34" width="30" height="5" fill="url(#yonexGreen)" />
 
-              {/* Yonex Logo Text */}
               <text x="50" y="52" fill="#0F172A" fontSize="7" fontWeight="900" textAnchor="middle" letterSpacing="0.8">
                 YONEX
               </text>
 
-              {/* Heel & Toe Reinforced Cushions */}
               <path d="M 35 65 Q 35 80 50 85 Z" fill="#E2E8F0" />
               <path d="M 90 92 Q 104 98 100 107 Q 92 110 82 105 Z" fill="#0F172A" />
             </g>
 
-            {/* Gold 100 Milestone Stamp */}
             <circle cx="28" cy="98" r="14" fill="#F59E0B" stroke="#FEF08A" strokeWidth="2" />
             <text x="28" y="102" fill="#FFFFFF" fontSize="9" fontWeight="900" textAnchor="middle">
               100
