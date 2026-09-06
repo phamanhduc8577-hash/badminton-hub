@@ -106,6 +106,33 @@ public class DataInitializer {
                 }
             }
 
+            // Update or seed test account: Nhân Thiện (0763595633) with 50 wins and 5 sessions
+            userRepository.findByPhone("0763595633").ifPresentOrElse(
+                    user -> {
+                        user.setWinCount(50);
+                        user.setLossCount(0);
+                        user.setEloScore(50);
+                        user.setSessionsAttended(5);
+                        userRepository.save(user);
+                    },
+                    () -> {
+                        User user = User.builder()
+                                .phone("0763595633")
+                                .fullName("Nhân Thiện")
+                                .password(passwordEncoder.encode("123456"))
+                                .gender(Gender.MALE)
+                                .role(Role.MEMBER)
+                                .membershipType(MembershipType.FIXED)
+                                .avatarUrl("/duck-mascot.png")
+                                .winCount(50)
+                                .lossCount(0)
+                                .eloScore(50)
+                                .sessionsAttended(5)
+                                .build();
+                        userRepository.save(user);
+                    }
+            );
+
             // Create a default venue if none exists
             if (venueRepository.count() == 0) {
                 Venue venue = Venue.builder()
