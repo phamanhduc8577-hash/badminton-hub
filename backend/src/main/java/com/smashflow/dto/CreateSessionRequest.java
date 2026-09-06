@@ -45,4 +45,5 @@ public class CreateSessionRequest {
 
     private BigDecimal costCourt = BigDecimal.ZERO;
     private BigDecimal costShuttlecock = BigDecimal.ZERO;
+    private BigDecimal costDrinks = BigDecimal.ZERO;
 }

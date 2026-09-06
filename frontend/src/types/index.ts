@@ -69,6 +69,7 @@ export interface SessionItem {
   depositAmount: number
   costCourt: number
   costShuttlecock: number
+  costDrinks?: number
   checkinToken?: string
   tokenExpiresAt?: string
   participants?: Participant[]
@@ -162,6 +163,7 @@ export interface HostReport {
   totalDepositCollected: number
   costCourt: number
   costShuttlecock: number
+  costDrinks?: number
   totalExpenses: number
   netProfit: number
   mvpUserId?: number

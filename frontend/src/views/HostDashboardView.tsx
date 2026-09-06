@@ -1446,6 +1446,15 @@ export const HostDashboardView: React.FC = () => {
                   </span>
                 </div>
 
+                {Number(report.costDrinks || 0) > 0 && (
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Tiền trà đá / nước uống:</span>
+                    <span className="font-bold text-slate-900">
+                      {Number(report.costDrinks).toLocaleString()}đ
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-slate-600">
                   <span>Tổng chi phí vận hành:</span>
                   <span className="font-bold text-rose-600">

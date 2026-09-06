@@ -46,6 +46,7 @@ public class SessionResponse {
 
     private BigDecimal costCourt;
     private BigDecimal costShuttlecock;
+    private BigDecimal costDrinks;
 
     private String checkinToken;
     private LocalDateTime tokenExpiresAt;

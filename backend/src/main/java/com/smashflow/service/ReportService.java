@@ -52,7 +52,8 @@ public class ReportService {
 
         BigDecimal costCourt = session.getCostCourt() != null ? session.getCostCourt() : BigDecimal.ZERO;
         BigDecimal costShuttle = session.getCostShuttlecock() != null ? session.getCostShuttlecock() : BigDecimal.ZERO;
-        BigDecimal totalExpenses = costCourt.add(costShuttle);
+        BigDecimal costDrinks = session.getCostDrinks() != null ? session.getCostDrinks() : BigDecimal.ZERO;
+        BigDecimal totalExpenses = costCourt.add(costShuttle).add(costDrinks);
         BigDecimal netProfit = totalRevenue.subtract(totalExpenses);
 
         // Compute Session MVP
@@ -95,6 +96,7 @@ public class ReportService {
                 .totalDepositCollected(totalDepositCollected)
                 .costCourt(costCourt)
                 .costShuttlecock(costShuttle)
+                .costDrinks(costDrinks)
                 .totalExpenses(totalExpenses)
                 .netProfit(netProfit)
                 .mvpUserId(mvpId)

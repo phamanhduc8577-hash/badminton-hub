@@ -55,6 +55,7 @@ export const CreateSessionView: React.FC = () => {
   const [depositAmount, setDepositAmount] = useState(20000)
   const [costCourt, setCostCourt] = useState(200000)
   const [costShuttlecock, setCostShuttlecock] = useState(80000)
+  const [costDrinks, setCostDrinks] = useState(30000)
 
   // Calculate session duration in hours
   const sessionHours = React.useMemo(() => {
@@ -122,6 +123,7 @@ export const CreateSessionView: React.FC = () => {
         depositAmount,
         costCourt,
         costShuttlecock,
+        costDrinks,
       })
       return res.data
     },
@@ -335,10 +337,11 @@ export const CreateSessionView: React.FC = () => {
             {sessionHours > 2 && (
               <div className="pt-3 border-t border-slate-200/90 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wide">
-                    ⚡ Giá slot tùy chọn chỉ đánh 2 Tiếng (Cho người về sớm / không đánh hết ca {sessionHours}h):
+                  <span className="text-[11px] font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+                    <span>Giá slot tùy chọn chỉ đánh 2 Tiếng (Cho người về sớm / không đánh hết ca {sessionHours}h):</span>
                   </span>
-                  <span className="text-[10px] bg-indigo-50 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200">
+                  <span className="text-[10px] bg-slate-100 text-slate-800 font-bold px-2 py-0.5 rounded border border-slate-200">
                     Slot 2h Linh Hoạt
                   </span>
                 </div>
@@ -351,7 +354,6 @@ export const CreateSessionView: React.FC = () => {
                     <CurrencyInput
                       value={memberMalePrice2h}
                       onChange={setMemberMalePrice2h}
-                      className="border-indigo-200"
                     />
                   </div>
 
@@ -362,7 +364,7 @@ export const CreateSessionView: React.FC = () => {
                     <CurrencyInput
                       value={memberFemalePrice2h}
                       onChange={setMemberFemalePrice2h}
-                      className="border-indigo-200 text-rose-600"
+                      className="text-rose-600"
                     />
                   </div>
 
@@ -373,7 +375,6 @@ export const CreateSessionView: React.FC = () => {
                     <CurrencyInput
                       value={guestMalePrice2h}
                       onChange={setGuestMalePrice2h}
-                      className="border-indigo-200"
                     />
                   </div>
 
@@ -384,7 +385,7 @@ export const CreateSessionView: React.FC = () => {
                     <CurrencyInput
                       value={guestFemalePrice2h}
                       onChange={setGuestFemalePrice2h}
-                      className="border-indigo-200 text-rose-600"
+                      className="text-rose-600"
                     />
                   </div>
                 </div>
@@ -411,7 +412,7 @@ export const CreateSessionView: React.FC = () => {
               <span>Dự toán chi phí ca (Hạch toán lãi ròng tự động)</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">Tiền thuê sân (VNĐ)</label>
                 <CurrencyInput
@@ -425,6 +426,14 @@ export const CreateSessionView: React.FC = () => {
                 <CurrencyInput
                   value={costShuttlecock}
                   onChange={setCostShuttlecock}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Tiền trà đá / nước uống (VNĐ)</label>
+                <CurrencyInput
+                  value={costDrinks}
+                  onChange={setCostDrinks}
                 />
               </div>
             </div>

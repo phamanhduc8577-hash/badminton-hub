@@ -98,6 +98,10 @@ public class Session {
     @Builder.Default
     private BigDecimal costShuttlecock = BigDecimal.ZERO;
 
+    @Column(precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal costDrinks = BigDecimal.ZERO; // Tiền nước / trà đá
+
     // Dynamic QR Token for check-in
     private String checkinToken;
     private LocalDateTime tokenExpiresAt;

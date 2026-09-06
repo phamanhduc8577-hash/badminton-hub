@@ -29,4 +29,5 @@ public class UpdateSessionRequest {
     private BigDecimal depositAmount;
     private BigDecimal costCourt;
     private BigDecimal costShuttlecock;
+    private BigDecimal costDrinks;
 }

@@ -19,6 +19,7 @@ public class HostSessionReport {
     private BigDecimal totalDepositCollected;
     private BigDecimal costCourt;
     private BigDecimal costShuttlecock;
+    private BigDecimal costDrinks;
     private BigDecimal totalExpenses;
     private BigDecimal netProfit;
 

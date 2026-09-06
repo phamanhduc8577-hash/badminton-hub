@@ -133,6 +133,7 @@ public class SessionService {
                 .depositAmount(request.getDepositAmount())
                 .costCourt(request.getCostCourt())
                 .costShuttlecock(request.getCostShuttlecock())
+                .costDrinks(request.getCostDrinks() != null ? request.getCostDrinks() : BigDecimal.ZERO)
                 .checkinToken(UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .tokenExpiresAt(request.getStartTime().plusMinutes(15))
                 .build();
@@ -418,6 +419,7 @@ public class SessionService {
         if (request.getDepositAmount() != null) session.setDepositAmount(request.getDepositAmount());
         if (request.getCostCourt() != null) session.setCostCourt(request.getCostCourt());
         if (request.getCostShuttlecock() != null) session.setCostShuttlecock(request.getCostShuttlecock());
+        if (request.getCostDrinks() != null) session.setCostDrinks(request.getCostDrinks());
 
         sessionRepository.save(session);
         return toSessionResponseSummary(session);
@@ -617,6 +619,7 @@ public class SessionService {
                 .depositAmount(session.getDepositAmount())
                 .costCourt(session.getCostCourt())
                 .costShuttlecock(session.getCostShuttlecock())
+                .costDrinks(session.getCostDrinks())
                 .checkinToken(session.getCheckinToken())
                 .tokenExpiresAt(session.getTokenExpiresAt())
                 .build();
