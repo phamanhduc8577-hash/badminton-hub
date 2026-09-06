@@ -13,6 +13,7 @@ export interface User {
   eloScore?: number
   placementMatches?: number
   currentStreak?: number
+  shieldMatches?: number
 }
 
 export interface MemberProfile {
@@ -30,6 +31,7 @@ export interface MemberProfile {
   eloScore?: number
   placementMatches?: number
   currentStreak?: number
+  shieldMatches?: number
   createdAt: string
 }
 
@@ -97,6 +99,7 @@ export interface Participant {
   eloScore?: number
   placementMatches?: number
   currentStreak?: number
+  shieldMatches?: number
   avatarUrl?: string
 }
 
@@ -129,6 +132,7 @@ export interface LeaderboardEntry {
   eloScore?: number
   placementMatches?: number
   currentStreak?: number
+  shieldMatches?: number
   rank: number
 }
 

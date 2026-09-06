@@ -31,6 +31,7 @@ export const MemberListView: React.FC = () => {
   const [editingRankMember, setEditingRankMember] = useState<MemberProfile | null>(null)
   const [manualLpInput, setManualLpInput] = useState<number>(0)
   const [manualPlacementsInput, setManualPlacementsInput] = useState<number>(5)
+  const [manualShieldInput, setManualShieldInput] = useState<number>(0)
 
   const { data: members = [], isLoading } = useQuery<MemberProfile[]>({
     queryKey: ['members'],
@@ -98,8 +99,18 @@ export const MemberListView: React.FC = () => {
 
   // Host Manual Rank Override Mutation
   const updateRankMutation = useMutation({
-    mutationFn: async ({ userId, eloScore, placementMatches }: { userId: number; eloScore: number; placementMatches: number }) => {
-      const res = await api.put(`/members/${userId}/rank`, { eloScore, placementMatches })
+    mutationFn: async ({
+      userId,
+      eloScore,
+      placementMatches,
+      shieldMatches,
+    }: {
+      userId: number
+      eloScore: number
+      placementMatches: number
+      shieldMatches: number
+    }) => {
+      const res = await api.put(`/members/${userId}/rank`, { eloScore, placementMatches, shieldMatches })
       return res.data
     },
     onSuccess: () => {
@@ -350,9 +361,9 @@ export const MemberListView: React.FC = () => {
 
                     <td className="py-3.5 px-3">
                       {(() => {
-                        const rankDisplay = getPlayerRankDisplay(m.eloScore || 0, m.placementMatches ?? 5)
+                        const rankDisplay = getPlayerRankDisplay(m.eloScore || 0, m.placementMatches ?? 5, m.shieldMatches ?? 0)
                         return (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span
                               className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}
                             >
@@ -361,6 +372,14 @@ export const MemberListView: React.FC = () => {
                             <span className="font-mono text-[11px] font-bold text-slate-700">
                               {m.eloScore || 0} LP
                             </span>
+                            {(m.shieldMatches ?? 0) > 0 && (
+                              <span
+                                title={`${m.shieldMatches} trận giáp bảo vệ`}
+                                className="px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-300 font-extrabold text-[9px]"
+                              >
+                                🛡️ {m.shieldMatches}
+                              </span>
+                            )}
                           </div>
                         )
                       })()}
@@ -379,6 +398,7 @@ export const MemberListView: React.FC = () => {
                                 setEditingRankMember(m)
                                 setManualLpInput(m.eloScore || 0)
                                 setManualPlacementsInput(m.placementMatches ?? 5)
+                                setManualShieldInput(m.shieldMatches ?? 0)
                               }}
                               className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 rounded-xl transition border border-slate-200"
                               title="Chỉnh sửa Bậc Rank / LP trực tiếp cho người chơi"
@@ -534,16 +554,40 @@ export const MemberListView: React.FC = () => {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5">
+                  Số trận Giáp Bảo Vệ Rank (Demotion Shield):
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  value={manualShieldInput}
+                  onChange={(e) => setManualShieldInput(Math.max(0, Number(e.target.value)))}
+                  className="w-full border border-slate-300 rounded-xl p-2.5 text-slate-900 font-bold focus:outline-none focus:border-slate-900"
+                />
+                <span className="text-[11px] text-slate-500 block mt-1">
+                  🛡️ Khi thua ở 0 LP, nếu còn giáp sẽ không bị rớt rank (giữ nguyên ở 0 LP).
+                </span>
+              </div>
+
               {/* Preview Result */}
               {(() => {
-                const preview = getPlayerRankDisplay(manualLpInput, manualPlacementsInput)
+                const preview = getPlayerRankDisplay(manualLpInput, manualPlacementsInput, manualShieldInput)
                 return (
                   <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
                     <div>
                       <span className="text-[10px] text-slate-500 font-bold uppercase block">Xem trước Rank:</span>
-                      <span className={`font-black text-sm ${preview.textColor}`}>
-                        {preview.name}
-                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={`font-black text-sm ${preview.textColor}`}>
+                          {preview.name}
+                        </span>
+                        {manualShieldInput > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 font-bold text-[10px]">
+                            🛡️ {manualShieldInput} giáp
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right font-mono font-bold text-slate-900">
                       <span>{manualLpInput} LP</span>
@@ -567,6 +611,7 @@ export const MemberListView: React.FC = () => {
                     userId: editingRankMember.id,
                     eloScore: manualLpInput,
                     placementMatches: manualPlacementsInput,
+                    shieldMatches: manualShieldInput,
                   })
                 }}
                 className="px-5 py-2 text-xs font-black bg-slate-950 hover:bg-slate-800 text-white rounded-xl shadow active:scale-95 transition"

@@ -135,6 +135,7 @@ public class AuthService {
                 .eloScore(user.getEloScore())
                 .placementMatches(user.getPlacementMatches() != null ? user.getPlacementMatches() : 0)
                 .currentStreak(user.getCurrentStreak() != null ? user.getCurrentStreak() : 0)
+                .shieldMatches(user.getShieldMatches() != null ? user.getShieldMatches() : 0)
                 .build();
     }
 }

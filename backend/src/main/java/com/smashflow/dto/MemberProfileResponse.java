@@ -25,5 +25,6 @@ public class MemberProfileResponse {
     private Integer eloScore;
     private Integer placementMatches;
     private Integer currentStreak;
+    private Integer shieldMatches;
     private LocalDateTime createdAt;
 }

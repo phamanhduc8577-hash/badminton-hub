@@ -33,6 +33,7 @@ export interface PlayerRankDisplay {
   totalLp: number
   isPlacement: boolean
   placementMatches: number
+  shieldMatches: number
   badge: string
   colorClass: string
   borderClass: string
@@ -190,9 +191,14 @@ export const LOL_RANKS: RankTier[] = [
  * Calculates Division (III, II, I) and LP in division (0..99 LP)
  * With 5 placement matches support (Unranked 0/5..5/5)
  */
-export const getPlayerRankDisplay = (score: number = 0, placementMatches: number = 5): PlayerRankDisplay => {
+export const getPlayerRankDisplay = (
+  score: number = 0,
+  placementMatches: number = 5,
+  shieldMatches: number = 0
+): PlayerRankDisplay => {
   const safeScore = Math.max(0, score)
   const isPlacement = placementMatches < 5
+  const safeShield = Math.max(0, shieldMatches || 0)
 
   // Tier calculation
   let baseTier = LOL_RANKS.find((r) => safeScore >= r.minScore && safeScore <= r.maxScore) || LOL_RANKS[0]
@@ -206,6 +212,7 @@ export const getPlayerRankDisplay = (score: number = 0, placementMatches: number
       totalLp: safeScore,
       isPlacement: true,
       placementMatches,
+      shieldMatches: 0,
       badge: `Phân Hạng (${placementMatches}/5)`,
       colorClass: 'text-slate-500',
       borderClass: 'border-dashed border-slate-300',
@@ -228,6 +235,7 @@ export const getPlayerRankDisplay = (score: number = 0, placementMatches: number
       totalLp: safeScore,
       isPlacement: false,
       placementMatches,
+      shieldMatches: safeShield,
       badge: baseTier.badge,
       colorClass: baseTier.colorClass,
       borderClass: baseTier.borderClass,
@@ -253,6 +261,7 @@ export const getPlayerRankDisplay = (score: number = 0, placementMatches: number
     totalLp: safeScore,
     isPlacement: false,
     placementMatches,
+    shieldMatches: safeShield,
     badge: `${baseTier.badge} ${divisionName}`,
     colorClass: baseTier.colorClass,
     borderClass: baseTier.borderClass,

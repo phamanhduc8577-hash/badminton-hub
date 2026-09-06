@@ -9,4 +9,6 @@ public class UpdateRankRequest {
     private Integer eloScore;
 
     private Integer placementMatches;
+
+    private Integer shieldMatches;
 }

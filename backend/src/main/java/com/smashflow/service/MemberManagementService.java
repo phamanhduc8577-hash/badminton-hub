@@ -85,6 +85,9 @@ public class MemberManagementService {
             // If Host sets rank score directly, mark placement complete (5/5)
             user.setPlacementMatches(5);
         }
+        if (request.getShieldMatches() != null) {
+            user.setShieldMatches(Math.max(0, request.getShieldMatches()));
+        }
 
         userRepository.save(user);
         return toResponse(user, true);
@@ -122,6 +125,7 @@ public class MemberManagementService {
                 .eloScore(u.getEloScore())
                 .placementMatches(u.getPlacementMatches() != null ? u.getPlacementMatches() : 0)
                 .currentStreak(u.getCurrentStreak() != null ? u.getCurrentStreak() : 0)
+                .shieldMatches(u.getShieldMatches() != null ? u.getShieldMatches() : 0)
                 .createdAt(u.getCreatedAt())
                 .build();
     }

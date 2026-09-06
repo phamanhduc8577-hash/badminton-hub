@@ -121,10 +121,16 @@ public class MatchService {
      * League of Legends (LMHT) Dynamic Elo & LP Progression System:
      * - Base Win: +20 LP, Base Loss: -18 LP
      * - Disparity bonus/penalty based on opponent team LP difference (Underdog vs Favorite)
-     * - Win streak bonus (+3 LP for 2-streak, +6 LP for 3-streak, up to +12 LP for 5+ streak)
+     * - Win streak bonus (+2 LP for 2-streak, +5 LP for 3-streak, up to +10 LP for 5+ streak)
      * - Placement match logic (First 5 matches):
      *   - Win gives +35 to +50 LP + opponent bonus
      *   - Loss in placements has NO LP penalty (0 LP loss) to encourage newcomers
+     * - Demotion Shield Protection (Bảo vệ tụt hạng):
+     *   - Thăng Bậc Lớn (Bạc -> Vàng, Vàng -> Bạch Kim...): Tặng 3 trận giáp bảo vệ (shieldMatches = 3)
+     *   - Thăng Đoàn Nhỏ (Vàng III -> Vàng II -> Vàng I): Tặng 1 trận giáp bảo vệ (shieldMatches = 1)
+     *   - Khi ở 0 LP của Bậc/Đoàn mới mà bị thua:
+     *     + Nếu còn khiên (shieldMatches > 0): Không tụt hạng, giữ nguyên ở 0 LP, tiêu hao 1 điểm khiên.
+     *     + Nếu hết khiên (shieldMatches == 0): Rớt hạng, đặt về 75 LP của Đoàn/Bậc dưới.
      * - Floor protection: Iron 0 LP (cannot drop below 0 LP)
      */
     private void applyMatchOutcome(User user, boolean isWin, int myTeamLp, int oppTeamLp) {
@@ -132,6 +138,10 @@ public class MatchService {
         boolean inPlacements = placementCount < 5;
         int currentLp = user.getEloScore();
         int streak = user.getCurrentStreak() != null ? user.getCurrentStreak() : 0;
+        int currentShield = user.getShieldMatches() != null ? user.getShieldMatches() : 0;
+
+        int oldTier = getTierLevel(currentLp);
+        int oldDivisionThreshold = getDivisionFloor(currentLp);
 
         int lpDiff = oppTeamLp - myTeamLp; // Positive if opponent has higher LP (underdog)
 
@@ -160,7 +170,22 @@ public class MatchService {
                 gainedLp = Math.max(12, Math.min(45, baseLp + diffAdjustment + streakBonus));
             }
 
-            user.setEloScore(currentLp + gainedLp);
+            int newLp = currentLp + gainedLp;
+            int newTier = getTierLevel(newLp);
+            int newDivisionThreshold = getDivisionFloor(newLp);
+
+            // Check promotion shield trigger
+            if (!inPlacements) {
+                if (newTier > oldTier) {
+                    // Promoted to higher Major Tier -> Grant 3 Shield Matches
+                    user.setShieldMatches(3);
+                } else if (newDivisionThreshold > oldDivisionThreshold) {
+                    // Promoted to higher Division (e.g. III -> II) -> Grant 1 Shield Match if no higher shield active
+                    user.setShieldMatches(Math.max(currentShield, 1));
+                }
+            }
+
+            user.setEloScore(newLp);
         } else {
             user.setLossCount(user.getLossCount() + 1);
             int newStreak = streak < 0 ? streak - 1 : -1;
@@ -168,16 +193,30 @@ public class MatchService {
 
             if (inPlacements) {
                 // Riot rule: No LP loss in placement matches!
-                // Elo remains unchanged, only placement matches counter increments
             } else {
                 // Regular match loss: Base -18 LP
                 int baseLoss = 18;
-                // Losing to lower LP opponent (favorite loss) = penalize more (-25)
-                // Losing to higher LP opponent (underdog loss) = lose less (-10)
                 int diffAdjustment = Math.max(-8, Math.min(8, (-lpDiff) / 15));
                 int lostLp = Math.max(10, Math.min(28, baseLoss + diffAdjustment));
 
-                user.setEloScore(Math.max(0, currentLp - lostLp));
+                int targetLp = currentLp - lostLp;
+                int currentFloor = getDivisionFloor(currentLp);
+
+                // If dropping below the current tier/division floor (would demote)
+                if (targetLp < currentFloor && currentLp >= currentFloor) {
+                    if (currentShield > 0) {
+                        // Protected by Demotion Shield! Hold at current division floor (0 LP in division)
+                        user.setEloScore(currentFloor);
+                        user.setShieldMatches(currentShield - 1);
+                    } else {
+                        // Shield broken / exhausted -> Demote to 75 LP of previous division
+                        int demotedLp = Math.max(0, currentFloor - 25);
+                        user.setEloScore(demotedLp);
+                        user.setShieldMatches(0);
+                    }
+                } else {
+                    user.setEloScore(Math.max(0, targetLp));
+                }
             }
         }
 
@@ -186,6 +225,16 @@ public class MatchService {
         }
 
         userRepository.save(user);
+    }
+
+    /**
+     * Helper to get division boundary threshold (0, 100, 200, 300, 400, ... 2100, 2500, 3000)
+     */
+    private int getDivisionFloor(int lp) {
+        if (lp >= 3000) return 3000;
+        if (lp >= 2500) return 2500;
+        if (lp >= 2100) return 2100;
+        return (lp / 100) * 100;
     }
 
     private void validateRankDifference(User pA1, User pA2, User pB1, User pB2) {

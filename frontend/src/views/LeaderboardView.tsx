@@ -196,7 +196,7 @@ export const LeaderboardView: React.FC = () => {
           <div className="space-y-3">
             {currentList?.map((entry) => {
               const score = tab === 'attendance' ? entry.sessionsAttended : (entry.eloScore ?? 0)
-              const rankDisplay = getPlayerRankDisplay(entry.eloScore ?? 0, entry.placementMatches ?? 5)
+              const rankDisplay = getPlayerRankDisplay(entry.eloScore ?? 0, entry.placementMatches ?? 5, entry.shieldMatches ?? 0)
               const baseTier = getLolRank(entry.eloScore ?? 0)
 
               return (
@@ -230,14 +230,24 @@ export const LeaderboardView: React.FC = () => {
 
                         {/* LOL Tier Pill for Wins */}
                         {tab === 'wins' ? (
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border font-black text-[11px] shadow-xs ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}
-                          >
-                            <span>{rankDisplay.name}</span>
-                            {!rankDisplay.isPlacement && rankDisplay.division && (
-                              <span className="opacity-80">({rankDisplay.currentLpInDivision} LP)</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border font-black text-[11px] shadow-xs ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}
+                            >
+                              <span>{rankDisplay.name}</span>
+                              {!rankDisplay.isPlacement && rankDisplay.division && (
+                                <span className="opacity-80">({rankDisplay.currentLpInDivision} LP)</span>
+                              )}
+                            </span>
+                            {!rankDisplay.isPlacement && (entry.shieldMatches ?? 0) > 0 && (
+                              <span
+                                title={`Đang được bảo vệ rank (${entry.shieldMatches} trận khiên còn lại)`}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300 font-extrabold text-[10px] shadow-2xs animate-pulse"
+                              >
+                                🛡️ {entry.shieldMatches} trận giáp
+                              </span>
                             )}
-                          </span>
+                          </div>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-slate-200 font-bold text-[11px] bg-slate-100 text-slate-700">
                             🏸 Thành viên
