@@ -279,7 +279,7 @@ export const LoginView: React.FC = () => {
                     <input
                       type="tel"
                       required
-                      placeholder="0901234567"
+                      placeholder="0325872682"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
@@ -498,48 +498,6 @@ export const LoginView: React.FC = () => {
                     {isRegister ? 'Đã có tài khoản? Đăng nhập ngay' : 'Chưa có tài khoản? Đăng ký thành viên'}
                   </button>
                 )}
-              </div>
-            )}
-
-            {/* Demo Quick Login Bar */}
-            {!isForgotPassword && (
-              <div className="pt-4 border-t border-slate-200 text-xs">
-                <span className="text-slate-600 font-bold block mb-2 text-[11px]">Tài khoản mẫu thử nghiệm:</span>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhone('0901234567')
-                      setPassword('123456')
-                      setIsRegister(false)
-                    }}
-                    className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg border border-amber-200 text-[11px] font-bold transition"
-                  >
-                    👑 Host (0901234567)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhone('0912345678')
-                      setPassword('123456')
-                      setIsRegister(false)
-                    }}
-                    className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg border border-blue-200 text-[11px] font-bold transition"
-                  >
-                    🏸 Nam (0912345678)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPhone('0987654321')
-                      setPassword('123456')
-                      setIsRegister(false)
-                    }}
-                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-900 rounded-lg border border-rose-200 text-[11px] font-bold transition"
-                  >
-                    🏸 Nữ (0987654321)
-                  </button>
-                </div>
               </div>
             )}
           </div>
