@@ -33,4 +33,10 @@ public class LoyaltyRewardController {
                                                              @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(loyaltyRewardService.claimReward(rewardId, user));
     }
+
+    @PostMapping("/milestone/{milestone}/claim")
+    public ResponseEntity<LoyaltyRewardResponse> claimRewardByMilestone(@PathVariable Integer milestone,
+                                                                        @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(loyaltyRewardService.claimRewardByMilestone(milestone, user));
+    }
 }

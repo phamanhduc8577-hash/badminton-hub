@@ -167,21 +167,12 @@ public class CheckinAndPricingService {
     }
 
     private void checkAndGrantLoyaltyRewards(User user) {
-        List<Integer> milestones = Arrays.asList(5, 10, 20, 30, 40, 50, 100);
+        List<Integer> milestones = Arrays.asList(5, 10, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100);
         int attended = user.getSessionsAttended();
 
         for (Integer m : milestones) {
             if (attended >= m && loyaltyRewardRepository.findByUserIdAndMilestoneSessions(user.getId(), m).isEmpty()) {
-                String rewardName = switch (m) {
-                    case 5 -> "1 chai nước tăng lực Revive";
-                    case 10 -> "Voucher giảm 15% tiền sân buổi kế tiếp";
-                    case 20 -> "Combo 3 chai nước tăng lực Revive";
-                    case 30 -> "1 quả cầu lông thi đấu chính hãng";
-                    case 40 -> "Gói Host VIP Premium đặc quyền";
-                    case 50 -> "Voucher giảm 35% tiền sân buổi kế tiếp";
-                    case 100 -> "Miễn phí 100% (FREE) tiền sân buổi kế tiếp";
-                    default -> "Hộp quà bí ẩn CLB Làng Địa Ngục";
-                };
+                String rewardName = LoyaltyRewardService.getRewardNameForMilestone(m);
 
                 LoyaltyReward reward = LoyaltyReward.builder()
                         .user(user)
