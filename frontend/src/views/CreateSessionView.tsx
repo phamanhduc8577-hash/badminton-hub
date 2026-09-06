@@ -11,10 +11,10 @@ export const CreateSessionView: React.FC = () => {
   const getInitialDates = () => {
     const now = new Date()
     const start = new Date(now)
+    // Default to tomorrow 20:00 to avoid any past time validation issue
+    start.setDate(start.getDate() + 1)
     start.setHours(20, 0, 0, 0)
-    if (now.getHours() >= 20) {
-      start.setDate(start.getDate() + 1)
-    }
+
     const end = new Date(start)
     end.setHours(start.getHours() + 2)
 
