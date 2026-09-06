@@ -4,10 +4,10 @@ import { api } from '../lib/api'
 import { LoyaltyReward, AttendanceRecord } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
+import { GiftGraphic } from '../components/GiftGraphic'
 import {
   Gift,
   CheckCircle2,
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Flame,
@@ -18,6 +18,8 @@ import {
   Zap,
   Activity,
   Award,
+  PackageOpen,
+  X,
 } from 'lucide-react'
 
 export const LoyaltyView: React.FC = () => {
@@ -40,10 +42,18 @@ export const LoyaltyView: React.FC = () => {
 
   // Calendar date view state
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [unlockedGiftModal, setUnlockedGiftModal] = useState<{
+
+  // Unboxing Modal State
+  const [unboxingMilestone, setUnboxingMilestone] = useState<{
     target: number
     gift: string
+    desc: string
+    type: string
+    isClaimed: boolean
   } | null>(null)
+
+  const [isRevealed, setIsRevealed] = useState(false)
+  const [claimSuccess, setClaimSuccess] = useState(false)
 
   // 1. Fetch user claimed / available rewards
   const { data: rewards } = useQuery<LoyaltyReward[]>({
@@ -67,14 +77,15 @@ export const LoyaltyView: React.FC = () => {
     refetchOnMount: 'always',
   })
 
-  const claimMutation = useMutation({
-    mutationFn: async (rewardId: number) => {
-      const res = await api.post(`/loyalty/${rewardId}/claim`)
+  const claimMilestoneMutation = useMutation({
+    mutationFn: async (milestone: number) => {
+      const res = await api.post(`/loyalty/milestone/${milestone}/claim`)
       return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['loyalty-rewards'] })
-      alert('Nhận phần thưởng thành công! Vui lòng liên hệ Host tại sân để nhận quà.')
+      queryClient.invalidateQueries({ queryKey: ['my-profile'] })
+      setClaimSuccess(true)
     },
     onError: (err: any) => {
       alert(err.response?.data?.message || 'Không thể nhận quà!')
@@ -82,58 +93,120 @@ export const LoyaltyView: React.FC = () => {
   })
 
   const attended = profile?.sessionsAttended ?? user?.sessionsAttended ?? 0
-  const winCount = profile?.winCount ?? user?.winCount ?? 0
 
-  // Defined Milestones with Surprise Gifts
+  // Defined Milestones with Real Badminton Gear & Beverage Rewards
   const milestones = [
     {
       target: 5,
       gift: '1 Chai nước tăng lực Revive',
-      desc: 'Bù khoáng & năng lượng tức thì sau trận đấu',
-      icon: '🍾',
+      desc: 'Bù khoáng & năng lượng tức thì sau set đấu kịch tính',
       tag: 'Khởi đầu',
+      type: 'REVIVE',
     },
     {
       target: 10,
       gift: 'Voucher giảm 15% tiền vé',
-      desc: 'Áp dụng trừ trực tiếp vào hóa đơn ca tiếp theo',
-      icon: '🏷️',
+      desc: 'Trừ trực tiếp vào hóa đơn ca đánh tiếp theo của CLB',
       tag: 'Bền bỉ',
+      type: 'DISCOUNT_15',
     },
     {
       target: 20,
-      gift: 'Combo 3 chai nước Revive',
-      desc: 'Thoải mái quẩy hết mình cùng đồng đội',
-      icon: '🍾🍾🍾',
+      gift: '1 Quấn cán vợt cao cấp',
+      desc: 'Quấn cán vợt cầu lông êm ái, bám tay chống trơn trượt',
       tag: 'Chuyên cần',
+      type: 'GRIP_1',
+    },
+    {
+      target: 25,
+      gift: '2 Quấn cán cao su',
+      desc: 'Bộ 2 quấn cán cao su đàn hồi tốt, độ bám siêu dính',
+      tag: 'Chiến binh',
+      type: 'GRIP_2',
     },
     {
       target: 30,
-      gift: '1 Quả cầu lông thi đấu xịn',
-      desc: 'Cầu lông tiêu chuẩn thi đấu chính hãng',
-      icon: '🏸',
-      tag: 'Chiến binh',
+      gift: 'Voucher giảm 20% giá sân',
+      desc: 'Ưu đãi trừ 20% chi phí vào ca đánh kế tiếp',
+      tag: 'Cống hiến',
+      type: 'DISCOUNT_20',
+    },
+    {
+      target: 35,
+      gift: 'Voucher giảm 25% giá sân',
+      desc: 'Ưu đãi trừ 25% chi phí cho tay vợt tích cực',
+      tag: 'Tinh anh',
+      type: 'DISCOUNT_25',
     },
     {
       target: 40,
-      gift: 'Gói Host VIP Premium',
-      desc: 'Đặc quyền ưu tiên chọn sân & chỗ đánh cố định',
-      icon: '👑',
+      gift: 'Voucher giảm 30% giá sân',
+      desc: 'Mức trợ giá 30% cực sâu cho thành viên nòng cốt',
       tag: 'VIP Member',
+      type: 'DISCOUNT_30',
+    },
+    {
+      target: 45,
+      gift: '2 Chai nước Revive ướp lạnh',
+      desc: 'Combo 2 chai bù nước điện giải sảng khoái mát lạnh',
+      tag: 'Năng nổ',
+      type: 'REVIVE_2',
     },
     {
       target: 50,
-      gift: 'Voucher giảm 35% tiền vé',
-      desc: 'Trợ giá khủng cho tay vợt cống hiến',
-      icon: '⚡',
+      gift: '3 Quấn cán cao su cao cấp',
+      desc: 'Bộ 3 quấn cán cao su chuyên dụng thi đấu cầu lông',
       tag: 'Huyền thoại',
+      type: 'GRIP_3',
+    },
+    {
+      target: 55,
+      gift: '3 Chai nước tăng lực Revive',
+      desc: 'Combo 3 chai Revive tiếp sức thi đấu bùng nổ cùng đồng đội',
+      tag: 'Đam mê',
+      type: 'REVIVE_3',
+    },
+    {
+      target: 60,
+      gift: 'Voucher giảm 30% giá vé',
+      desc: 'Trợ giá 30% vé vào sân cho hội viên kỳ cựu',
+      tag: 'Bất khuất',
+      type: 'DISCOUNT_30',
+    },
+    {
+      target: 65,
+      gift: 'Voucher giảm 35% giá vé',
+      desc: 'Mức trợ giá 35% tri ân sâu sắc thành viên gắn bó',
+      tag: 'Siêu sao',
+      type: 'DISCOUNT_35',
+    },
+    {
+      target: 70,
+      gift: '3 Chai nước tăng lực Revive',
+      desc: 'Bổ sung thể lực tối đa cho những trận cầu rực lửa',
+      tag: 'Chiến tướng',
+      type: 'REVIVE_3',
+    },
+    {
+      target: 80,
+      gift: 'Voucher giảm 38% giá vé',
+      desc: 'Ưu đãi giảm 38% chi phí ca đánh tại CLB',
+      tag: 'Kỳ tài',
+      type: 'DISCOUNT_38',
+    },
+    {
+      target: 90,
+      gift: 'Voucher giảm 40% giá vé',
+      desc: 'Trợ giá khủng 40% cho tay vợt tâm huyết của làng',
+      tag: 'Bậc thầy',
+      type: 'DISCOUNT_40',
     },
     {
       target: 100,
-      gift: 'FREE 100% Tiền Sân Ca Đấu',
-      desc: 'Miễn phí hoàn toàn 1 ca đánh bất kỳ của CLB',
-      icon: '🏆',
+      gift: '1 Đôi vớ Yonex chính hãng',
+      desc: 'Vớ thể thao Yonex dày dặn, thấm hút mồ hôi, êm chân chuẩn thi đấu',
       tag: 'Đại sứ CLB',
+      type: 'YONEX_SOCKS',
     },
   ]
 
@@ -189,6 +262,18 @@ export const LoyaltyView: React.FC = () => {
     'Tháng Mười Một',
     'Tháng Mười Hai',
   ]
+
+  const handleOpenUnboxing = (m: (typeof milestones)[0], isClaimed: boolean) => {
+    setUnboxingMilestone({
+      target: m.target,
+      gift: m.gift,
+      desc: m.desc,
+      type: m.type,
+      isClaimed,
+    })
+    setIsRevealed(isClaimed) // If already claimed, reveal immediately
+    setClaimSuccess(isClaimed)
+  }
 
   return (
     <div className="space-y-10">
@@ -480,7 +565,7 @@ export const LoyaltyView: React.FC = () => {
               <span>Danh Sách Hộp Quà Bí Ẩn & Phần Thưởng Tri Ân</span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 font-semibold mt-1">
-              Đạt đủ số buổi để mở khóa hộp quà bí ẩn và nhận quà trực tiếp từ Host!
+              Đạt đủ số buổi để mở khóa hộp quà bí ẩn và nhận quà thực tế từ Host CLB!
             </p>
           </div>
         </div>
@@ -489,15 +574,16 @@ export const LoyaltyView: React.FC = () => {
           {milestones.map((m) => {
             const isReached = attended >= m.target
             const rewardRecord = rewards?.find((r) => r.milestoneSessions === m.target)
-            const isClaimed = rewardRecord?.isClaimed
+            const isClaimed = !!rewardRecord?.isClaimed
 
             return (
               <div
                 key={m.target}
+                onClick={() => isReached && handleOpenUnboxing(m, isClaimed)}
                 className={`rounded-3xl p-6 border transition flex flex-col justify-between shadow-md relative overflow-hidden group ${
                   isReached
-                    ? 'bg-white border-slate-300 hover:border-slate-400 shadow-slate-900/[0.06] hover:-translate-y-1 duration-200'
-                    : 'bg-slate-50/70 border-slate-200/90 opacity-80'
+                    ? 'bg-white border-slate-300 hover:border-amber-400 hover:shadow-xl shadow-slate-900/[0.06] hover:-translate-y-1 duration-200 cursor-pointer'
+                    : 'bg-slate-50/70 border-slate-200/90 opacity-80 cursor-not-allowed'
                 }`}
               >
                 {/* Milestone Badge Tag */}
@@ -519,7 +605,7 @@ export const LoyaltyView: React.FC = () => {
                     </span>
                   ) : isReached ? (
                     <span className="text-[10px] font-black text-rose-600 animate-pulse bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                      Sẵn sàng mở!
+                      Mở hộp ngay!
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-[10px] font-black text-slate-400">
@@ -529,17 +615,14 @@ export const LoyaltyView: React.FC = () => {
                   )}
                 </div>
 
-                {/* Gift Visual Frame */}
+                {/* Gift Visual Frame with Realistic Graphics */}
                 <div className="py-4 text-center flex flex-col items-center justify-center space-y-3">
-                  <div
-                    className={`w-20 h-20 rounded-3xl flex items-center justify-center text-4xl shadow-inner border transition duration-300 ${
-                      isReached
-                        ? 'bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200 group-hover:scale-110 shadow-amber-200/50'
-                        : 'bg-slate-100 border-slate-200 text-slate-300'
-                    }`}
-                  >
-                    {isReached ? m.icon : '🎁'}
-                  </div>
+                  <GiftGraphic
+                    type={m.type}
+                    isReached={isReached}
+                    isClaimed={isClaimed}
+                    size="lg"
+                  />
 
                   <div className="space-y-1">
                     <h3 className="font-black text-slate-950 text-base leading-snug">
@@ -558,21 +641,13 @@ export const LoyaltyView: React.FC = () => {
                       <Check size={14} className="text-emerald-600" />
                       <span>Đã nhận quà thành công</span>
                     </span>
-                  ) : isReached && rewardRecord ? (
-                    <button
-                      disabled={claimMutation.isPending}
-                      onClick={() => claimMutation.mutate(rewardRecord.id)}
-                      className="w-full py-3 bg-slate-950 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-lg shadow-slate-950/20 transition active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      <Sparkles size={14} className="text-amber-400" />
-                      <span>Nhận quà ngay</span>
-                    </button>
                   ) : isReached ? (
                     <button
-                      onClick={() => setUnlockedGiftModal({ target: m.target, gift: m.gift })}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95"
+                      type="button"
+                      className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-black text-xs rounded-xl shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-2"
                     >
-                      Xem chi tiết quà
+                      <PackageOpen size={15} />
+                      <span>Mở hộp & Nhận quà</span>
                     </button>
                   ) : (
                     <span className="text-xs font-bold text-slate-400">
@@ -586,28 +661,116 @@ export const LoyaltyView: React.FC = () => {
         </div>
       </div>
 
-      {/* Detail Pop-up Modal */}
-      {unlockedGiftModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-5 text-center animate-in zoom-in-90 duration-200">
-            <div className="w-18 h-18 bg-amber-100 text-4xl rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-              🎉
-            </div>
-            <div className="space-y-2">
-              <span className="text-xs font-black text-rose-600 uppercase tracking-wider bg-rose-50 px-3 py-1 rounded-full border border-rose-200">
-                Chúc mừng bạn đã đạt mốc!
-              </span>
-              <h3 className="text-xl font-black text-slate-950 mt-2">{unlockedGiftModal.gift}</h3>
-              <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                Bạn đã tích lũy đủ <b>{unlockedGiftModal.target} buổi tham gia</b>. Vui lòng gặp Host tại sân trong ca đánh tới để nhận quà trực tiếp!
-              </p>
-            </div>
+      {/* 4. Interactive 3D Unboxing & Claim Modal */}
+      {unboxingMilestone && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-6 text-center animate-in zoom-in-95 duration-200 relative overflow-hidden">
+            {/* Ambient Background Burst */}
+            <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-amber-400/20 via-rose-400/10 to-transparent pointer-events-none" />
+
             <button
-              onClick={() => setUnlockedGiftModal(null)}
-              className="w-full py-3.5 bg-slate-950 text-white font-black text-xs rounded-xl hover:bg-slate-800 transition shadow-lg active:scale-95"
+              onClick={() => setUnboxingMilestone(null)}
+              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-950 hover:bg-slate-100 transition z-10"
             >
-              Đã hiểu & Đóng
+              <X size={20} />
             </button>
+
+            {!isRevealed ? (
+              /* State 1: Mystery Box Ready to be Tapped */
+              <div className="space-y-6 py-4 relative z-10">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-xs font-black uppercase tracking-wider">
+                  <Sparkles size={14} />
+                  <span>Hộp Quà Mốc {unboxingMilestone.target} Buổi</span>
+                </div>
+
+                <div
+                  onClick={() => setIsRevealed(true)}
+                  className="cursor-pointer group flex flex-col items-center justify-center py-4"
+                >
+                  <div className="relative transform group-hover:scale-110 transition duration-300 animate-bounce">
+                    <div className="w-36 h-36 rounded-3xl bg-gradient-to-br from-amber-400 via-rose-500 to-amber-600 p-1 shadow-2xl shadow-rose-500/30 flex items-center justify-center">
+                      <div className="w-full h-full bg-slate-950 rounded-[22px] flex items-center justify-center text-6xl">
+                        🎁
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs font-black text-amber-600 mt-6 animate-pulse uppercase tracking-wider">
+                    👉 Nhấn vào hộp quà để mở hé lộ!
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setIsRevealed(true)}
+                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-rose-600 text-white font-black text-sm rounded-2xl hover:brightness-110 transition shadow-lg shadow-rose-600/30 active:scale-95"
+                >
+                  Mở hộp quà ngay ✨
+                </button>
+              </div>
+            ) : (
+              /* State 2: Revealed Item with Graphic & Claim CTA */
+              <div className="space-y-5 relative z-10 animate-in zoom-in-75 duration-300">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black uppercase tracking-wider">
+                  <Sparkles size={14} className="text-amber-500" />
+                  <span>Chúc Mừng Đạt Mốc {unboxingMilestone.target} Buổi!</span>
+                </div>
+
+                <div className="flex flex-col items-center justify-center py-2">
+                  <GiftGraphic
+                    type={unboxingMilestone.type}
+                    isReached={true}
+                    size="xl"
+                    className="shadow-2xl ring-4 ring-amber-400/30"
+                  />
+                  <h3 className="text-2xl font-black text-slate-950 mt-4 tracking-tight">
+                    {unboxingMilestone.gift}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 font-medium mt-1.5 max-w-xs leading-relaxed">
+                    {unboxingMilestone.desc}
+                  </p>
+                </div>
+
+                {claimSuccess || unboxingMilestone.isClaimed ? (
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-emerald-950 space-y-2">
+                    <div className="flex items-center justify-center gap-2 font-black text-sm text-emerald-800">
+                      <CheckCircle2 size={18} className="text-emerald-600" />
+                      <span>Đã nhận phần thưởng thành công!</span>
+                    </div>
+                    <p className="text-xs text-emerald-700 font-semibold leading-relaxed">
+                      Thông tin nhận quà đã được ghi nhận. Vui lòng gặp Host tại sân để nhận hiện vật hoặc áp dụng giảm giá ca tiếp theo!
+                    </p>
+                    <button
+                      onClick={() => setUnboxingMilestone(null)}
+                      className="w-full mt-2 py-3 bg-slate-950 text-white font-black text-xs rounded-xl hover:bg-slate-800 transition"
+                    >
+                      Tuyệt vời! Đóng
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <button
+                      disabled={claimMilestoneMutation.isPending}
+                      onClick={() => claimMilestoneMutation.mutate(unboxingMilestone.target)}
+                      className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm rounded-2xl shadow-xl shadow-emerald-600/30 transition active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      {claimMilestoneMutation.isPending ? (
+                        <span>Đang xử lý nhận quà...</span>
+                      ) : (
+                        <>
+                          <Sparkles size={18} className="text-amber-300" />
+                          <span>Nhận món quà này ngay</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setUnboxingMilestone(null)}
+                      className="w-full py-2.5 text-xs text-slate-500 font-bold hover:text-slate-800 transition"
+                    >
+                      Để sau
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
