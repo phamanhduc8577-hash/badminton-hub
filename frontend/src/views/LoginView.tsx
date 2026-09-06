@@ -279,7 +279,7 @@ export const LoginView: React.FC = () => {
                     <input
                       type="tel"
                       required
-                      placeholder="0325872682"
+                      placeholder="Nhập số điện thoại của bạn..."
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
