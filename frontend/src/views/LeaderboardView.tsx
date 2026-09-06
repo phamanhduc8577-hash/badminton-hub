@@ -4,7 +4,7 @@ import { api } from '../lib/api'
 import { LeaderboardEntry } from '../types'
 import { DuckMascot } from '../components/DuckMascot'
 import { RankEmblem } from '../components/RankEmblem'
-import { getLolRank, LOL_RANKS } from '../lib/ranks'
+import { getLolRank, getPlayerRankDisplay, LOL_RANKS } from '../lib/ranks'
 import { Trophy, Flame, Award, TrendingUp, Shield, Sparkles, ChevronRight, Info, Zap } from 'lucide-react'
 
 export const LeaderboardView: React.FC = () => {
@@ -76,7 +76,7 @@ export const LeaderboardView: React.FC = () => {
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-              Vinh danh các tay vợt theo hệ thống 10 Bậc Rank Liên Minh Huyền Thoại chuẩn Riot: Từ Đồng, Bạc, Vàng, Bạch Kim đến Cao Thủ & Thách Đấu dựa trên <b>Điểm Elo Chiến Thần (Trận Thắng - Trận Thua)</b>.
+              Vinh danh các tay vợt theo hệ thống 10 Bậc Rank & Đoàn (III, II, I) Liên Minh Huyền Thoại chuẩn Riot: 100 LP mỗi đoàn, chuỗi thắng thưởng LP, và 5 trận phân hạng khởi đầu.
             </p>
 
             {/* Quick Rank Crest Strip Preview */}
@@ -153,7 +153,10 @@ export const LeaderboardView: React.FC = () => {
                   <RankEmblem tier={tier} size="lg" />
                   <h4 className={`font-black text-xs mt-2 ${tier.textColor}`}>{tier.name}</h4>
                   <span className="text-[10px] font-extrabold text-slate-700 mt-1 bg-white/90 px-2.5 py-0.5 rounded-full border border-slate-200 shadow-2xs">
-                    {tier.maxScore > 9000 ? `&ge; ${tier.minScore} Điểm` : `${tier.minScore} - ${tier.maxScore} Điểm`}
+                    {tier.maxScore > 9000 ? `&ge; ${tier.minScore} LP` : `${tier.minScore} - ${tier.maxScore} LP`}
+                  </span>
+                  <span className="text-[9px] text-slate-500 mt-0.5 font-bold">
+                    {tier.tier === 'MASTER' || tier.tier === 'GRANDMASTER' || tier.tier === 'CHALLENGER' ? 'Không chia Đoàn' : '100 LP / Đoàn (III -> I)'}
                   </span>
                 </div>
               ))}
@@ -192,9 +195,9 @@ export const LeaderboardView: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {currentList?.map((entry) => {
-              // For Attendance: score is sessionsAttended. For Chiến Thần (Wins): Elo Score = Max(0, winCount - lossCount)
-              const score = tab === 'attendance' ? entry.sessionsAttended : (entry.eloScore ?? Math.max(0, entry.winCount - entry.lossCount))
-              const rankInfo = getLolRank(score)
+              const score = tab === 'attendance' ? entry.sessionsAttended : (entry.eloScore ?? 0)
+              const rankDisplay = getPlayerRankDisplay(entry.eloScore ?? 0, entry.placementMatches ?? 5)
+              const baseTier = getLolRank(entry.eloScore ?? 0)
 
               return (
                 <div
@@ -207,7 +210,7 @@ export const LeaderboardView: React.FC = () => {
 
                     {tab === 'wins' && (
                       <div className="shrink-0">
-                        <RankEmblem tier={rankInfo} size="md" />
+                        <RankEmblem tier={baseTier} size="md" />
                       </div>
                     )}
 
@@ -228,9 +231,12 @@ export const LeaderboardView: React.FC = () => {
                         {/* LOL Tier Pill for Wins */}
                         {tab === 'wins' ? (
                           <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border font-black text-[11px] shadow-xs ${rankInfo.bgClass} ${rankInfo.borderClass} ${rankInfo.textColor}`}
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border font-black text-[11px] shadow-xs ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}
                           >
-                            <span>{rankInfo.name}</span>
+                            <span>{rankDisplay.name}</span>
+                            {!rankDisplay.isPlacement && rankDisplay.division && (
+                              <span className="opacity-80">({rankDisplay.currentLpInDivision} LP)</span>
+                            )}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-slate-200 font-bold text-[11px] bg-slate-100 text-slate-700">
@@ -248,7 +254,7 @@ export const LeaderboardView: React.FC = () => {
                           {entry.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
                         </span>
                       </div>
-                      <span className="text-xs text-slate-500 font-semibold">{entry.phone}</span>
+                      {entry.phone && <span className="text-xs text-slate-500 font-semibold">{entry.phone}</span>}
                     </div>
                   </div>
 
@@ -267,13 +273,13 @@ export const LeaderboardView: React.FC = () => {
                     ) : (
                       <div>
                         <div className="flex items-center gap-2 sm:justify-end">
-                          <span className="text-2xl font-black text-slate-950">{score} LP</span>
+                          <span className="text-2xl font-black text-slate-950">{entry.eloScore ?? 0} LP</span>
                           <span className="text-xs font-bold text-slate-500">
                             ({entry.winCount}W - {entry.lossCount}L)
                           </span>
                         </div>
                         <span className="text-xs text-slate-600 block font-bold mt-0.5">
-                          Tỷ lệ thắng: <b className="text-slate-950">{entry.winRate}%</b> • <b className={rankInfo.textColor}>{rankInfo.name}</b>
+                          Tỷ lệ thắng: <b className="text-slate-950">{entry.winRate}%</b> • <b className={rankDisplay.textColor}>{rankDisplay.name}</b>
                         </span>
                       </div>
                     )}

@@ -636,6 +636,8 @@ public class SessionService {
                 .winCount(p.getUser() != null ? p.getUser().getWinCount() : 0)
                 .lossCount(p.getUser() != null ? p.getUser().getLossCount() : 0)
                 .eloScore(p.getUser() != null ? p.getUser().getEloScore() : 0)
+                .placementMatches(p.getUser() != null ? (p.getUser().getPlacementMatches() != null ? p.getUser().getPlacementMatches() : 0) : 0)
+                .currentStreak(p.getUser() != null ? (p.getUser().getCurrentStreak() != null ? p.getUser().getCurrentStreak() : 0) : 0)
                 .avatarUrl(p.getUser() != null ? p.getUser().getAvatarUrl() : "/duck-mascot.png")
                 .build();
     }

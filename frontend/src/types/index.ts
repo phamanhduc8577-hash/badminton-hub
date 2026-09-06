@@ -11,6 +11,8 @@ export interface User {
   lossCount: number
   winRate: number
   eloScore?: number
+  placementMatches?: number
+  currentStreak?: number
 }
 
 export interface MemberProfile {
@@ -26,6 +28,8 @@ export interface MemberProfile {
   lossCount: number
   winRate: number
   eloScore?: number
+  placementMatches?: number
+  currentStreak?: number
   createdAt: string
 }
 
@@ -91,6 +95,8 @@ export interface Participant {
   winCount?: number
   lossCount?: number
   eloScore?: number
+  placementMatches?: number
+  currentStreak?: number
   avatarUrl?: string
 }
 
@@ -121,6 +127,8 @@ export interface LeaderboardEntry {
   lossCount: number
   winRate: number
   eloScore?: number
+  placementMatches?: number
+  currentStreak?: number
   rank: number
 }
 

@@ -72,6 +72,25 @@ public class MemberManagementService {
     }
 
     @Transactional
+    public MemberProfileResponse updateMemberRank(Long userId, com.smashflow.dto.UpdateRankRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thành viên!"));
+
+        if (request.getEloScore() != null) {
+            user.setEloScore(Math.max(0, request.getEloScore()));
+        }
+        if (request.getPlacementMatches() != null) {
+            user.setPlacementMatches(Math.max(0, Math.min(5, request.getPlacementMatches())));
+        } else if (request.getEloScore() != null && request.getEloScore() > 0) {
+            // If Host sets rank score directly, mark placement complete (5/5)
+            user.setPlacementMatches(5);
+        }
+
+        userRepository.save(user);
+        return toResponse(user, true);
+    }
+
+    @Transactional
     public String resetMemberPassword(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thành viên!"));
@@ -101,6 +120,8 @@ public class MemberManagementService {
                 .lossCount(u.getLossCount() != null ? u.getLossCount() : 0)
                 .winRate(u.getWinRate())
                 .eloScore(u.getEloScore())
+                .placementMatches(u.getPlacementMatches() != null ? u.getPlacementMatches() : 0)
+                .currentStreak(u.getCurrentStreak() != null ? u.getCurrentStreak() : 0)
                 .createdAt(u.getCreatedAt())
                 .build();
     }

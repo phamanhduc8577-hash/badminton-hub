@@ -36,6 +36,8 @@ public class LeaderboardService {
                     .lossCount(u.getLossCount())
                     .winRate(u.getWinRate())
                     .eloScore(u.getEloScore())
+                    .placementMatches(u.getPlacementMatches() != null ? u.getPlacementMatches() : 0)
+                    .currentStreak(u.getCurrentStreak() != null ? u.getCurrentStreak() : 0)
                     .rank(rank++)
                     .build());
         }
@@ -68,6 +70,8 @@ public class LeaderboardService {
                     .lossCount(u.getLossCount())
                     .winRate(u.getWinRate())
                     .eloScore(u.getEloScore())
+                    .placementMatches(u.getPlacementMatches() != null ? u.getPlacementMatches() : 0)
+                    .currentStreak(u.getCurrentStreak() != null ? u.getCurrentStreak() : 0)
                     .rank(rank++)
                     .build());
         }

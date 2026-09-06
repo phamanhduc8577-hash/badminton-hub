@@ -5,7 +5,7 @@ import { api } from '../lib/api'
 import { SessionItem, Participant, Match, HostReport } from '../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { DuckMascot } from '../components/DuckMascot'
-import { getLolRank } from '../lib/ranks'
+import { getPlayerRankDisplay, getLolRank } from '../lib/ranks'
 import {
   Users,
   Swords,
@@ -1144,11 +1144,11 @@ export const HostDashboardView: React.FC = () => {
                       >
                         <option value="">Chọn tay vợt...</option>
                         {getAvailableUsersForCourt(currentCourtName, currentDraft.teamAP1).map((u) => {
-                          const rank = getLolRank(u.eloScore || 0)
+                          const rank = getPlayerRankDisplay(u.eloScore || 0, u.placementMatches ?? 5)
                           const stats = playerStatsMap[String(u.userId || u.id)]
                           return (
                             <option key={u.id} value={String(u.userId || u.id)}>
-                              {u.name} • {rank.badge} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
+                              {u.name} • {rank.name} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
                               {u.isGuest ? '[Vãng lai]' : ''}
                             </option>
                           )
@@ -1165,11 +1165,11 @@ export const HostDashboardView: React.FC = () => {
                       >
                         <option value="">(Không có - Đánh đơn)</option>
                         {getAvailableUsersForCourt(currentCourtName, currentDraft.teamAP2).map((u) => {
-                          const rank = getLolRank(u.eloScore || 0)
+                          const rank = getPlayerRankDisplay(u.eloScore || 0, u.placementMatches ?? 5)
                           const stats = playerStatsMap[String(u.userId || u.id)]
                           return (
                             <option key={u.id} value={String(u.userId || u.id)}>
-                              {u.name} • {rank.badge} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
+                              {u.name} • {rank.name} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
                               {u.isGuest ? '[Vãng lai]' : ''}
                             </option>
                           )
@@ -1197,11 +1197,11 @@ export const HostDashboardView: React.FC = () => {
                       >
                         <option value="">Chọn tay vợt...</option>
                         {getAvailableUsersForCourt(currentCourtName, currentDraft.teamBP1).map((u) => {
-                          const rank = getLolRank(u.eloScore || 0)
+                          const rank = getPlayerRankDisplay(u.eloScore || 0, u.placementMatches ?? 5)
                           const stats = playerStatsMap[String(u.userId || u.id)]
                           return (
                             <option key={u.id} value={String(u.userId || u.id)}>
-                              {u.name} • {rank.badge} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
+                              {u.name} • {rank.name} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
                               {u.isGuest ? '[Vãng lai]' : ''}
                             </option>
                           )
@@ -1218,11 +1218,11 @@ export const HostDashboardView: React.FC = () => {
                       >
                         <option value="">(Không có - Đánh đơn)</option>
                         {getAvailableUsersForCourt(currentCourtName, currentDraft.teamBP2).map((u) => {
-                          const rank = getLolRank(u.eloScore || 0)
+                          const rank = getPlayerRankDisplay(u.eloScore || 0, u.placementMatches ?? 5)
                           const stats = playerStatsMap[String(u.userId || u.id)]
                           return (
                             <option key={u.id} value={String(u.userId || u.id)}>
-                              {u.name} • {rank.badge} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
+                              {u.name} • {rank.name} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
                               {u.isGuest ? '[Vãng lai]' : ''}
                             </option>
                           )

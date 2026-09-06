@@ -17,5 +17,7 @@ public class LeaderboardEntry {
     private Integer lossCount;
     private Double winRate;
     private Integer eloScore;
+    private Integer placementMatches;
+    private Integer currentStreak;
     private Integer rank;
 }

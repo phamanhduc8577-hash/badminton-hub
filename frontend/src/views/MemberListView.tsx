@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { MemberProfile } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
+import { getPlayerRankDisplay, LOL_RANKS } from '../lib/ranks'
 import {
   Users,
   ShieldCheck,
@@ -16,6 +17,8 @@ import {
   Flame,
   Award,
   KeyRound,
+  Edit2,
+  X,
 } from 'lucide-react'
 
 export const MemberListView: React.FC = () => {
@@ -23,6 +26,11 @@ export const MemberListView: React.FC = () => {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'FIXED' | 'PENDING' | 'CASUAL'>('FIXED')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // State for Host Manual Rank Editing Modal
+  const [editingRankMember, setEditingRankMember] = useState<MemberProfile | null>(null)
+  const [manualLpInput, setManualLpInput] = useState<number>(0)
+  const [manualPlacementsInput, setManualPlacementsInput] = useState<number>(5)
 
   const { data: members = [], isLoading } = useQuery<MemberProfile[]>({
     queryKey: ['members'],
@@ -85,6 +93,23 @@ export const MemberListView: React.FC = () => {
     },
     onError: (err: any) => {
       alert(err.response?.data?.message || 'Không thể đặt lại mật khẩu!')
+    },
+  })
+
+  // Host Manual Rank Override Mutation
+  const updateRankMutation = useMutation({
+    mutationFn: async ({ userId, eloScore, placementMatches }: { userId: number; eloScore: number; placementMatches: number }) => {
+      const res = await api.put(`/members/${userId}/rank`, { eloScore, placementMatches })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      setEditingRankMember(null)
+      alert('Đã cập nhật Bậc Rank & LP cho thành viên thành công!')
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể cập nhật Rank!')
     },
   })
 
@@ -324,10 +349,21 @@ export const MemberListView: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-1 font-mono font-bold text-slate-900">
-                        <Award size={14} className="text-amber-500" />
-                        <span>{m.eloScore || 0} ELO</span>
-                      </div>
+                      {(() => {
+                        const rankDisplay = getPlayerRankDisplay(m.eloScore || 0, m.placementMatches ?? 5)
+                        return (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}
+                            >
+                              {rankDisplay.name}
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-slate-700">
+                              {m.eloScore || 0} LP
+                            </span>
+                          </div>
+                        )
+                      })()}
                     </td>
 
                     {/* Host Controls */}
@@ -337,6 +373,19 @@ export const MemberListView: React.FC = () => {
                           <span className="text-[10px] text-slate-400 font-bold italic">Host Mặc định</span>
                         ) : (
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Nút Host Chỉnh Sửa Rank trực tiếp */}
+                            <button
+                              onClick={() => {
+                                setEditingRankMember(m)
+                                setManualLpInput(m.eloScore || 0)
+                                setManualPlacementsInput(m.placementMatches ?? 5)
+                              }}
+                              className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 rounded-xl transition border border-slate-200"
+                              title="Chỉnh sửa Bậc Rank / LP trực tiếp cho người chơi"
+                            >
+                              <Award size={13} className="text-amber-600" />
+                            </button>
+
                             {/* Nút Host Reset Mật khẩu nhanh */}
                             <button
                               onClick={() => {
@@ -410,6 +459,124 @@ export const MemberListView: React.FC = () => {
           </div>
         )}
       </div>
+      {/* Host Manual Rank Editor Modal */}
+      {editingRankMember && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <Award size={18} className="text-amber-500" />
+                <h3 className="font-black text-slate-900 text-sm">
+                  Chỉnh Rank & LP: {editingRankMember.fullName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingRankMember(null)}
+                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5">
+                  Điểm LP Tích Lũy Tổng (Total LP):
+                </label>
+                <input
+                  type="number"
+                  step="10"
+                  min="0"
+                  value={manualLpInput}
+                  onChange={(e) => setManualLpInput(Math.max(0, Number(e.target.value)))}
+                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 font-mono font-bold text-base focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              {/* Quick LP Tier Select Buttons for Host Convenience */}
+              <div>
+                <label className="block text-slate-500 font-bold text-[11px] mb-1.5">
+                  Gợi ý chọn mốc Rank nhanh:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {LOL_RANKS.map((r) => (
+                    <button
+                      key={r.tier}
+                      type="button"
+                      onClick={() => setManualLpInput(r.minScore)}
+                      className={`px-2 py-1.5 rounded-lg border text-[10px] font-black transition ${
+                        manualLpInput >= r.minScore && manualLpInput <= r.maxScore
+                          ? 'bg-slate-950 text-white border-slate-950'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {r.badge} ({r.minScore} LP)
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5">
+                  Trạng thái trận Phân Hạng (0..5 trận):
+                </label>
+                <select
+                  value={manualPlacementsInput}
+                  onChange={(e) => setManualPlacementsInput(Number(e.target.value))}
+                  className="w-full border border-slate-300 rounded-xl p-2.5 text-slate-900 font-bold focus:outline-none focus:border-slate-900"
+                >
+                  <option value={5}>✅ Đã hoàn thành phân hạng (Hiện Bậc Rank & Đoàn)</option>
+                  <option value={0}>⏳ Chưa đánh trận nào (0/5)</option>
+                  <option value={1}>⏳ Đã đánh 1 trận (1/5)</option>
+                  <option value={2}>⏳ Đã đánh 2 trận (2/5)</option>
+                  <option value={3}>⏳ Đã đánh 3 trận (3/5)</option>
+                  <option value={4}>⏳ Đã đánh 4 trận (4/5)</option>
+                </select>
+              </div>
+
+              {/* Preview Result */}
+              {(() => {
+                const preview = getPlayerRankDisplay(manualLpInput, manualPlacementsInput)
+                return (
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase block">Xem trước Rank:</span>
+                      <span className={`font-black text-sm ${preview.textColor}`}>
+                        {preview.name}
+                      </span>
+                    </div>
+                    <div className="text-right font-mono font-bold text-slate-900">
+                      <span>{manualLpInput} LP</span>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+              <button
+                onClick={() => setEditingRankMember(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={updateRankMutation.isPending}
+                onClick={() => {
+                  updateRankMutation.mutate({
+                    userId: editingRankMember.id,
+                    eloScore: manualLpInput,
+                    placementMatches: manualPlacementsInput,
+                  })
+                }}
+                className="px-5 py-2 text-xs font-black bg-slate-950 hover:bg-slate-800 text-white rounded-xl shadow active:scale-95 transition"
+              >
+                {updateRankMutation.isPending ? 'Đang lưu...' : 'Lưu Bậc Rank'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

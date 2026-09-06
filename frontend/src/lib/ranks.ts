@@ -1,8 +1,38 @@
 export interface RankTier {
   name: string
-  tier: 'UNRANKED' | 'IRON' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'EMERALD' | 'DIAMOND' | 'MASTER' | 'GRANDMASTER' | 'CHALLENGER'
+  tier:
+    | 'UNRANKED'
+    | 'IRON'
+    | 'BRONZE'
+    | 'SILVER'
+    | 'GOLD'
+    | 'PLATINUM'
+    | 'EMERALD'
+    | 'DIAMOND'
+    | 'MASTER'
+    | 'GRANDMASTER'
+    | 'CHALLENGER'
+  division?: 'I' | 'II' | 'III'
   minScore: number
   maxScore: number
+  badge: string
+  colorClass: string
+  borderClass: string
+  bgClass: string
+  gradient: string
+  textColor: string
+  icon: string
+  imagePath: string
+}
+
+export interface PlayerRankDisplay {
+  name: string
+  tier: string
+  division: string
+  currentLpInDivision: number
+  totalLp: number
+  isPlacement: boolean
+  placementMatches: number
   badge: string
   colorClass: string
   borderClass: string
@@ -18,7 +48,7 @@ export const LOL_RANKS: RankTier[] = [
     name: 'Sắt Đoàn',
     tier: 'IRON',
     minScore: 0,
-    maxScore: 0,
+    maxScore: 299,
     badge: 'Sắt',
     colorClass: 'text-slate-400',
     borderClass: 'border-slate-500/60',
@@ -31,8 +61,8 @@ export const LOL_RANKS: RankTier[] = [
   {
     name: 'Đồng Đoàn',
     tier: 'BRONZE',
-    minScore: 1,
-    maxScore: 5,
+    minScore: 300,
+    maxScore: 599,
     badge: 'Đồng',
     colorClass: 'text-amber-700',
     borderClass: 'border-amber-800/60',
@@ -45,8 +75,8 @@ export const LOL_RANKS: RankTier[] = [
   {
     name: 'Bạc Đoàn',
     tier: 'SILVER',
-    minScore: 6,
-    maxScore: 10,
+    minScore: 600,
+    maxScore: 899,
     badge: 'Bạc',
     colorClass: 'text-slate-600',
     borderClass: 'border-slate-400',
@@ -59,8 +89,8 @@ export const LOL_RANKS: RankTier[] = [
   {
     name: 'Vàng Đoàn',
     tier: 'GOLD',
-    minScore: 11,
-    maxScore: 20,
+    minScore: 900,
+    maxScore: 1199,
     badge: 'Vàng',
     colorClass: 'text-yellow-600',
     borderClass: 'border-yellow-500',
@@ -73,8 +103,8 @@ export const LOL_RANKS: RankTier[] = [
   {
     name: 'Bạch Kim',
     tier: 'PLATINUM',
-    minScore: 21,
-    maxScore: 30,
+    minScore: 1200,
+    maxScore: 1499,
     badge: 'Bạch Kim',
     colorClass: 'text-teal-600',
     borderClass: 'border-teal-400',
@@ -85,10 +115,24 @@ export const LOL_RANKS: RankTier[] = [
     imagePath: '/ranks/platinum.png',
   },
   {
+    name: 'Lục Bảo',
+    tier: 'EMERALD',
+    minScore: 1500,
+    maxScore: 1799,
+    badge: 'Lục Bảo',
+    colorClass: 'text-emerald-600',
+    borderClass: 'border-emerald-400',
+    bgClass: 'bg-emerald-50',
+    gradient: 'from-emerald-500 to-teal-700',
+    textColor: 'text-emerald-950 font-bold',
+    icon: '❇️',
+    imagePath: '/ranks/platinum.png',
+  },
+  {
     name: 'Kim Cương',
     tier: 'DIAMOND',
-    minScore: 31,
-    maxScore: 50,
+    minScore: 1800,
+    maxScore: 2099,
     badge: 'Kim Cương',
     colorClass: 'text-cyan-600',
     borderClass: 'border-cyan-400',
@@ -101,8 +145,8 @@ export const LOL_RANKS: RankTier[] = [
   {
     name: 'Cao Thủ',
     tier: 'MASTER',
-    minScore: 51,
-    maxScore: 75,
+    minScore: 2100,
+    maxScore: 2499,
     badge: 'Cao Thủ',
     colorClass: 'text-purple-600',
     borderClass: 'border-purple-400',
@@ -115,8 +159,8 @@ export const LOL_RANKS: RankTier[] = [
   {
     name: 'Đại Cao Thủ',
     tier: 'GRANDMASTER',
-    minScore: 76,
-    maxScore: 149,
+    minScore: 2500,
+    maxScore: 2999,
     badge: 'Đại Cao Thủ',
     colorClass: 'text-rose-600',
     borderClass: 'border-rose-400',
@@ -129,7 +173,7 @@ export const LOL_RANKS: RankTier[] = [
   {
     name: 'Thách Đấu',
     tier: 'CHALLENGER',
-    minScore: 150,
+    minScore: 3000,
     maxScore: 99999,
     badge: 'Thách Đấu',
     colorClass: 'text-amber-500',
@@ -142,9 +186,87 @@ export const LOL_RANKS: RankTier[] = [
   },
 ]
 
-export const getLolRank = (score: number): RankTier => {
+/**
+ * Calculates Division (III, II, I) and LP in division (0..99 LP)
+ * With 5 placement matches support (Unranked 0/5..5/5)
+ */
+export const getPlayerRankDisplay = (score: number = 0, placementMatches: number = 5): PlayerRankDisplay => {
+  const safeScore = Math.max(0, score)
+  const isPlacement = placementMatches < 5
+
+  // Tier calculation
+  let baseTier = LOL_RANKS.find((r) => safeScore >= r.minScore && safeScore <= r.maxScore) || LOL_RANKS[0]
+
+  if (isPlacement) {
+    return {
+      name: `Phân Hạng (${placementMatches}/5)`,
+      tier: 'UNRANKED',
+      division: `${placementMatches}/5 Trận`,
+      currentLpInDivision: safeScore,
+      totalLp: safeScore,
+      isPlacement: true,
+      placementMatches,
+      badge: `Phân Hạng (${placementMatches}/5)`,
+      colorClass: 'text-slate-500',
+      borderClass: 'border-dashed border-slate-300',
+      bgClass: 'bg-slate-100/80',
+      gradient: 'from-slate-400 to-slate-600',
+      textColor: 'text-slate-700',
+      icon: '⏳',
+      imagePath: '/ranks/iron.png',
+    }
+  }
+
+  // Apex Tiers: Master, Grandmaster, Challenger don't have Divisions
+  if (baseTier.tier === 'MASTER' || baseTier.tier === 'GRANDMASTER' || baseTier.tier === 'CHALLENGER') {
+    const apexLp = safeScore - baseTier.minScore
+    return {
+      name: baseTier.name,
+      tier: baseTier.tier,
+      division: '',
+      currentLpInDivision: apexLp,
+      totalLp: safeScore,
+      isPlacement: false,
+      placementMatches,
+      badge: baseTier.badge,
+      colorClass: baseTier.colorClass,
+      borderClass: baseTier.borderClass,
+      bgClass: baseTier.bgClass,
+      gradient: baseTier.gradient,
+      textColor: baseTier.textColor,
+      icon: baseTier.icon,
+      imagePath: baseTier.imagePath,
+    }
+  }
+
+  // Standard Tiers: Division III (0-99 LP), Division II (100-199 LP), Division I (200-299 LP)
+  const tierOffset = safeScore - baseTier.minScore
+  const divIndex = Math.floor(tierOffset / 100) // 0: III, 1: II, 2: I
+  const divisionName = divIndex === 0 ? 'III' : divIndex === 1 ? 'II' : 'I'
+  const currentLpInDiv = tierOffset % 100
+
+  return {
+    name: `${baseTier.name} ${divisionName}`,
+    tier: baseTier.tier,
+    division: divisionName,
+    currentLpInDivision: currentLpInDiv,
+    totalLp: safeScore,
+    isPlacement: false,
+    placementMatches,
+    badge: `${baseTier.badge} ${divisionName}`,
+    colorClass: baseTier.colorClass,
+    borderClass: baseTier.borderClass,
+    bgClass: baseTier.bgClass,
+    gradient: baseTier.gradient,
+    textColor: baseTier.textColor,
+    icon: baseTier.icon,
+    imagePath: baseTier.imagePath,
+  }
+}
+
+export const getLolRank = (score: number = 0): RankTier => {
   if (score <= 0) return LOL_RANKS[0]
-  if (score >= 150) return LOL_RANKS[LOL_RANKS.length - 1]
+  if (score >= 3000) return LOL_RANKS[LOL_RANKS.length - 1]
   const found = LOL_RANKS.find((r) => score >= r.minScore && score <= r.maxScore)
   return found || LOL_RANKS[0]
 }

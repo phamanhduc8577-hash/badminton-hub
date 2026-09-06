@@ -56,6 +56,12 @@ public class User {
     private Integer eloScore = 0;
 
     @Builder.Default
+    private Integer placementMatches = 0; // 0..5 placement matches
+
+    @Builder.Default
+    private Integer currentStreak = 0; // >0 win streak, <0 loss streak
+
+    @Builder.Default
     private Integer sessionsAttended = 0;
 
     @CreationTimestamp

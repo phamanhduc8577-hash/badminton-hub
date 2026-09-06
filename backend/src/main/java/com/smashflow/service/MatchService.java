@@ -91,34 +91,100 @@ public class MatchService {
 
         matchRepository.save(match);
 
-        // Update Win/Loss Stats for all players
+        // Calculate Team LP Averages for dynamic underdog/favorite LP gain calculation
+        int teamALp = calculateTeamAvgLp(pA1, pA2);
+        int teamBLp = calculateTeamAvgLp(pB1, pB2);
+
+        // Update Win/Loss/Elo Stats for all players with LOL dynamic LP & placement calibration
         if (request.getWinningTeam() == WinningTeam.A) {
-            incrementWin(pA1);
-            if (pA2 != null) incrementWin(pA2);
-            incrementLoss(pB1);
-            if (pB2 != null) incrementLoss(pB2);
+            applyMatchOutcome(pA1, true, teamALp, teamBLp);
+            if (pA2 != null) applyMatchOutcome(pA2, true, teamALp, teamBLp);
+            applyMatchOutcome(pB1, false, teamBLp, teamALp);
+            if (pB2 != null) applyMatchOutcome(pB2, false, teamBLp, teamALp);
         } else {
-            incrementLoss(pA1);
-            if (pA2 != null) incrementLoss(pA2);
-            incrementWin(pB1);
-            if (pB2 != null) incrementWin(pB2);
+            applyMatchOutcome(pA1, false, teamALp, teamBLp);
+            if (pA2 != null) applyMatchOutcome(pA2, false, teamALp, teamBLp);
+            applyMatchOutcome(pB1, true, teamBLp, teamALp);
+            if (pB2 != null) applyMatchOutcome(pB2, true, teamBLp, teamALp);
         }
 
         return toMatchResponse(match);
     }
 
-    private void incrementWin(User user) {
-        user.setWinCount(user.getWinCount() + 1);
-        int currentElo = user.getEloScore();
-        user.setEloScore(currentElo + 1);
-        userRepository.save(user);
+    private int calculateTeamAvgLp(User p1, User p2) {
+        int lp1 = p1.getEloScore();
+        if (p2 == null) return lp1;
+        return (lp1 + p2.getEloScore()) / 2;
     }
 
-    private void incrementLoss(User user) {
-        user.setLossCount(user.getLossCount() + 1);
-        int currentElo = user.getEloScore();
-        // At Iron 0 LP (eloScore <= 0), loss does NOT decrease below 0 LP
-        user.setEloScore(Math.max(0, currentElo - 1));
+    /**
+     * League of Legends (LMHT) Dynamic Elo & LP Progression System:
+     * - Base Win: +20 LP, Base Loss: -18 LP
+     * - Disparity bonus/penalty based on opponent team LP difference (Underdog vs Favorite)
+     * - Win streak bonus (+3 LP for 2-streak, +6 LP for 3-streak, up to +12 LP for 5+ streak)
+     * - Placement match logic (First 5 matches):
+     *   - Win gives +35 to +50 LP + opponent bonus
+     *   - Loss in placements has NO LP penalty (0 LP loss) to encourage newcomers
+     * - Floor protection: Iron 0 LP (cannot drop below 0 LP)
+     */
+    private void applyMatchOutcome(User user, boolean isWin, int myTeamLp, int oppTeamLp) {
+        int placementCount = user.getPlacementMatches() != null ? user.getPlacementMatches() : 0;
+        boolean inPlacements = placementCount < 5;
+        int currentLp = user.getEloScore();
+        int streak = user.getCurrentStreak() != null ? user.getCurrentStreak() : 0;
+
+        int lpDiff = oppTeamLp - myTeamLp; // Positive if opponent has higher LP (underdog)
+
+        if (isWin) {
+            user.setWinCount(user.getWinCount() + 1);
+            int newStreak = streak > 0 ? streak + 1 : 1;
+            user.setCurrentStreak(newStreak);
+
+            int gainedLp;
+            if (inPlacements) {
+                // High calibration during placements: +35 to +50 LP
+                int basePlacement = 40;
+                int diffAdjustment = Math.max(-10, Math.min(20, lpDiff / 10)); // +bonus if beat higher rank
+                gainedLp = Math.max(25, basePlacement + diffAdjustment);
+            } else {
+                // Regular match: Base 20 LP
+                int baseLp = 20;
+                // Underdog gets up to +15 LP bonus; Favorite gets reduced LP (down to 12)
+                int diffAdjustment = Math.max(-8, Math.min(15, lpDiff / 15));
+                // Win streak bonus
+                int streakBonus = 0;
+                if (newStreak >= 5) streakBonus = 10;
+                else if (newStreak >= 3) streakBonus = 5;
+                else if (newStreak >= 2) streakBonus = 2;
+
+                gainedLp = Math.max(12, Math.min(45, baseLp + diffAdjustment + streakBonus));
+            }
+
+            user.setEloScore(currentLp + gainedLp);
+        } else {
+            user.setLossCount(user.getLossCount() + 1);
+            int newStreak = streak < 0 ? streak - 1 : -1;
+            user.setCurrentStreak(newStreak);
+
+            if (inPlacements) {
+                // Riot rule: No LP loss in placement matches!
+                // Elo remains unchanged, only placement matches counter increments
+            } else {
+                // Regular match loss: Base -18 LP
+                int baseLoss = 18;
+                // Losing to lower LP opponent (favorite loss) = penalize more (-25)
+                // Losing to higher LP opponent (underdog loss) = lose less (-10)
+                int diffAdjustment = Math.max(-8, Math.min(8, (-lpDiff) / 15));
+                int lostLp = Math.max(10, Math.min(28, baseLoss + diffAdjustment));
+
+                user.setEloScore(Math.max(0, currentLp - lostLp));
+            }
+        }
+
+        if (inPlacements) {
+            user.setPlacementMatches(placementCount + 1);
+        }
+
         userRepository.save(user);
     }
 
@@ -131,35 +197,37 @@ public class MatchService {
         int avgTierA = (tierA1 + tierA2 + 1) / 2;
         int avgTierB = (tierB1 + tierB2 + 1) / 2;
 
-        // Max tier gap allowed between opposing teams is 3 tiers (e.g., Gold vs Diamond max; Sắt cannot play with Thách Đấu)
+        // Max tier gap allowed between opposing teams is 4 tiers (e.g. Sắt vs Bạch Kim max)
         int tierGap = Math.abs(avgTierA - avgTierB);
-        if (tierGap > 3) {
+        if (tierGap > 4) {
             throw new RuntimeException("Kèo đấu bị chênh lệch trình độ quá lớn (" + tierGap + " Bậc Rank)! Vui lòng cân bằng lại đội hình.");
         }
     }
 
     /**
-     * Map LP Elo score to 10 Tier Levels:
-     * 0: IRON (Sắt)
-     * 1: BRONZE (Đồng)
-     * 2: SILVER (Bạc)
-     * 3: GOLD (Vàng)
-     * 4: PLATINUM (Bạch Kim)
-     * 5: DIAMOND (Kim Cương)
-     * 6: MASTER (Cao Thủ)
-     * 7: GRANDMASTER (Đại Cao Thủ)
-     * 8: CHALLENGER (Thách Đấu)
+     * Map Cumulative LP to LOL Tier Levels (100 LP per Division):
+     * 0: IRON (Sắt III..I: 0 - 299 LP)
+     * 1: BRONZE (Đồng III..I: 300 - 599 LP)
+     * 2: SILVER (Bạc III..I: 600 - 899 LP)
+     * 3: GOLD (Vàng III..I: 900 - 1199 LP)
+     * 4: PLATINUM (Bạch Kim III..I: 1200 - 1499 LP)
+     * 5: EMERALD (Lục Bảo III..I: 1500 - 1799 LP)
+     * 6: DIAMOND (Kim Cương III..I: 1800 - 2099 LP)
+     * 7: MASTER (Cao Thủ: 2100 - 2499 LP)
+     * 8: GRANDMASTER (Đại Cao Thủ: 2500 - 2999 LP)
+     * 9: CHALLENGER (Thách Đấu: 3000+ LP)
      */
     private int getTierLevel(int eloScore) {
-        if (eloScore <= 0) return 0; // Sắt
-        if (eloScore <= 5) return 1; // Đồng
-        if (eloScore <= 10) return 2; // Bạc
-        if (eloScore <= 20) return 3; // Vàng
-        if (eloScore <= 30) return 4; // Bạch Kim
-        if (eloScore <= 50) return 5; // Kim Cương
-        if (eloScore <= 75) return 6; // Cao Thủ
-        if (eloScore <= 149) return 7; // Đại Cao Thủ
-        return 8; // Thách Đấu
+        if (eloScore < 300) return 0;
+        if (eloScore < 600) return 1;
+        if (eloScore < 900) return 2;
+        if (eloScore < 1200) return 3;
+        if (eloScore < 1500) return 4;
+        if (eloScore < 1800) return 5;
+        if (eloScore < 2100) return 6;
+        if (eloScore < 2500) return 7;
+        if (eloScore < 3000) return 8;
+        return 9;
     }
 
     private MatchResponse toMatchResponse(Match m) {

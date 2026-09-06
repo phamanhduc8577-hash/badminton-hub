@@ -23,5 +23,7 @@ public class MemberProfileResponse {
     private Integer lossCount;
     private Double winRate;
     private Integer eloScore;
+    private Integer placementMatches;
+    private Integer currentStreak;
     private LocalDateTime createdAt;
 }

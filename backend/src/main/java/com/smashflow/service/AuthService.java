@@ -133,6 +133,8 @@ public class AuthService {
                 .lossCount(user.getLossCount())
                 .winRate(user.getWinRate())
                 .eloScore(user.getEloScore())
+                .placementMatches(user.getPlacementMatches() != null ? user.getPlacementMatches() : 0)
+                .currentStreak(user.getCurrentStreak() != null ? user.getCurrentStreak() : 0)
                 .build();
     }
 }

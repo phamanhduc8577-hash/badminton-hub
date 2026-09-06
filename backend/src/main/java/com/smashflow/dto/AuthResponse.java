@@ -20,5 +20,7 @@ public class AuthResponse {
     private Integer lossCount;
     private Double winRate;
     private Integer eloScore;
+    private Integer placementMatches;
+    private Integer currentStreak;
     private String avatarUrl;
 }

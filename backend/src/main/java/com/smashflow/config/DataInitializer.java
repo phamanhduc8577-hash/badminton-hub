@@ -34,9 +34,11 @@ public class DataInitializer {
             } catch (Exception ignored) {
             }
 
-            // Ensure membership_type column exists in database
+            // Ensure membership_type and lol elo columns exist in database
             try {
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS membership_type VARCHAR(20) DEFAULT 'CASUAL';");
+                jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS placement_matches INT DEFAULT 0;");
+                jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak INT DEFAULT 0;");
                 jdbcTemplate.execute("UPDATE users SET membership_type = 'FIXED' WHERE role = 'HOST';");
             } catch (Exception ignored) {
             }

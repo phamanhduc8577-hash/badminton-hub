@@ -49,6 +49,14 @@ public class MemberController {
         return ResponseEntity.ok(memberManagementService.updateMembershipType(userId, request));
     }
 
+    @PutMapping("/{userId}/rank")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<MemberProfileResponse> updateMemberRank(
+            @PathVariable Long userId,
+            @Valid @RequestBody com.smashflow.dto.UpdateRankRequest request) {
+        return ResponseEntity.ok(memberManagementService.updateMemberRank(userId, request));
+    }
+
     @PostMapping("/{userId}/reset-password")
     @PreAuthorize("hasRole('HOST')")
     public ResponseEntity<java.util.Map<String, String>> resetMemberPassword(@PathVariable Long userId) {

@@ -36,5 +36,7 @@ public class ParticipantResponse {
     private Integer winCount;
     private Integer lossCount;
     private Integer eloScore;
+    private Integer placementMatches;
+    private Integer currentStreak;
     private String avatarUrl;
 }
