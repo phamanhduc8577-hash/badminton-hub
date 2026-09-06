@@ -21,11 +21,12 @@ public class MemberController {
 
     @GetMapping
     public ResponseEntity<List<MemberProfileResponse>> getAllMembers(
-            @RequestParam(required = false) MembershipType type) {
+            @RequestParam(required = false) MembershipType type,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.smashflow.model.User currentUser) {
         if (type != null) {
-            return ResponseEntity.ok(memberManagementService.getMembersByType(type));
+            return ResponseEntity.ok(memberManagementService.getMembersByType(type, currentUser));
         }
-        return ResponseEntity.ok(memberManagementService.getAllMembers());
+        return ResponseEntity.ok(memberManagementService.getAllMembers(currentUser));
     }
 
     @PostMapping("/{userId}/approve-fixed")

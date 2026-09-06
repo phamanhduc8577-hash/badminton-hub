@@ -100,11 +100,11 @@ export const MemberListView: React.FC = () => {
       ? pendingMembers
       : casualMembers
 
-  const filteredList = currentList.filter(
-    (m) =>
-      m.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.phone.includes(searchQuery)
-  )
+  const filteredList = currentList.filter((m) => {
+    const nameMatch = m.fullName.toLowerCase().includes(searchQuery.toLowerCase())
+    const phoneMatch = m.phone ? m.phone.includes(searchQuery) : false
+    return nameMatch || phoneMatch
+  })
 
   return (
     <div className="space-y-6">
@@ -241,7 +241,7 @@ export const MemberListView: React.FC = () => {
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider bg-slate-50/50">
                   <th className="py-3 px-3">#</th>
-                  <th className="py-3 px-3">Họ và tên / SĐT</th>
+                  <th className="py-3 px-3">{user?.role === 'HOST' ? 'Họ và tên / SĐT' : 'Họ và tên'}</th>
                   <th className="py-3 px-3">Giới tính</th>
                   <th className="py-3 px-3">Phân loại</th>
                   <th className="py-3 px-3">Chuyên cần</th>
@@ -272,7 +272,7 @@ export const MemberListView: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-slate-500">{m.phone}</span>
+                          {m.phone && <span className="text-[11px] text-slate-500">{m.phone}</span>}
                         </div>
                       </div>
                     </td>

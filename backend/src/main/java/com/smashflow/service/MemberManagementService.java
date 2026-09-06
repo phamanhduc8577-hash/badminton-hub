@@ -21,17 +21,19 @@ public class MemberManagementService {
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final TelegramNotificationService telegramNotificationService;
 
-    public List<MemberProfileResponse> getAllMembers() {
+    public List<MemberProfileResponse> getAllMembers(User currentUser) {
+        boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
         return userRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
-                .map(this::toResponse)
+                .map(u -> toResponse(u, isHost))
                 .collect(Collectors.toList());
     }
 
-    public List<MemberProfileResponse> getMembersByType(MembershipType type) {
+    public List<MemberProfileResponse> getMembersByType(MembershipType type, User currentUser) {
+        boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
         return userRepository.findByMembershipType(type)
                 .stream()
-                .map(this::toResponse)
+                .map(u -> toResponse(u, isHost))
                 .collect(Collectors.toList());
     }
 
@@ -42,7 +44,7 @@ public class MemberManagementService {
 
         user.setMembershipType(MembershipType.FIXED);
         userRepository.save(user);
-        return toResponse(user);
+        return toResponse(user, true);
     }
 
     @Transactional
@@ -52,7 +54,7 @@ public class MemberManagementService {
 
         user.setMembershipType(MembershipType.CASUAL);
         userRepository.save(user);
-        return toResponse(user);
+        return toResponse(user, true);
     }
 
     @Transactional
@@ -66,7 +68,7 @@ public class MemberManagementService {
 
         user.setMembershipType(request.getMembershipType());
         userRepository.save(user);
-        return toResponse(user);
+        return toResponse(user, true);
     }
 
     @Transactional
@@ -85,10 +87,10 @@ public class MemberManagementService {
         return "Đã đặt lại mật khẩu cho " + user.getFullName() + " về mặc định: " + defaultPass;
     }
 
-    private MemberProfileResponse toResponse(User u) {
+    private MemberProfileResponse toResponse(User u, boolean isHost) {
         return MemberProfileResponse.builder()
                 .id(u.getId())
-                .phone(u.getPhone())
+                .phone(isHost ? u.getPhone() : null)
                 .fullName(u.getFullName())
                 .gender(u.getGender())
                 .role(u.getRole())
