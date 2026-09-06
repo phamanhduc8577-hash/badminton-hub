@@ -358,7 +358,7 @@ export const SessionListView: React.FC = () => {
                   <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-500 font-bold">Vé Nam / Nữ (Trợ giá):</span>
+                        <span className="text-[10px] text-slate-500 font-bold">Slot Nam / Nữ (Trợ giá):</span>
                         {session.startTime && session.endTime && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                             {Math.round(((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60)) * 10) / 10}h

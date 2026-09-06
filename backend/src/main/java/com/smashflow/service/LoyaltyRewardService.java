@@ -72,7 +72,7 @@ public class LoyaltyRewardService {
     public static String getRewardNameForMilestone(int milestone) {
         return switch (milestone) {
             case 5 -> "1 chai nước tăng lực Revive";
-            case 10 -> "Voucher giảm 15% tiền vé";
+            case 10 -> "Voucher giảm 15% tiền slot";
             case 20 -> "1 quấn cán vợt cao cấp";
             case 25 -> "2 quấn cán cao su";
             case 30 -> "Voucher giảm 20% giá sân";
@@ -81,11 +81,11 @@ public class LoyaltyRewardService {
             case 45 -> "2 chai nước tăng lực Revive";
             case 50 -> "3 quấn cán cao su";
             case 55 -> "3 chai nước tăng lực Revive";
-            case 60 -> "Voucher giảm 30% giá vé";
-            case 65 -> "Voucher giảm 35% giá vé";
+            case 60 -> "Voucher giảm 30% giá slot";
+            case 65 -> "Voucher giảm 35% giá slot";
             case 70 -> "3 chai nước tăng lực Revive";
-            case 80 -> "Voucher giảm 38% giá vé";
-            case 90 -> "Voucher giảm 40% giá vé";
+            case 80 -> "Voucher giảm 38% giá slot";
+            case 90 -> "Voucher giảm 40% giá slot";
             case 100 -> "1 đôi vớ Yonex chính hãng";
             default -> "Hộp quà tri ân đặc biệt CLB Làng Địa Ngục";
         };

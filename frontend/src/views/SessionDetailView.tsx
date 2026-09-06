@@ -326,7 +326,7 @@ export const SessionDetailView: React.FC = () => {
               <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
                   <DollarSign size={15} className="text-slate-900" />
-                  <span>Bảng giá vé tham gia</span>
+                  <span>Bảng giá slot tham gia</span>
                 </h3>
                 {session.startTime && session.endTime && (
                   <span className="text-[10px] font-black px-2.5 py-0.5 rounded-lg bg-slate-900 text-white shadow-xs">
@@ -485,7 +485,7 @@ export const SessionDetailView: React.FC = () => {
                       {/* Chi tiết khấu trừ cọc nếu có */}
                       <div className="text-[11px] text-amber-900 space-y-1 bg-amber-100/60 p-2.5 rounded-xl">
                         <div className="flex justify-between">
-                          <span>• Giá vé ca đánh:</span>
+                          <span>• Giá slot ca đánh:</span>
                           <span className="font-semibold">{Number(isUserParticipant.finalFee).toLocaleString('vi-VN')}đ</span>
                         </div>
                         {Number(isUserParticipant.depositAmount) > 0 && (

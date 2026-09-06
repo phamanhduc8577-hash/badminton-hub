@@ -105,7 +105,7 @@ export const LoyaltyView: React.FC = () => {
     },
     {
       target: 10,
-      gift: 'Voucher giảm 15% tiền vé',
+      gift: 'Voucher giảm 15% tiền slot',
       desc: 'Trừ trực tiếp vào hóa đơn ca đánh tiếp theo của CLB',
       tag: 'Bền bỉ',
       type: 'DISCOUNT_15',
@@ -168,14 +168,14 @@ export const LoyaltyView: React.FC = () => {
     },
     {
       target: 60,
-      gift: 'Voucher giảm 30% giá vé',
-      desc: 'Trợ giá 30% vé vào sân cho hội viên kỳ cựu',
+      gift: 'Voucher giảm 30% giá slot',
+      desc: 'Trợ giá 30% slot vào sân cho hội viên kỳ cựu',
       tag: 'Bất khuất',
       type: 'DISCOUNT_30',
     },
     {
       target: 65,
-      gift: 'Voucher giảm 35% giá vé',
+      gift: 'Voucher giảm 35% giá slot',
       desc: 'Mức trợ giá 35% tri ân sâu sắc thành viên gắn bó',
       tag: 'Siêu sao',
       type: 'DISCOUNT_35',
@@ -189,14 +189,14 @@ export const LoyaltyView: React.FC = () => {
     },
     {
       target: 80,
-      gift: 'Voucher giảm 38% giá vé',
+      gift: 'Voucher giảm 38% giá slot',
       desc: 'Ưu đãi giảm 38% chi phí ca đánh tại CLB',
       tag: 'Kỳ tài',
       type: 'DISCOUNT_38',
     },
     {
       target: 90,
-      gift: 'Voucher giảm 40% giá vé',
+      gift: 'Voucher giảm 40% giá slot',
       desc: 'Trợ giá khủng 40% cho tay vợt tâm huyết của làng',
       tag: 'Bậc thầy',
       type: 'DISCOUNT_40',

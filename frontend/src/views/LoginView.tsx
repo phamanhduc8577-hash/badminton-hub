@@ -369,7 +369,7 @@ export const LoginView: React.FC = () => {
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-500 leading-tight">
-                            Đánh linh hoạt theo buổi, giá vé vãng lai.
+                            Đánh linh hoạt theo buổi, giá slot vãng lai.
                           </p>
                         </button>
 
@@ -389,7 +389,7 @@ export const LoginView: React.FC = () => {
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-500 leading-tight">
-                            Giá vé CLB rẻ hơn, cần Host duyệt chính thức.
+                            Giá slot CLB rẻ hơn, cần Host duyệt chính thức.
                           </p>
                         </button>
                       </div>

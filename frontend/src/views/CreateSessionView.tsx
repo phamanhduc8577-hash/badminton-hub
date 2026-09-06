@@ -153,7 +153,7 @@ export const CreateSessionView: React.FC = () => {
           </div>
           <div>
             <h1 className="text-lg font-black text-slate-900">Thiết lập ca đánh mới</h1>
-            <p className="text-xs text-slate-600 font-medium">Cấu hình thời gian, ma trận giá vé động và chi phí ca sân</p>
+            <p className="text-xs text-slate-600 font-medium">Cấu hình thời gian, ma trận giá slot động và chi phí ca sân</p>
           </div>
         </div>
 
@@ -280,7 +280,7 @@ export const CreateSessionView: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/80">
               <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                 <DollarSign size={15} className="text-rose-600" />
-                <span>Ma trận giá vé & Tiền cọc 30%</span>
+                <span>Ma trận giá slot & Tiền cọc 30%</span>
               </h3>
               <span className="text-[11px] font-black px-2.5 py-0.5 rounded-lg bg-slate-900 text-white shadow-xs w-fit">
                 ⏱️ Khung ca: {sessionHours} Giờ ({sessionHours === 2 ? 'Ca chuẩn 2 Tiếng' : sessionHours === 3 ? 'Ca kéo dài 3 Tiếng' : `Ca ${sessionHours} Tiếng`})
@@ -290,7 +290,7 @@ export const CreateSessionView: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Vé Nam cố định ({sessionHours}h)
+                  Slot Nam cố định ({sessionHours}h)
                 </label>
                 <CurrencyInput
                   value={memberMalePrice}
@@ -300,7 +300,7 @@ export const CreateSessionView: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Vé Nữ cố định ({sessionHours}h - Trợ giá)
+                  Slot Nữ cố định ({sessionHours}h - Trợ giá)
                 </label>
                 <CurrencyInput
                   value={memberFemalePrice}
@@ -311,7 +311,7 @@ export const CreateSessionView: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Vé Nam vãng lai ({sessionHours}h)
+                  Slot Nam vãng lai ({sessionHours}h)
                 </label>
                 <CurrencyInput
                   value={guestMalePrice}
@@ -321,7 +321,7 @@ export const CreateSessionView: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Vé Nữ vãng lai ({sessionHours}h - Trợ giá)
+                  Slot Nữ vãng lai ({sessionHours}h - Trợ giá)
                 </label>
                 <CurrencyInput
                   value={guestFemalePrice}
@@ -336,7 +336,7 @@ export const CreateSessionView: React.FC = () => {
               <div className="pt-3 border-t border-slate-200/90 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wide">
-                    ⚡ Giá vé tùy chọn chỉ đánh 2 Tiếng (Cho người về sớm / không đánh hết ca {sessionHours}h):
+                    ⚡ Giá slot tùy chọn chỉ đánh 2 Tiếng (Cho người về sớm / không đánh hết ca {sessionHours}h):
                   </span>
                   <span className="text-[10px] bg-indigo-50 text-indigo-800 font-bold px-2 py-0.5 rounded border border-indigo-200">
                     Slot 2h Linh Hoạt
