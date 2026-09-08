@@ -19,6 +19,7 @@ import {
   KeyRound,
   Edit2,
   RotateCcw,
+  Trash2,
   X,
 } from 'lucide-react'
 
@@ -95,6 +96,23 @@ export const MemberListView: React.FC = () => {
     },
     onError: (err: any) => {
       alert(err.response?.data?.message || 'Không thể đặt lại mật khẩu!')
+    },
+  })
+
+  // Host Delete Member Mutation
+  const deleteMemberMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await api.delete(`/members/${userId}`)
+      return res.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
+      alert(data?.message || 'Đã xóa tài khoản thành viên thành công!')
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể xóa thành viên!')
     },
   })
 
@@ -192,7 +210,7 @@ export const MemberListView: React.FC = () => {
 
           <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl">
             <span className="text-[11px] font-bold text-amber-800 block">⏳ Đang chờ duyệt</span>
-            <span className="text-xl font-black text-amber-950 mt-0.5 block">{pendingMembers.length} đơn</span>
+            <span className="text-xl font-black text-amber-950 mt-0.5 block">{pendingMembers.length} người</span>
           </div>
 
           <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl">
@@ -512,6 +530,20 @@ export const MemberListView: React.FC = () => {
                                 <span>Level Up Cố Định</span>
                               </button>
                             )}
+
+                            {/* Nút Xóa Thành Viên */}
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`CẢNH BÁO: Bạn có chắc chắn muốn XÓA VĨNH VIỄN tài khoản của "${m.fullName}" (${m.phone || 'Không có SĐT'}) khỏi hệ thống?`)) {
+                                  deleteMemberMutation.mutate(m.id)
+                                }
+                              }}
+                              disabled={deleteMemberMutation.isPending}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-800 rounded-xl transition border border-rose-200 shadow-2xs"
+                              title="Xóa vĩnh viễn tài khoản thành viên này"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </div>
                         )}
                       </td>

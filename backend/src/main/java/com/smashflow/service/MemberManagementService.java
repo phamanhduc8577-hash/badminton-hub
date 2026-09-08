@@ -111,6 +111,30 @@ public class MemberManagementService {
     }
 
     @Transactional
+    public String deleteMember(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thành viên!"));
+
+        if (user.getRole() == Role.HOST) {
+            throw new RuntimeException("Không thể xóa tài khoản của Host CLB!");
+        }
+
+        String memberName = user.getFullName();
+        String memberPhone = user.getPhone();
+
+        // 1. Delete associated loyalty rewards
+        jdbcTemplate.update("DELETE FROM loyalty_rewards WHERE user_id = ?", userId);
+
+        // 2. Unlink or clean participants
+        jdbcTemplate.update("DELETE FROM session_participants WHERE user_id = ?", userId);
+
+        // 3. Delete user
+        userRepository.delete(user);
+
+        return "Đã xóa tài khoản của thành viên " + memberName + " (" + memberPhone + ") thành công!";
+    }
+
+    @Transactional
     public java.util.Map<String, Object> resetDatabaseClean() {
         try {
             jdbcTemplate.execute("DELETE FROM matches;");
