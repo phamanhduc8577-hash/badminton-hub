@@ -44,21 +44,17 @@ public class DataInitializer {
             } catch (Exception ignored) {
             }
 
-            // Ensure host account is clean with 0 stats
+            // Ensure host account exists and has proper role & membership
             userRepository.findByPhone("0325872682").ifPresentOrElse(
                     host -> {
                         host.setRole(Role.HOST);
                         host.setMembershipType(MembershipType.FIXED);
-                        host.setPassword(passwordEncoder.encode("040304"));
-                        host.setFullName("Phạm Anh Đức");
-                        host.setAvatarUrl("/duck-host-sassy.png");
-                        host.setWinCount(0);
-                        host.setLossCount(0);
-                        host.setEloScore(0);
-                        host.setSessionsAttended(0);
-                        host.setPlacementMatches(0);
-                        host.setCurrentStreak(0);
-                        host.setShieldMatches(0);
+                        if (host.getFullName() == null || host.getFullName().isBlank()) {
+                            host.setFullName("Phạm Anh Đức");
+                        }
+                        if (host.getAvatarUrl() == null || host.getAvatarUrl().isBlank()) {
+                            host.setAvatarUrl("/duck-host-sassy.png");
+                        }
                         userRepository.save(host);
                     },
                     () -> {
@@ -82,20 +78,53 @@ public class DataInitializer {
                     }
             );
 
-            // CLEAN UP ALL DUMMY / TEST ACCOUNTS & SESSIONS & VENUES TO START PRODUCTION CLEAN
-            try {
-                // Delete all matches, participants, loyalty rewards, sessions, venues
-                jdbcTemplate.execute("DELETE FROM matches;");
-                jdbcTemplate.execute("DELETE FROM session_participants;");
-                jdbcTemplate.execute("DELETE FROM loyalty_rewards;");
-                jdbcTemplate.execute("DELETE FROM sessions;");
-                jdbcTemplate.execute("DELETE FROM venues;");
-                // Reset stats for Host in DB
-                jdbcTemplate.execute("UPDATE users SET win_count = 0, loss_count = 0, elo_score = 0, sessions_attended = 0, placement_matches = 0, current_streak = 0, shield_matches = 0 WHERE phone = '0325872682';");
-                // Delete all users except Host Phạm Anh Đức (0325872682)
-                jdbcTemplate.execute("DELETE FROM users WHERE phone != '0325872682';");
-            } catch (Exception e) {
-                System.err.println("Clean database error: " + e.getMessage());
+            // Seed active club members if they don't exist
+            // Phone, FullName, Gender, MembershipType, winCount, lossCount, eloScore, sessionsAttended, placementMatches, currentStreak, shieldMatches
+            Object[][] initialMembers = {
+                    {"0912345678", "Nguyễn Văn An", Gender.MALE, MembershipType.FIXED, 8, 4, 35, 15, 5, 2, 1},
+                    {"0987654321", "Trần Thị Bình", Gender.FEMALE, MembershipType.FIXED, 5, 5, 20, 10, 5, 0, 0},
+                    {"0908111222", "Lê Hoàng Long", Gender.MALE, MembershipType.FIXED, 14, 2, 75, 20, 5, 4, 2},
+                    {"0908333444", "Phạm Minh Tuấn", Gender.MALE, MembershipType.FIXED, 9, 6, 42, 12, 5, 1, 0},
+                    {"0908555666", "Đỗ Quỳnh Như", Gender.FEMALE, MembershipType.PENDING_FIXED, 3, 2, 15, 4, 3, 1, 0},
+                    {"0908777888", "Vũ Quốc Bảo", Gender.MALE, MembershipType.FIXED, 18, 4, 88, 22, 5, 5, 3},
+                    {"0908999000", "Ngô Bảo Châu", Gender.FEMALE, MembershipType.CASUAL, 4, 3, 18, 5, 4, 0, 0},
+                    {"0908123789", "Đặng Tuấn Kiệt", Gender.MALE, MembershipType.CASUAL, 6, 8, 25, 8, 5, 0, 0},
+                    {"0763595633", "Nhân Thiện", Gender.MALE, MembershipType.FIXED, 50, 0, 150, 30, 5, 10, 5}
+            };
+
+            for (Object[] m : initialMembers) {
+                String phone = (String) m[0];
+                if (!userRepository.existsByPhone(phone)) {
+                    User u = User.builder()
+                            .phone(phone)
+                            .fullName((String) m[1])
+                            .password(passwordEncoder.encode("123456"))
+                            .gender((Gender) m[2])
+                            .role(Role.MEMBER)
+                            .membershipType((MembershipType) m[3])
+                            .avatarUrl("/duck-mascot.png")
+                            .winCount((Integer) m[4])
+                            .lossCount((Integer) m[5])
+                            .eloScore((Integer) m[6])
+                            .sessionsAttended((Integer) m[7])
+                            .placementMatches((Integer) m[8])
+                            .currentStreak((Integer) m[9])
+                            .shieldMatches((Integer) m[10])
+                            .build();
+                    userRepository.save(u);
+                }
+            }
+
+            // Create default venue if none exists
+            if (venueRepository.count() == 0) {
+                Venue venue = Venue.builder()
+                        .name("Sân Cầu Lông SmashHub Quận 7")
+                        .address("123 Nguyễn Thị Thập, Tân Phú, Quận 7, TP.HCM")
+                        .latitude(new BigDecimal("10.7380120"))
+                        .longitude(new BigDecimal("106.7153450"))
+                        .radiusMeters(150)
+                        .build();
+                venueRepository.save(venue);
             }
         };
     }
