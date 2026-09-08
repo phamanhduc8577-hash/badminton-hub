@@ -143,7 +143,6 @@ public class MemberManagementService {
             jdbcTemplate.execute("DELETE FROM sessions;");
             jdbcTemplate.execute("DELETE FROM venues;");
             jdbcTemplate.execute("UPDATE users SET win_count = 0, loss_count = 0, elo_score = 0, sessions_attended = 0, placement_matches = 0, current_streak = 0, shield_matches = 0 WHERE phone = '0325872682';");
-            jdbcTemplate.execute("DELETE FROM users WHERE phone != '0325872682';");
 
             userRepository.findByPhone("0325872682").ifPresent(host -> {
                 host.setRole(Role.HOST);
@@ -161,7 +160,7 @@ public class MemberManagementService {
                 userRepository.save(host);
             });
 
-            return java.util.Map.of("success", true, "message", "Đã dọn dẹp sạch toàn bộ database và reset Host về 0!");
+            return java.util.Map.of("success", true, "message", "Đã dọn sạch ca sân, trận đấu và lịch sử, bảo lưu toàn bộ tài khoản thành viên thật!");
         } catch (Exception e) {
             throw new RuntimeException("Lỗi dọn dẹp database: " + e.getMessage());
         }

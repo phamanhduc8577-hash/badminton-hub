@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { SessionItem, Participant, Match, HostReport } from '../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { DuckMascot } from '../components/DuckMascot'
+import { useToast } from '../components/ToastProvider'
 import { getPlayerRankDisplay, getLolRank } from '../lib/ranks'
 import { CurrencyInput } from '../components/CurrencyInput'
 import {
@@ -42,6 +43,7 @@ export const HostDashboardView: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
 
   // State tabs: 'roster' | 'matchmaker' | 'settle'
   const [activeTab, setActiveTab] = useState<'roster' | 'matchmaker' | 'settle'>('roster')
@@ -261,7 +263,7 @@ export const HostDashboardView: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] })
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể cập nhật danh sách sân!')
+      showToast(err.response?.data?.message || 'Không thể cập nhật danh sách sân!', 'error')
     },
   })
 
@@ -274,10 +276,10 @@ export const HostDashboardView: React.FC = () => {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['session', id] })
       queryClient.invalidateQueries({ queryKey: ['report', id] })
-      alert(data.message || 'Đã xử lý thành công!')
+      showToast(data.message || 'Đã xử lý thành công!')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể xóa người tham gia!')
+      showToast(err.response?.data?.message || 'Không thể xóa người tham gia!', 'error')
     },
   })
 
@@ -291,10 +293,10 @@ export const HostDashboardView: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['session', id] })
       queryClient.invalidateQueries({ queryKey: ['matches', id] })
       queryClient.invalidateQueries({ queryKey: ['report', id] })
-      alert(data.message || 'Mô phỏng 8 người & 6 trận đấu thành công!')
+      showToast(data.message || 'Mô phỏng 8 người & 6 trận đấu thành công!')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể chạy mô phỏng!')
+      showToast(err.response?.data?.message || 'Không thể chạy mô phỏng!', 'error')
     },
   })
 
@@ -305,7 +307,7 @@ export const HostDashboardView: React.FC = () => {
 
     const newCourt = courtNameInput.trim()
     if (courtList.includes(newCourt)) {
-      alert('Tên sân này đã tồn tại trong ca!')
+      showToast('Tên sân này đã tồn tại trong ca!', 'error')
       return
     }
 
@@ -325,7 +327,7 @@ export const HostDashboardView: React.FC = () => {
 
   const handleRemoveCourt = (courtToRemove: string) => {
     if (courtList.length <= 1) {
-      alert('Phải giữ lại tối thiểu 1 sân để tổ chức ca đánh!')
+      showToast('Phải giữ lại tối thiểu 1 sân để tổ chức ca đánh!', 'error')
       return
     }
 
@@ -340,7 +342,7 @@ export const HostDashboardView: React.FC = () => {
 
   const handleRemoveParticipant = (p: Participant) => {
     if (p.checkinStatus === 'CHECKED_IN') {
-      alert('Người chơi này đã tới sân và điểm danh thành công, không thể xóa khỏi ca!')
+      showToast('Người chơi này đã tới sân và điểm danh thành công, không thể xóa khỏi ca!', 'error')
       return
     }
 
@@ -392,10 +394,10 @@ export const HostDashboardView: React.FC = () => {
       }))
       queryClient.invalidateQueries({ queryKey: ['matches', id] })
       queryClient.invalidateQueries({ queryKey: ['report', id] })
-      alert(`Đã ghi nhận kết quả trận đấu cho [${vars.court}] thành công!`)
+      showToast(`Đã ghi nhận kết quả trận đấu cho [${vars.court}] thành công!`)
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể ghi nhận trận đấu!')
+      showToast(err.response?.data?.message || 'Không thể ghi nhận trận đấu!', 'error')
     },
   })
 
@@ -455,7 +457,7 @@ export const HostDashboardView: React.FC = () => {
       })
 
     if (pool.length < 2) {
-      alert('Không đủ người chơi rảnh để tự động xếp cặp!')
+      showToast('Không đủ người chơi rảnh để tự động xếp cặp!', 'error')
       return
     }
 

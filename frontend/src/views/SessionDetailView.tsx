@@ -6,6 +6,7 @@ import { SessionItem, Participant } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { QrCameraScanner } from '../components/QrCameraScanner'
 import { DuckMascot } from '../components/DuckMascot'
+import { useToast } from '../components/ToastProvider'
 import {
   Clock,
   MapPin,
@@ -29,6 +30,7 @@ export const SessionDetailView: React.FC = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
+  const { showToast } = useToast()
 
   // State modals
   const [showMemberDepositModal, setShowMemberDepositModal] = useState(false)
@@ -134,13 +136,15 @@ export const SessionDetailView: React.FC = () => {
           setDepositQrData({ qrUrl: qrRes.data.qrUrl, participant })
           setShowMemberDepositModal(true)
         } catch (e) {
-          alert('Không thể tạo mã VietQR cọc, vui lòng liên hệ trực tiếp Host!')
+          showToast('Không thể tạo mã VietQR cọc, vui lòng liên hệ trực tiếp Host!', 'error')
         }
+      } else {
+        showToast('Đăng ký tham gia ca thành công!', 'success')
       }
       queryClient.invalidateQueries({ queryKey: ['session', id] })
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể tham gia ca!')
+      showToast(err.response?.data?.message || 'Không thể tham gia ca!', 'error')
     },
   })
 
@@ -202,11 +206,11 @@ export const SessionDetailView: React.FC = () => {
       if (res.data?.qrUrl) {
         setShowPaymentQrModal(res.data.qrUrl)
       } else {
-        alert('Không thể tạo mã QR thanh toán!')
+        showToast('Không thể tạo mã QR thanh toán!', 'error')
       }
     } catch (err: any) {
       console.error('QR Payment Error:', err)
-      alert(err.response?.data?.message || 'Không thể tạo mã QR thanh toán! Vui lòng kiểm tra lại kết nối Backend.')
+      showToast(err.response?.data?.message || 'Không thể tạo mã QR thanh toán! Vui lòng kiểm tra lại kết nối Backend.', 'error')
     }
   }
 
@@ -418,7 +422,7 @@ export const SessionDetailView: React.FC = () => {
                           setDepositQrData({ qrUrl: qrRes.data.qrUrl, participant: isUserParticipant })
                           setShowMemberDepositModal(true)
                         } catch (e) {
-                          alert('Không thể tạo mã VietQR cọc!')
+                          showToast('Không thể tạo mã VietQR cọc!', 'error')
                         }
                       }}
                       className="w-full sm:w-auto px-5 py-2.5 bg-slate-950 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95"

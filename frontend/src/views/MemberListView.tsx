@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { MemberProfile } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
+import { useToast } from '../components/ToastProvider'
 import { getPlayerRankDisplay, LOL_RANKS } from '../lib/ranks'
 import {
   Users,
@@ -25,6 +26,7 @@ import {
 
 export const MemberListView: React.FC = () => {
   const { user } = useAuthStore()
+  const { showToast } = useToast()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'FIXED' | 'PENDING' | 'CASUAL'>('FIXED')
   const [searchQuery, setSearchQuery] = useState('')
@@ -52,10 +54,10 @@ export const MemberListView: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
-      alert('Đã duyệt thành viên Cố Định thành công!')
+      showToast('Đã duyệt thành viên Cố Định thành công!')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể duyệt thành viên!')
+      showToast(err.response?.data?.message || 'Không thể duyệt thành viên!', 'error')
     },
   })
 
@@ -66,10 +68,10 @@ export const MemberListView: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
-      alert('Đã từ chối / chuyển thành viên về trạng thái Vãng Lai!')
+      showToast('Đã từ chối / chuyển thành viên về trạng thái Vãng Lai!', 'info')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Có lỗi xảy ra!')
+      showToast(err.response?.data?.message || 'Có lỗi xảy ra!', 'error')
     },
   })
 
@@ -80,9 +82,10 @@ export const MemberListView: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
+      showToast('Đã cập nhật phân loại thành viên!')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể đổi phân loại!')
+      showToast(err.response?.data?.message || 'Không thể đổi phân loại!', 'error')
     },
   })
 
@@ -92,10 +95,10 @@ export const MemberListView: React.FC = () => {
       return res.data
     },
     onSuccess: (data) => {
-      alert(data.message || 'Đã đặt lại mật khẩu về 123456 thành công!')
+      showToast(data.message || 'Đã đặt lại mật khẩu về 123456 thành công!')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể đặt lại mật khẩu!')
+      showToast(err.response?.data?.message || 'Không thể đặt lại mật khẩu!', 'error')
     },
   })
 
@@ -109,10 +112,10 @@ export const MemberListView: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
-      alert(data?.message || 'Đã xóa tài khoản thành viên thành công!')
+      showToast(data?.message || 'Đã xóa tài khoản thành viên thành công!')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể xóa thành viên!')
+      showToast(err.response?.data?.message || 'Không thể xóa thành viên!', 'error')
     },
   })
 
@@ -136,27 +139,10 @@ export const MemberListView: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
       setEditingRankMember(null)
-      alert('Đã cập nhật Bậc Rank & LP cho thành viên thành công!')
+      showToast('Đã cập nhật Bậc Rank & LP cho thành viên thành công!')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể cập nhật Rank!')
-    },
-  })
-
-  // Host Restore Sample Members Mutation
-  const restoreSampleMutation = useMutation({
-    mutationFn: async () => {
-      const res = await api.post('/members/restore-sample-members')
-      return res.data
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['members'] })
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
-      alert(data?.message || 'Đã nạp lại danh sách thành viên mẫu thành công!')
-    },
-    onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể khôi phục thành viên!')
+      showToast(err.response?.data?.message || 'Không thể cập nhật Rank!', 'error')
     },
   })
 
@@ -166,14 +152,14 @@ export const MemberListView: React.FC = () => {
       const res = await api.post('/members/reset-database-clean')
       return res.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
-      alert('Đã dọn sạch database và reset thông số Host về 0 thành công!')
+      showToast(data?.message || 'Đã dọn sạch ca sân, bảo lưu toàn bộ thành viên thật!')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể dọn dẹp database!')
+      showToast(err.response?.data?.message || 'Không thể dọn dẹp database!', 'error')
     },
   })
 
@@ -457,29 +443,16 @@ export const MemberListView: React.FC = () => {
                             </button>
                             <button
                               onClick={() => {
-                                if (window.confirm('Bạn có chắc chắn muốn XÓA SẠCH toàn bộ dữ liệu database (ca sân, thành viên test, lịch sử) và reset thông số Host về 0?')) {
+                                if (window.confirm('Bạn có chắc chắn muốn dọn dẹp các ca sân & trận đấu cũ? (Toàn bộ tài khoản thành viên thật sẽ được GIỮ NGUYÊN)')) {
                                   resetDbMutation.mutate()
                                 }
                               }}
                               disabled={resetDbMutation.isPending}
                               className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-[10px] font-bold transition active:scale-95 flex items-center gap-1"
-                              title="Dọn dẹp sạch toàn bộ database về 0"
+                              title="Dọn dẹp ca sân và lịch sử cũ (Giữ nguyên thành viên)"
                             >
                               <RotateCcw size={11} />
-                              <span>{resetDbMutation.isPending ? 'Đang xóa...' : 'Clear về 0'}</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (window.confirm('Bạn muốn nạp lại danh sách thành viên mẫu (An, Bình, Long, Tuấn, Như, Bảo, Châu, Kiệt, Thiện)?')) {
-                                  restoreSampleMutation.mutate()
-                                }
-                              }}
-                              disabled={restoreSampleMutation.isPending}
-                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-bold transition active:scale-95 flex items-center gap-1"
-                              title="Khôi phục danh sách thành viên mẫu"
-                            >
-                              <Sparkles size={11} className="text-emerald-600" />
-                              <span>{restoreSampleMutation.isPending ? 'Đang nạp...' : 'Nạp lại TV mẫu'}</span>
+                              <span>{resetDbMutation.isPending ? 'Đang dọn...' : 'Dọn dẹp ca sân'}</span>
                             </button>
                           </div>
                         ) : (

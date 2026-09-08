@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
+import { useToast } from '../components/ToastProvider'
 import {
   LogIn,
   UserPlus,
@@ -26,6 +27,7 @@ import {
 export const LoginView: React.FC = () => {
   const { user, token, setAuth } = useAuthStore()
   const navigate = useNavigate()
+  const { showToast } = useToast()
 
   // If already logged in, redirect to home
   useEffect(() => {
@@ -128,7 +130,9 @@ export const LoginView: React.FC = () => {
         })
         setAuth(res.data, res.data.token)
         if (membershipChoice === 'FIXED') {
-          alert('Đăng ký tài khoản thành công! Yêu cầu gia nhập "Thành viên cố định" của bạn đã được gửi đến Host và đang chờ duyệt.')
+          showToast('Đăng ký thành công! Yêu cầu "Cố định" đang chờ Host duyệt.', 'info')
+        } else {
+          showToast('Đăng ký tài khoản thành công!', 'success')
         }
         navigate('/')
       } else {

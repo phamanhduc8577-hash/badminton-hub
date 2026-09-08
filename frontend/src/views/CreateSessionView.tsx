@@ -4,9 +4,11 @@ import { useMutation } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { DollarSign, Plus, ArrowLeft, Receipt, MapPin } from 'lucide-react'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { useToast } from '../components/ToastProvider'
 
 export const CreateSessionView: React.FC = () => {
   const navigate = useNavigate()
+  const { showToast } = useToast()
 
   const getInitialDates = () => {
     const now = new Date()
@@ -128,11 +130,11 @@ export const CreateSessionView: React.FC = () => {
       return res.data
     },
     onSuccess: (data) => {
-      alert('Tạo ca đánh thành công!')
+      showToast('Tạo ca đánh thành công!', 'success')
       navigate(`/host/session/${data.id}`)
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể tạo ca đánh!')
+      showToast(err.response?.data?.message || err.message || 'Không thể tạo ca đánh!', 'error')
     },
   })
 

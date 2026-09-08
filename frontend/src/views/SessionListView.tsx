@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { SessionItem } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
+import { useToast } from '../components/ToastProvider'
 import {
   Clock,
   MapPin,
@@ -30,6 +31,7 @@ export const SessionListView: React.FC = () => {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
+  const { showToast } = useToast()
 
   // State modal chỉnh sửa nhanh ca đánh (dành cho Host)
   const [editingSession, setEditingSession] = useState<SessionItem | null>(null)
@@ -70,10 +72,10 @@ export const SessionListView: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] })
       setEditingSession(null)
-      alert('Đã cập nhật sân và số slot thành công!')
+      showToast('Đã cập nhật sân và số slot thành công!', 'success')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể cập nhật ca đánh!')
+      showToast(err.response?.data?.message || 'Không thể cập nhật ca đánh!', 'error')
     },
   })
 
@@ -91,11 +93,11 @@ export const SessionListView: React.FC = () => {
     e.preventDefault()
     if (!editingSession) return
     if (!editForm.courtNames.trim()) {
-      alert('Vui lòng nhập tên sân!')
+      showToast('Vui lòng nhập tên sân!', 'error')
       return
     }
     if (editForm.maxSlots < editingSession.bookedSlots) {
-      alert(`Số slot không được nhỏ hơn số người đã đăng ký (${editingSession.bookedSlots} người)!`)
+      showToast(`Số slot không được nhỏ hơn số người đã đăng ký (${editingSession.bookedSlots} người)!`, 'error')
       return
     }
 

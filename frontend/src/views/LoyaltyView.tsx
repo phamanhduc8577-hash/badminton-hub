@@ -5,6 +5,7 @@ import { LoyaltyReward, AttendanceRecord } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { GiftGraphic } from '../components/GiftGraphic'
+import { useToast } from '../components/ToastProvider'
 import {
   Gift,
   CheckCircle2,
@@ -25,6 +26,7 @@ import {
 export const LoyaltyView: React.FC = () => {
   const { user, setAuth, token } = useAuthStore()
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
 
   // Always fetch latest User profile (sessionsAttended, winCount, lossCount)
   const { data: profile } = useQuery({
@@ -86,9 +88,10 @@ export const LoyaltyView: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['loyalty-rewards'] })
       queryClient.invalidateQueries({ queryKey: ['my-profile'] })
       setClaimSuccess(true)
+      showToast('Chúc mừng bạn đã nhận phần thưởng chuyên cần!', 'success')
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Không thể nhận quà!')
+      showToast(err.response?.data?.message || 'Không thể nhận quà!', 'error')
     },
   })
 
