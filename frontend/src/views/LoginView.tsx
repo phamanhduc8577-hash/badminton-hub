@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuthStore } from '../store/useAuthStore'
@@ -18,9 +18,22 @@ import {
   KeyRound,
   Send,
   ArrowLeft,
+  Gift,
+  Coins,
+  Swords,
 } from 'lucide-react'
 
 export const LoginView: React.FC = () => {
+  const { user, token, setAuth } = useAuthStore()
+  const navigate = useNavigate()
+
+  // If already logged in, redirect to home
+  useEffect(() => {
+    if (user && token) {
+      navigate('/', { replace: true })
+    }
+  }, [user, token, navigate])
+
   const [isRegister, setIsRegister] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [forgotSuccess, setForgotSuccess] = useState('')
@@ -33,9 +46,6 @@ export const LoginView: React.FC = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const { setAuth } = useAuthStore()
-  const navigate = useNavigate()
 
   // Handle local image file upload & resize/compress to base64
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,46 +165,46 @@ export const LoginView: React.FC = () => {
             <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
               Quản trị CLB cầu lông & <br />
               <span className="underline decoration-rose-500/40 decoration-4 underline-offset-8">
-                điểm danh thông minh.
+                điểm danh thông minh
               </span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-              Hệ thống tự động hóa toàn diện: Điểm danh GPS Geofencing &le; 150m, cọc slot VietQR tự động, ghép cặp đấu 1-chạm và hạch toán dòng tiền chính xác.
+              Hệ sinh thái cầu lông thông minh: Tích điểm chuyên cần đổi quà, vinh danh leo rank Thách Đấu, ghép sân cân bằng trình độ và minh bạch chi phí từng ca.
             </p>
           </div>
 
           {/* Value Props Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
             <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold">
-                <QrCode size={16} />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm">Điểm danh 2 lớp</h4>
-              <p className="text-slate-600 text-[11px]">QR Dynamic 15 phút + GPS sân &le; 150m chống gian lận.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
               <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold">
-                <ShieldCheck size={16} />
+                <Gift size={16} />
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Chống bùng slot</h4>
-              <p className="text-slate-600 text-[11px]">Khách vãng lai cọc trước 30% qua VietQR tự động.</p>
+              <h4 className="font-bold text-slate-900 text-sm">Tích điểm chuyên cần</h4>
+              <p className="text-slate-600 text-[11px]">Đổi nước tăng lực & voucher giảm giá slot ca đánh.</p>
             </div>
 
             <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
               <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
                 <Trophy size={16} />
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">BXH & Gamification</h4>
-              <p className="text-slate-600 text-[11px]">Vinh danh chuyên cần và chiến thần tỷ lệ thắng.</p>
+              <h4 className="font-bold text-slate-900 text-sm">Leo Rank & Vinh danh</h4>
+              <p className="text-slate-600 text-[11px]">Bảng xếp hạng chiến thần và danh hiệu Thách Đấu.</p>
             </div>
 
             <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center font-bold">
-                <CheckCircle2 size={16} />
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
+                <Swords size={16} />
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Chốt ca linh hoạt</h4>
-              <p className="text-slate-600 text-[11px]">Sửa bill nước, tiền cầu, hạch toán lãi ròng tức thì.</p>
+              <h4 className="font-bold text-slate-900 text-sm">Ghép sân thông minh</h4>
+              <p className="text-slate-600 text-[11px]">Cân bằng trình độ 100%, bắt kèo đấu sòng phẳng.</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
+                <Coins size={16} />
+              </div>
+              <h4 className="font-bold text-slate-900 text-sm">Chia tiền tự động</h4>
+              <p className="text-slate-600 text-[11px]">Hạch toán chi phí sân, cầu, nước rõ ràng từng buổi.</p>
             </div>
           </div>
         </div>

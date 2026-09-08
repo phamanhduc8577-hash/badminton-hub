@@ -306,6 +306,22 @@ export const Layout: React.FC = () => {
             <Shield size={18} />
             <span>Host</span>
           </NavLink>
+        ) : user ? (
+          <button
+            type="button"
+            onClick={() => setShowProfileModal(true)}
+            className="flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-950 transition"
+          >
+            <DuckMascot
+              src={user.avatarUrl || '/duck-mascot.png'}
+              size={18}
+              rounded="full"
+              className="border border-slate-300 shadow-2xs"
+            />
+            <span className="font-bold text-slate-900 truncate max-w-[65px]">
+              {user.fullName ? user.fullName.split(' ').slice(-1)[0] : 'Cá nhân'}
+            </span>
+          </button>
         ) : (
           <NavLink
             to="/login"

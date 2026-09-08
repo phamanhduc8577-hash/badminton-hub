@@ -21,6 +21,9 @@ import {
   Settings,
   X,
   Layers,
+  Gift,
+  Coins,
+  Swords,
 } from 'lucide-react'
 
 export const SessionListView: React.FC = () => {
@@ -143,12 +146,12 @@ export const SessionListView: React.FC = () => {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-[1.08]">
               Quản trị ca đấu & <br />
               <span className="bg-gradient-to-r from-slate-950 via-rose-700 to-slate-950 bg-clip-text text-transparent underline decoration-rose-600/40 decoration-4 underline-offset-8">
-                điểm danh thông minh.
+                điểm danh thông minh
               </span>
             </h1>
 
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-medium">
-              Nền tảng thể thao hiệu suất cao: Điểm danh bảo mật QR 15 phút + GPS Geofencing, cọc slot VietQR tự động, ghép cặp đấu 1-chạm và hạch toán dòng tiền chính xác từng buổi.
+              Hệ sinh thái cầu lông thông minh: Tích điểm chuyên cần đổi nước & voucher, bảng vàng leo rank Thách Đấu, ghép sân cân bằng trình độ và minh bạch chi phí từng ca.
             </p>
 
             {/* CTA Buttons & User Welcome */}
@@ -207,40 +210,52 @@ export const SessionListView: React.FC = () => {
           </div>
         </div>
 
-        {/* Feature Grid Highlights */}
+        {/* Feature Grid Highlights - Member Benefits */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-10 pt-8 border-t border-slate-200 text-xs">
-          <div className="p-4.5 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-1">
-            <div className="flex items-center gap-2 text-slate-600 font-bold">
-              <Activity size={15} className="text-slate-950" />
-              <span>Ca hoạt động</span>
+          <div
+            onClick={() => navigate('/loyalty')}
+            className="p-4.5 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-1 cursor-pointer hover:border-rose-300 hover:shadow-md transition group"
+          >
+            <div className="flex items-center gap-2 text-slate-600 font-bold group-hover:text-rose-600 transition">
+              <Gift size={16} className="text-rose-500" />
+              <span>Tích điểm chuyên cần</span>
             </div>
-            <span className="text-xl font-black text-slate-950 block mt-1">
-              {sessions?.filter((s) => s.status === 'UPCOMING' || s.status === 'ACTIVE').length || 0} Ca đang mở
+            <span className="text-lg sm:text-xl font-black text-slate-950 block mt-1 tracking-tight">
+              Đổi Nước & Voucher
+            </span>
+          </div>
+
+          <div
+            onClick={() => navigate('/leaderboard')}
+            className="p-4.5 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-1 cursor-pointer hover:border-amber-300 hover:shadow-md transition group"
+          >
+            <div className="flex items-center gap-2 text-slate-600 font-bold group-hover:text-amber-600 transition">
+              <Trophy size={16} className="text-amber-500" />
+              <span>Leo Rank & Vinh danh</span>
+            </div>
+            <span className="text-lg sm:text-xl font-black text-slate-950 block mt-1 tracking-tight">
+              Thách Đấu & Thần Kiếm
             </span>
           </div>
 
           <div className="p-4.5 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-1">
             <div className="flex items-center gap-2 text-slate-600 font-bold">
-              <ShieldCheck size={15} className="text-rose-600" />
-              <span>Định vị GPS</span>
+              <Swords size={16} className="text-indigo-500" />
+              <span>Ghép sân thông minh</span>
             </div>
-            <span className="text-xl font-black text-slate-950 block mt-1">&le; 150m Tại sân đấu</span>
+            <span className="text-lg sm:text-xl font-black text-slate-950 block mt-1 tracking-tight">
+              Cân bằng trình độ 100%
+            </span>
           </div>
 
           <div className="p-4.5 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-1">
             <div className="flex items-center gap-2 text-slate-600 font-bold">
-              <Zap size={15} className="text-amber-500" />
-              <span>Cọc vãng lai</span>
+              <Coins size={16} className="text-emerald-600" />
+              <span>Chia tiền tự động</span>
             </div>
-            <span className="text-xl font-black text-slate-950 block mt-1">VietQR Động 30%</span>
-          </div>
-
-          <div className="p-4.5 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-1">
-            <div className="flex items-center gap-2 text-slate-600 font-bold">
-              <Award size={15} className="text-blue-600" />
-              <span>Kèo đấu 1-chạm</span>
-            </div>
-            <span className="text-xl font-black text-slate-950 block mt-1">Tự động Win/Loss</span>
+            <span className="text-lg sm:text-xl font-black text-slate-950 block mt-1 tracking-tight">
+              Chi phí rõ ràng từng ca
+            </span>
           </div>
         </div>
       </div>
