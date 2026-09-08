@@ -143,6 +143,23 @@ export const MemberListView: React.FC = () => {
     },
   })
 
+  // Host Restore Sample Members Mutation
+  const restoreSampleMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post('/members/restore-sample-members')
+      return res.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
+      alert(data?.message || 'Đã nạp lại danh sách thành viên mẫu thành công!')
+    },
+    onError: (err: any) => {
+      alert(err.response?.data?.message || 'Không thể khôi phục thành viên!')
+    },
+  })
+
   // Host Clear Database Mutation
   const resetDbMutation = useMutation({
     mutationFn: async () => {
@@ -450,6 +467,19 @@ export const MemberListView: React.FC = () => {
                             >
                               <RotateCcw size={11} />
                               <span>{resetDbMutation.isPending ? 'Đang xóa...' : 'Clear về 0'}</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm('Bạn muốn nạp lại danh sách thành viên mẫu (An, Bình, Long, Tuấn, Như, Bảo, Châu, Kiệt, Thiện)?')) {
+                                  restoreSampleMutation.mutate()
+                                }
+                              }}
+                              disabled={restoreSampleMutation.isPending}
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-bold transition active:scale-95 flex items-center gap-1"
+                              title="Khôi phục danh sách thành viên mẫu"
+                            >
+                              <Sparkles size={11} className="text-emerald-600" />
+                              <span>{restoreSampleMutation.isPending ? 'Đang nạp...' : 'Nạp lại TV mẫu'}</span>
                             </button>
                           </div>
                         ) : (
