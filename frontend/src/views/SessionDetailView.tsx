@@ -341,42 +341,50 @@ export const SessionDetailView: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm space-y-1.5">
                   <span className="text-[10px] text-slate-500 block font-bold uppercase">Thành viên CLB</span>
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-slate-900">
-                      Nam: <span className="font-bold">{Number(session.memberMalePrice).toLocaleString()}đ</span>
-                    </p>
-                    <p className="font-semibold text-rose-600">
-                      Nữ: <span>{Number(session.memberFemalePrice).toLocaleString()}đ</span> (Trợ giá)
-                    </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium">Nam:</span>
+                      <span className="font-bold text-slate-900">{Number(session.memberMalePrice).toLocaleString()}đ</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium">Nữ (Trợ giá):</span>
+                      <span className="font-bold text-slate-900">{Number(session.memberFemalePrice).toLocaleString()}đ</span>
+                    </div>
                   </div>
                   {session.memberMalePrice2h && (
-                    <div className="pt-1.5 border-t border-slate-100 text-[11px]">
-                      <span className="text-indigo-600 font-bold block">Tùy chọn chơi 2 Tiếng:</span>
-                      <span className="text-slate-700 font-semibold">Nam: {Number(session.memberMalePrice2h).toLocaleString()}đ</span>
-                      <span className="text-slate-300 mx-1">|</span>
-                      <span className="text-rose-600 font-semibold">Nữ: {Number(session.memberFemalePrice2h).toLocaleString()}đ</span>
+                    <div className="pt-2 border-t border-slate-100 space-y-1 text-[11px]">
+                      <span className="text-slate-700 font-bold block">Tùy chọn 2 tiếng:</span>
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span>Nam: <b className="text-slate-900 font-semibold">{Number(session.memberMalePrice2h).toLocaleString()}đ</b></span>
+                        <span className="text-slate-300">|</span>
+                        <span>Nữ: <b className="text-slate-900 font-semibold">{Number(session.memberFemalePrice2h).toLocaleString()}đ</b></span>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm space-y-1.5">
+                <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm space-y-2">
                   <span className="text-[10px] text-slate-500 block font-bold uppercase">
                     Khách Vãng Lai (Cọc {Number(session.depositAmount).toLocaleString()}đ)
                   </span>
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-slate-900">
-                      Nam: <span className="font-bold">{Number(session.guestMalePrice).toLocaleString()}đ</span>
-                    </p>
-                    <p className="font-semibold text-rose-600">
-                      Nữ: <span>{Number(session.guestFemalePrice).toLocaleString()}đ</span> (Trợ giá)
-                    </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium">Nam:</span>
+                      <span className="font-bold text-slate-900">{Number(session.guestMalePrice).toLocaleString()}đ</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium">Nữ (Trợ giá):</span>
+                      <span className="font-bold text-slate-900">{Number(session.guestFemalePrice).toLocaleString()}đ</span>
+                    </div>
                   </div>
                   {session.guestMalePrice2h && (
-                    <div className="pt-1.5 border-t border-slate-100 text-[11px]">
-                      <span className="text-indigo-600 font-bold block">Tùy chọn chơi 2 Tiếng:</span>
-                      <span className="text-slate-700 font-semibold">Nam: {Number(session.guestMalePrice2h).toLocaleString()}đ</span>
-                      <span className="text-slate-300 mx-1">|</span>
-                      <span className="text-rose-600 font-semibold">Nữ: {Number(session.guestFemalePrice2h).toLocaleString()}đ</span>
+                    <div className="pt-2 border-t border-slate-100 space-y-1 text-[11px]">
+                      <span className="text-slate-700 font-bold block">Tùy chọn 2 tiếng:</span>
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span>Nam: <b className="text-slate-900 font-semibold">{Number(session.guestMalePrice2h).toLocaleString()}đ</b></span>
+                        <span className="text-slate-300">|</span>
+                        <span>Nữ: <b className="text-slate-900 font-semibold">{Number(session.guestFemalePrice2h).toLocaleString()}đ</b></span>
+                      </div>
                     </div>
                   )}
                 </div>
