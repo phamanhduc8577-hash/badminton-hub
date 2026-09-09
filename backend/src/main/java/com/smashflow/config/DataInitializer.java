@@ -36,6 +36,8 @@ public class DataInitializer {
 
             // Ensure membership_type and lol elo columns exist in database
             try {
+                jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN DEFAULT FALSE;");
+                jdbcTemplate.execute("UPDATE users SET deleted = FALSE WHERE deleted IS NULL;");
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS membership_type VARCHAR(20) DEFAULT 'CASUAL';");
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS placement_matches INT DEFAULT 0;");
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak INT DEFAULT 0;");
