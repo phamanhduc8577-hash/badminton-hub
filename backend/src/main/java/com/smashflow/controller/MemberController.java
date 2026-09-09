@@ -64,6 +64,19 @@ public class MemberController {
         return ResponseEntity.ok(java.util.Map.of("message", msg));
     }
 
+    @GetMapping("/deleted")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<List<MemberProfileResponse>> getDeletedMembers(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.smashflow.model.User currentUser) {
+        return ResponseEntity.ok(memberManagementService.getDeletedMembers(currentUser));
+    }
+
+    @PostMapping("/{userId}/restore")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<MemberProfileResponse> restoreMember(@PathVariable Long userId) {
+        return ResponseEntity.ok(memberManagementService.restoreMember(userId));
+    }
+
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasRole('HOST')")
     public ResponseEntity<java.util.Map<String, String>> deleteMember(@PathVariable Long userId) {

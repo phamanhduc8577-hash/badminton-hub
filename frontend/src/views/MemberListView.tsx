@@ -37,6 +37,8 @@ export const MemberListView: React.FC = () => {
   const [manualPlacementsInput, setManualPlacementsInput] = useState<number>(5)
   const [manualShieldInput, setManualShieldInput] = useState<number>(0)
 
+  const [showRestoreModal, setShowRestoreModal] = useState(false)
+
   const { data: members = [], isLoading } = useQuery<MemberProfile[]>({
     queryKey: ['members'],
     queryFn: async () => {
@@ -44,6 +46,33 @@ export const MemberListView: React.FC = () => {
       return res.data
     },
     refetchInterval: 8000,
+  })
+
+  const { data: deletedMembers = [], isLoading: isLoadingDeleted, refetch: refetchDeleted } = useQuery<MemberProfile[]>({
+    queryKey: ['deleted-members'],
+    queryFn: async () => {
+      const res = await api.get('/members/deleted')
+      return res.data
+    },
+    enabled: user?.role === 'HOST',
+  })
+
+  // Restore member mutation
+  const restoreMemberMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await api.post(`/members/${userId}/restore`)
+      return res.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['deleted-members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
+      showToast(`Đã khôi phục thành công tài khoản của ${data.fullName}!`, 'success')
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Không thể khôi phục thành viên!', 'error')
+    },
   })
 
   // Mutations for Host
@@ -443,16 +472,19 @@ export const MemberListView: React.FC = () => {
                             </button>
                             <button
                               onClick={() => {
-                                if (window.confirm('Bạn có chắc chắn muốn dọn dẹp các ca sân & trận đấu cũ? (Toàn bộ tài khoản thành viên thật sẽ được GIỮ NGUYÊN)')) {
-                                  resetDbMutation.mutate()
-                                }
+                                refetchDeleted()
+                                setShowRestoreModal(true)
                               }}
-                              disabled={resetDbMutation.isPending}
-                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-[10px] font-bold transition active:scale-95 flex items-center gap-1"
-                              title="Dọn dẹp ca sân và lịch sử cũ (Giữ nguyên thành viên)"
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-bold transition active:scale-95 flex items-center gap-1"
+                              title="Xem danh sách và khôi phục các thành viên đã lỡ xóa"
                             >
                               <RotateCcw size={11} />
-                              <span>{resetDbMutation.isPending ? 'Đang dọn...' : 'Dọn dẹp ca sân'}</span>
+                              <span>Khôi phục thành viên</span>
+                              {deletedMembers.length > 0 && (
+                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[9px]">
+                                  {deletedMembers.length}
+                                </span>
+                              )}
                             </button>
                           </div>
                         ) : (
@@ -696,6 +728,80 @@ export const MemberListView: React.FC = () => {
                 className="px-5 py-2 text-xs font-black bg-slate-950 hover:bg-slate-800 text-white rounded-xl shadow active:scale-95 transition"
               >
                 {updateRankMutation.isPending ? 'Đang lưu...' : 'Lưu Bậc Rank'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Host Restore Deleted Members Modal */}
+      {showRestoreModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <RotateCcw size={18} className="text-emerald-600" />
+                <h3 className="font-black text-slate-900 text-sm">
+                  Khôi Phục Thành Viên Đã Xóa
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowRestoreModal(false)}
+                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Dưới đây là các tài khoản thành viên thật từng bị xóa. Bạn có thể nhấn <span className="font-bold text-emerald-700">"Khôi phục"</span> để đưa thành viên trở lại hoạt động bình thường với đầy đủ lịch sử, LP và phân loại.
+            </p>
+
+            {isLoadingDeleted ? (
+              <div className="py-10 text-center text-xs text-slate-500 font-semibold animate-pulse">
+                Đang tải danh sách thành viên đã xóa...
+              </div>
+            ) : deletedMembers.length === 0 ? (
+              <div className="py-10 text-center text-xs text-slate-500 space-y-2">
+                <DuckMascot size={36} rounded="xl" className="mx-auto opacity-50" />
+                <p className="font-bold text-slate-700">Không có thành viên nào bị xóa gần đây!</p>
+                <p className="text-[11px] text-slate-400">Dữ liệu toàn bộ thành viên đều đang an toàn và đầy đủ.</p>
+              </div>
+            ) : (
+              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 pr-1 space-y-1">
+                {deletedMembers.map((dm) => (
+                  <div key={dm.id} className="py-2.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={dm.avatarUrl || '/duck-mascot.png'}
+                        alt={dm.fullName}
+                        className="w-8 h-8 rounded-full border border-slate-200 object-cover shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="font-black text-slate-900 text-xs truncate">{dm.fullName}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{dm.phone || 'Không có SĐT'} • {dm.membershipType === 'FIXED' ? 'Cố định' : 'Vãng lai'}</div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => restoreMemberMutation.mutate(dm.id)}
+                      disabled={restoreMemberMutation.isPending}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1 shrink-0"
+                    >
+                      <RotateCcw size={12} />
+                      <span>{restoreMemberMutation.isPending ? 'Đang...' : 'Khôi phục'}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-3 border-t border-slate-200">
+              <button
+                onClick={() => setShowRestoreModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 rounded-xl"
+              >
+                Đóng
               </button>
             </div>
           </div>

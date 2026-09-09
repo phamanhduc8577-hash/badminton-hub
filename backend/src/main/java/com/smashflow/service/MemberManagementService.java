@@ -24,7 +24,15 @@ public class MemberManagementService {
 
     public List<MemberProfileResponse> getAllMembers(User currentUser) {
         boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
-        return userRepository.findAllByOrderByCreatedAtDesc()
+        return userRepository.findByDeletedFalseOrderByCreatedAtDesc()
+                .stream()
+                .map(u -> toResponse(u, isHost))
+                .collect(Collectors.toList());
+    }
+
+    public List<MemberProfileResponse> getDeletedMembers(User currentUser) {
+        boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
+        return userRepository.findByDeletedTrueOrderByUpdatedAtDesc()
                 .stream()
                 .map(u -> toResponse(u, isHost))
                 .collect(Collectors.toList());
@@ -34,6 +42,7 @@ public class MemberManagementService {
         boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
         return userRepository.findByMembershipType(type)
                 .stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getDeleted()))
                 .map(u -> toResponse(u, isHost))
                 .collect(Collectors.toList());
     }
@@ -119,19 +128,20 @@ public class MemberManagementService {
             throw new RuntimeException("Không thể xóa tài khoản của Host CLB!");
         }
 
-        String memberName = user.getFullName();
-        String memberPhone = user.getPhone();
+        user.setDeleted(true);
+        userRepository.save(user);
 
-        // 1. Delete associated loyalty rewards
-        jdbcTemplate.update("DELETE FROM loyalty_rewards WHERE user_id = ?", userId);
+        return "Đã xóa tài khoản " + user.getFullName() + ". Bạn có thể khôi phục lại bất kỳ lúc nào!";
+    }
 
-        // 2. Unlink or clean participants
-        jdbcTemplate.update("DELETE FROM session_participants WHERE user_id = ?", userId);
+    @Transactional
+    public MemberProfileResponse restoreMember(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thành viên!"));
 
-        // 3. Delete user
-        userRepository.delete(user);
-
-        return "Đã xóa tài khoản của thành viên " + memberName + " (" + memberPhone + ") thành công!";
+        user.setDeleted(false);
+        userRepository.save(user);
+        return toResponse(user, true);
     }
 
     @Transactional

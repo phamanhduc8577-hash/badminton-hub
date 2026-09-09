@@ -67,6 +67,9 @@ public class User {
     @Builder.Default
     private Integer sessionsAttended = 0;
 
+    @Builder.Default
+    private Boolean deleted = false;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

@@ -75,6 +75,10 @@ public class AuthService {
         User user = userRepository.findByPhone(request.getPhone())
                 .orElseThrow(() -> new RuntimeException("Số điện thoại hoặc mật khẩu không chính xác!"));
 
+        if (Boolean.TRUE.equals(user.getDeleted())) {
+            throw new RuntimeException("Tài khoản này đã bị xóa hoặc tạm khóa. Vui lòng liên hệ Host để được khôi phục!");
+        }
+
         if (user.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Số điện thoại hoặc mật khẩu không chính xác!");
         }
