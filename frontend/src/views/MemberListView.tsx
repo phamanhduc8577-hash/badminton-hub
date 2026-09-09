@@ -38,6 +38,10 @@ export const MemberListView: React.FC = () => {
   const [manualShieldInput, setManualShieldInput] = useState<number>(0)
 
   const [showRestoreModal, setShowRestoreModal] = useState(false)
+  const [confirmDeleteMember, setConfirmDeleteMember] = useState<MemberProfile | null>(null)
+  const [confirmResetPassMember, setConfirmResetPassMember] = useState<MemberProfile | null>(null)
+  const [confirmDowngradeMember, setConfirmDowngradeMember] = useState<MemberProfile | null>(null)
+  const [confirmUpgradeMember, setConfirmUpgradeMember] = useState<MemberProfile | null>(null)
 
   const { data: members = [], isLoading } = useQuery<MemberProfile[]>({
     queryKey: ['members'],
@@ -505,11 +509,7 @@ export const MemberListView: React.FC = () => {
 
                             {/* Nút Host Reset Mật khẩu nhanh */}
                             <button
-                              onClick={() => {
-                                if (window.confirm(`Đặt lại mật khẩu của ${m.fullName} về mặc định 123456 và gửi báo về Telegram?`)) {
-                                  resetPasswordMutation.mutate(m.id)
-                                }
-                              }}
+                              onClick={() => setConfirmResetPassMember(m)}
                               disabled={resetPasswordMutation.isPending}
                               className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 rounded-xl transition border border-slate-200"
                               title="Reset mật khẩu về 123456"
@@ -541,11 +541,7 @@ export const MemberListView: React.FC = () => {
                               </>
                             ) : m.membershipType === 'FIXED' ? (
                               <button
-                                onClick={() => {
-                                  if (window.confirm(`Bạn có chắc muốn chuyển ${m.fullName} về trạng thái Vãng Lai?`)) {
-                                    updateTypeMutation.mutate({ userId: m.id, type: 'CASUAL' })
-                                  }
-                                }}
+                                onClick={() => setConfirmDowngradeMember(m)}
                                 className="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-bold text-[11px] rounded-xl border border-slate-200 transition"
                                 title="Hạ cấp về Khách Vãng Lai"
                               >
@@ -553,11 +549,7 @@ export const MemberListView: React.FC = () => {
                               </button>
                             ) : (
                               <button
-                                onClick={() => {
-                                  if (window.confirm(`Nâng cấp trực tiếp ${m.fullName} lên Thành Viên Cố Định?`)) {
-                                    updateTypeMutation.mutate({ userId: m.id, type: 'FIXED' })
-                                  }
-                                }}
+                                onClick={() => setConfirmUpgradeMember(m)}
                                 className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1"
                                 title="Level Up lên Thành Viên Cố Định"
                               >
@@ -568,14 +560,10 @@ export const MemberListView: React.FC = () => {
 
                             {/* Nút Xóa Thành Viên */}
                             <button
-                              onClick={() => {
-                                if (window.confirm(`CẢNH BÁO: Bạn có chắc chắn muốn XÓA VĨNH VIỄN tài khoản của "${m.fullName}" (${m.phone || 'Không có SĐT'}) khỏi hệ thống?`)) {
-                                  deleteMemberMutation.mutate(m.id)
-                                }
-                              }}
+                              onClick={() => setConfirmDeleteMember(m)}
                               disabled={deleteMemberMutation.isPending}
                               className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-800 rounded-xl transition border border-rose-200 shadow-2xs"
-                              title="Xóa vĩnh viễn tài khoản thành viên này"
+                              title="Xóa tài khoản thành viên này (Có thể khôi phục)"
                             >
                               <Trash2 size={13} />
                             </button>
@@ -802,6 +790,152 @@ export const MemberListView: React.FC = () => {
                 className="px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 rounded-xl"
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Center Modal: Confirm Delete Member */}
+      {confirmDeleteMember && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto shadow-sm">
+              <Trash2 size={24} />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-black text-slate-900 text-base">Xác nhận xóa thành viên</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Bạn có chắc chắn muốn xóa tài khoản của <b className="text-slate-900 font-bold">"{confirmDeleteMember.fullName}"</b> ({confirmDeleteMember.phone || 'Không có SĐT'})?
+              </p>
+              <p className="text-[11px] text-emerald-700 font-medium bg-emerald-50 p-2 rounded-xl border border-emerald-200 mt-2">
+                💡 Dữ liệu không bị mất. Bạn có thể khôi phục lại bất kỳ lúc nào qua nút "Khôi phục thành viên"!
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setConfirmDeleteMember(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                disabled={deleteMemberMutation.isPending}
+                onClick={() => {
+                  deleteMemberMutation.mutate(confirmDeleteMember.id, {
+                    onSettled: () => setConfirmDeleteMember(null),
+                  })
+                }}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 disabled:opacity-50"
+              >
+                {deleteMemberMutation.isPending ? 'Đang xóa...' : 'Đồng ý xóa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Center Modal: Confirm Reset Password */}
+      {confirmResetPassMember && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center mx-auto shadow-sm">
+              <KeyRound size={24} />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-black text-slate-900 text-base">Đặt lại mật khẩu</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Đặt lại mật khẩu của <b className="text-slate-900 font-bold">{confirmResetPassMember.fullName}</b> về mặc định <code className="px-1.5 py-0.5 bg-slate-100 rounded text-amber-800 font-bold">123456</code> và thông báo về Telegram?
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setConfirmResetPassMember(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={resetPasswordMutation.isPending}
+                onClick={() => {
+                  resetPasswordMutation.mutate(confirmResetPassMember.id, {
+                    onSettled: () => setConfirmResetPassMember(null),
+                  })
+                }}
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 disabled:opacity-50"
+              >
+                {resetPasswordMutation.isPending ? 'Đang cấp...' : 'Đặt lại'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Center Modal: Confirm Downgrade to Casual */}
+      {confirmDowngradeMember && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
+            <div className="space-y-1">
+              <h3 className="font-black text-slate-900 text-base">Chuyển về Vãng Lai</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Bạn có chắc chắn muốn chuyển <b className="text-slate-900 font-bold">{confirmDowngradeMember.fullName}</b> từ Cố Định về <b className="text-amber-700 font-bold">Khách Vãng Lai</b>?
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setConfirmDowngradeMember(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={updateTypeMutation.isPending}
+                onClick={() => {
+                  updateTypeMutation.mutate(
+                    { userId: confirmDowngradeMember.id, type: 'CASUAL' },
+                    { onSettled: () => setConfirmDowngradeMember(null) }
+                  )
+                }}
+                className="flex-1 py-2.5 bg-slate-950 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Center Modal: Confirm Upgrade to Fixed */}
+      {confirmUpgradeMember && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-sm">
+              <Sparkles size={24} className="text-amber-500" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-black text-slate-900 text-base">Nâng cấp Cố Định</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Nâng cấp trực tiếp thành viên <b className="text-slate-900 font-bold">{confirmUpgradeMember.fullName}</b> lên <b className="text-emerald-700 font-bold">Thành Viên Cố Định</b> chính thức của CLB?
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setConfirmUpgradeMember(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={updateTypeMutation.isPending}
+                onClick={() => {
+                  updateTypeMutation.mutate(
+                    { userId: confirmUpgradeMember.id, type: 'FIXED' },
+                    { onSettled: () => setConfirmUpgradeMember(null) }
+                  )
+                }}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95"
+              >
+                Đồng ý
               </button>
             </div>
           </div>
