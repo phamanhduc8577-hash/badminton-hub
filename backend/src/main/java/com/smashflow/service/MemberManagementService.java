@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 public class MemberManagementService {
 
     private final UserRepository userRepository;
+    private final com.smashflow.repository.SessionParticipantRepository participantRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final TelegramNotificationService telegramNotificationService;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
@@ -54,6 +55,10 @@ public class MemberManagementService {
 
         user.setMembershipType(MembershipType.FIXED);
         userRepository.save(user);
+
+        // Auto sync active session participations to official FIXED member pricing and status
+        syncMemberPricingForActiveSessions(user, MembershipType.FIXED);
+
         return toResponse(user, true);
     }
 
@@ -64,6 +69,9 @@ public class MemberManagementService {
 
         user.setMembershipType(MembershipType.CASUAL);
         userRepository.save(user);
+
+        syncMemberPricingForActiveSessions(user, MembershipType.CASUAL);
+
         return toResponse(user, true);
     }
 
@@ -78,7 +86,60 @@ public class MemberManagementService {
 
         user.setMembershipType(request.getMembershipType());
         userRepository.save(user);
+
+        syncMemberPricingForActiveSessions(user, request.getMembershipType());
+
         return toResponse(user, true);
+    }
+
+    private void syncMemberPricingForActiveSessions(User user, MembershipType newType) {
+        try {
+            List<com.smashflow.model.SessionParticipant> participations = participantRepository.findByUserId(user.getId());
+            for (com.smashflow.model.SessionParticipant p : participations) {
+                com.smashflow.model.Session s = p.getSession();
+                if (s == null) continue;
+
+                boolean is2h = p.getDurationHours() != null && p.getDurationHours().compareTo(new java.math.BigDecimal("2.0")) == 0;
+                boolean isFixed = (newType == MembershipType.FIXED);
+
+                java.math.BigDecimal newBaseFee;
+                if (isFixed) {
+                    p.setIsGuest(false);
+                    // Cố định được miễn cọc
+                    if (p.getDepositStatus() == com.smashflow.model.DepositStatus.PENDING) {
+                        p.setDepositStatus(com.smashflow.model.DepositStatus.NONE);
+                        p.setDepositAmount(java.math.BigDecimal.ZERO);
+                    }
+                    if (is2h && s.getMemberMalePrice2h() != null) {
+                        newBaseFee = user.getGender() == com.smashflow.model.Gender.FEMALE
+                                ? (s.getMemberFemalePrice2h() != null ? s.getMemberFemalePrice2h() : s.getMemberFemalePrice())
+                                : (s.getMemberMalePrice2h() != null ? s.getMemberMalePrice2h() : s.getMemberMalePrice());
+                    } else {
+                        newBaseFee = user.getGender() == com.smashflow.model.Gender.FEMALE
+                                ? s.getMemberFemalePrice()
+                                : s.getMemberMalePrice();
+                    }
+                } else {
+                    p.setIsGuest(true);
+                    if (is2h && s.getGuestMalePrice2h() != null) {
+                        newBaseFee = user.getGender() == com.smashflow.model.Gender.FEMALE
+                                ? (s.getGuestFemalePrice2h() != null ? s.getGuestFemalePrice2h() : s.getGuestFemalePrice())
+                                : (s.getGuestMalePrice2h() != null ? s.getGuestMalePrice2h() : s.getGuestMalePrice());
+                    } else {
+                        newBaseFee = user.getGender() == com.smashflow.model.Gender.FEMALE
+                                ? s.getGuestFemalePrice()
+                                : s.getGuestMalePrice();
+                    }
+                }
+
+                if (newBaseFee != null) {
+                    p.setBaseFee(newBaseFee);
+                    java.math.BigDecimal adj = p.getAdjustmentAmount() != null ? p.getAdjustmentAmount() : java.math.BigDecimal.ZERO;
+                    p.setFinalFee(newBaseFee.add(adj).max(java.math.BigDecimal.ZERO));
+                    participantRepository.save(p);
+                }
+            }
+        } catch (Exception ignored) {}
     }
 
     @Transactional
