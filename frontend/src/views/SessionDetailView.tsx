@@ -610,7 +610,7 @@ export const SessionDetailView: React.FC = () => {
                         {idx + 1}
                       </span>
                       <DuckMascot
-                        src={p.isGuest ? '/duck-mascot.png' : (p.gender === 'FEMALE' ? '/duck-mascot.png' : '/duck-mascot.png')}
+                        src={p.avatarUrl || '/duck-mascot.png'}
                         size={32}
                         rounded="xl"
                         className="border border-slate-200 shadow-2xs"
