@@ -16,7 +16,8 @@ public class LeaderboardService {
     private final UserRepository userRepository;
 
     public List<LeaderboardEntry> getAttendanceLeaderboard() {
-        List<User> users = userRepository.findByDeletedFalseOrderByCreatedAtDesc().stream()
+        List<User> users = userRepository.findAll().stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getDeleted()))
                 .sorted((a, b) -> Integer.compare(b.getSessionsAttended(), a.getSessionsAttended()))
                 .limit(20)
                 .toList();
@@ -47,7 +48,8 @@ public class LeaderboardService {
 
     public List<LeaderboardEntry> getWinRateLeaderboard() {
         // Elo ranking based on (winCount - lossCount) >= 0
-        List<User> users = userRepository.findByDeletedFalseOrderByCreatedAtDesc().stream()
+        List<User> users = userRepository.findAll().stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getDeleted()))
                 .sorted((a, b) -> {
                     int eloCompare = Integer.compare(b.getEloScore(), a.getEloScore());
                     if (eloCompare != 0) return eloCompare;

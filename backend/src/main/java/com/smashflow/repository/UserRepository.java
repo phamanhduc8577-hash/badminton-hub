@@ -15,9 +15,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByRole(Role role);
     List<User> findByMembershipType(com.smashflow.model.MembershipType membershipType);
     List<User> findAllByOrderByCreatedAtDesc();
-    List<User> findByDeletedFalseOrderByCreatedAtDesc();
-    List<User> findByDeletedTrueOrderByUpdatedAtDesc();
-    List<User> findTop20ByDeletedFalseOrderBySessionsAttendedDesc();
-    List<User> findTop20ByDeletedFalseOrderByWinCountDesc();
+    List<User> findTop20ByOrderBySessionsAttendedDesc();
+    List<User> findTop20ByOrderByWinCountDesc();
 }
 

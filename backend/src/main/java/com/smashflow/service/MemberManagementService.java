@@ -25,16 +25,18 @@ public class MemberManagementService {
 
     public List<MemberProfileResponse> getAllMembers(User currentUser) {
         boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
-        return userRepository.findByDeletedFalseOrderByCreatedAtDesc()
+        return userRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getDeleted()))
                 .map(u -> toResponse(u, isHost))
                 .collect(Collectors.toList());
     }
 
     public List<MemberProfileResponse> getDeletedMembers(User currentUser) {
         boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
-        return userRepository.findByDeletedTrueOrderByUpdatedAtDesc()
+        return userRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
+                .filter(u -> Boolean.TRUE.equals(u.getDeleted()))
                 .map(u -> toResponse(u, isHost))
                 .collect(Collectors.toList());
     }
