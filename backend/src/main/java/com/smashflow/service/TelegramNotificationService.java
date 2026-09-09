@@ -1,12 +1,16 @@
 package com.smashflow.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 
 @Service
@@ -22,16 +26,18 @@ public class TelegramNotificationService {
     @Value("${telegram.enabled:true}")
     private boolean enabled;
 
-    private final RestTemplate restTemplate;
+    private final HttpClient httpClient;
+    private final ObjectMapper objectMapper;
 
     public TelegramNotificationService() {
-        this.restTemplate = new RestTemplate();
-        // Force UTF-8 StringHttpMessageConverter
-        this.restTemplate.getMessageConverters().add(0, new org.springframework.http.converter.StringHttpMessageConverter(java.nio.charset.StandardCharsets.UTF_8));
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+        this.objectMapper = new ObjectMapper();
     }
 
     /**
-     * Send notification to Host's Telegram.
+     * Send notification to Host's Telegram via direct UTF-8 java.net.http.HttpClient.
      */
     public void sendNotification(String message) {
         String token = (botToken != null && !botToken.isBlank()) ? botToken.trim() : "8664493359:AAEIrvA-XuX3aoclYOOh5bAyvMdDOLDu7UE";
@@ -42,13 +48,10 @@ public class TelegramNotificationService {
             return;
         }
 
-        // Run in detached thread to avoid blocking HTTP response
+        // Run in detached daemon thread to prevent any API latency
         new Thread(() -> {
             try {
                 String url = "https://api.telegram.org/bot" + token + "/sendMessage";
-
-                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-                headers.setContentType(new org.springframework.http.MediaType("application", "json", java.nio.charset.StandardCharsets.UTF_8));
 
                 Map<String, Object> body = Map.of(
                         "chat_id", cid,
@@ -56,14 +59,21 @@ public class TelegramNotificationService {
                         "parse_mode", "HTML"
                 );
 
-                String jsonBody = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(body);
-                org.springframework.http.HttpEntity<String> request = new org.springframework.http.HttpEntity<>(jsonBody, headers);
-                ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+                String jsonBody = objectMapper.writeValueAsString(body);
 
-                if (response.getStatusCode().is2xxSuccessful()) {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .timeout(Duration.ofSeconds(10))
+                        .header("Content-Type", "application/json; charset=utf-8")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+                if (response.statusCode() >= 200 && response.statusCode() < 300) {
                     log.info("Telegram notification sent successfully to chat_id={}", cid);
                 } else {
-                    log.warn("Telegram notification failed with status: {}, body: {}", response.getStatusCode(), response.getBody());
+                    log.warn("Telegram notification failed with status: {}, body: {}", response.statusCode(), response.body());
                 }
             } catch (Exception e) {
                 log.error("Error sending Telegram notification: {}", e.getMessage(), e);
