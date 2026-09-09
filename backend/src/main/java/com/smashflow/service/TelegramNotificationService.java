@@ -13,46 +13,55 @@ import java.util.Map;
 @Slf4j
 public class TelegramNotificationService {
 
-    @Value("${telegram.bot-token:}")
+    @Value("${telegram.bot-token:8664493359:AAEIrvA-XuX3aoclYOOh5bAyvMdDOLDu7UE}")
     private String botToken;
 
-    @Value("${telegram.chat-id:}")
+    @Value("${telegram.chat-id:8723745423}")
     private String chatId;
 
     @Value("${telegram.enabled:true}")
     private boolean enabled;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public TelegramNotificationService() {
+        this.restTemplate = new RestTemplate();
+        // Force UTF-8 StringHttpMessageConverter
+        this.restTemplate.getMessageConverters().add(0, new org.springframework.http.converter.StringHttpMessageConverter(java.nio.charset.StandardCharsets.UTF_8));
+    }
 
     /**
      * Send notification to Host's Telegram.
      */
     public void sendNotification(String message) {
-        if (!enabled || botToken == null || botToken.isBlank() || chatId == null || chatId.isBlank()) {
-            log.warn("Telegram notification skipped: enabled={}, botTokenPresent={}, chatIdPresent={}",
-                    enabled, (botToken != null && !botToken.isBlank()), (chatId != null && !chatId.isBlank()));
+        String token = (botToken != null && !botToken.isBlank()) ? botToken.trim() : "8664493359:AAEIrvA-XuX3aoclYOOh5bAyvMdDOLDu7UE";
+        String cid = (chatId != null && !chatId.isBlank()) ? chatId.trim() : "8723745423";
+
+        if (!enabled) {
+            log.warn("Telegram notification skipped: disabled");
             return;
         }
 
-        // Run in detached daemon thread to prevent blocking HTTP response while avoiding proxy issues
+        // Run in detached thread to avoid blocking HTTP response
         new Thread(() -> {
             try {
-                String url = String.format("https://api.telegram.org/bot%s/sendMessage", botToken.trim());
+                String url = "https://api.telegram.org/bot" + token + "/sendMessage";
 
                 org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-                headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                headers.setContentType(new org.springframework.http.MediaType("application", "json", java.nio.charset.StandardCharsets.UTF_8));
 
                 Map<String, Object> body = Map.of(
-                        "chat_id", chatId.trim(),
+                        "chat_id", cid,
                         "text", message,
                         "parse_mode", "HTML"
                 );
 
-                org.springframework.http.HttpEntity<Map<String, Object>> request = new org.springframework.http.HttpEntity<>(body, headers);
+                String jsonBody = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(body);
+                org.springframework.http.HttpEntity<String> request = new org.springframework.http.HttpEntity<>(jsonBody, headers);
                 ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
                 if (response.getStatusCode().is2xxSuccessful()) {
-                    log.info("Telegram notification sent successfully to chat_id={}", chatId);
+                    log.info("Telegram notification sent successfully to chat_id={}", cid);
                 } else {
                     log.warn("Telegram notification failed with status: {}, body: {}", response.getStatusCode(), response.getBody());
                 }
