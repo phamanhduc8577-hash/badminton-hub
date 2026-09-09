@@ -25,33 +25,41 @@ public class TelegramNotificationService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     /**
-     * Send async markdown notification to Host's Telegram.
-     * Async ensures that if Telegram API is slow or unreachable, it does NOT block the user request.
+     * Send notification to Host's Telegram.
      */
-    @Async
     public void sendNotification(String message) {
         if (!enabled || botToken == null || botToken.isBlank() || chatId == null || chatId.isBlank()) {
-            log.debug("Telegram notification disabled or credentials missing. Message:\n{}", message);
+            log.warn("Telegram notification skipped: enabled={}, botTokenPresent={}, chatIdPresent={}",
+                    enabled, (botToken != null && !botToken.isBlank()), (chatId != null && !chatId.isBlank()));
             return;
         }
 
-        try {
-            String url = String.format("https://api.telegram.org/bot%s/sendMessage", botToken);
-            Map<String, Object> body = Map.of(
-                    "chat_id", chatId,
-                    "text", message,
-                    "parse_mode", "HTML"
-            );
+        // Run in detached daemon thread to prevent blocking HTTP response while avoiding proxy issues
+        new Thread(() -> {
+            try {
+                String url = String.format("https://api.telegram.org/bot%s/sendMessage", botToken.trim());
 
-            ResponseEntity<String> response = restTemplate.postForEntity(url, body, String.class);
-            if (response.getStatusCode().is2xxSuccessful()) {
-                log.info("Telegram notification sent successfully to chat_id={}", chatId);
-            } else {
-                log.warn("Telegram notification failed with status: {}", response.getStatusCode());
+                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+                headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+
+                Map<String, Object> body = Map.of(
+                        "chat_id", chatId.trim(),
+                        "text", message,
+                        "parse_mode", "HTML"
+                );
+
+                org.springframework.http.HttpEntity<Map<String, Object>> request = new org.springframework.http.HttpEntity<>(body, headers);
+                ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+                if (response.getStatusCode().is2xxSuccessful()) {
+                    log.info("Telegram notification sent successfully to chat_id={}", chatId);
+                } else {
+                    log.warn("Telegram notification failed with status: {}, body: {}", response.getStatusCode(), response.getBody());
+                }
+            } catch (Exception e) {
+                log.error("Error sending Telegram notification: {}", e.getMessage(), e);
             }
-        } catch (Exception e) {
-            log.error("Error sending Telegram notification: {}", e.getMessage());
-        }
+        }).start();
     }
 
     /**
