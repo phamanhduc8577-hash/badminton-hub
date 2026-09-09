@@ -66,6 +66,16 @@ public class AuthService {
 
         userRepository.save(user);
 
+        // Notify Host on Telegram whenever a new user registers or requests FIXED membership
+        try {
+            telegramNotificationService.notifyNewUserRegistered(
+                    user.getFullName(),
+                    user.getPhone(),
+                    user.getGender() != null ? user.getGender().name() : "MALE",
+                    mType != null ? mType.name() : "CASUAL"
+            );
+        } catch (Exception ignored) {}
+
         String token = jwtProvider.generateToken(user.getPhone(), user.getRole().name(), user.getId());
 
         return toAuthResponse(user, token);

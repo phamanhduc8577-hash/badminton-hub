@@ -133,6 +133,32 @@ public class TelegramNotificationService {
     }
 
     /**
+     * Template: New User Registration & Pending Approval Notice
+     */
+    public void notifyNewUserRegistered(String fullName, String phone, String gender, String membershipType) {
+        String typeLabel = "PENDING_FIXED".equalsIgnoreCase(membershipType)
+                ? "⏳ Đăng ký Thành viên Cố định (Đang chờ Host duyệt)"
+                : "🟡 Thành viên / Khách Vãng lai";
+
+        String msg = String.format(
+                "🎉 <b>[SmashFlow] CÓ THÀNH VIÊN MỚI TẠO TÀI KHOẢN!</b>\n\n" +
+                "👤 <b>Họ tên:</b> %s\n" +
+                "📞 <b>Số điện thoại:</b> <code>%s</code>\n" +
+                "⚧ <b>Giới tính:</b> %s\n" +
+                "🏷️ <b>Phân loại:</b> %s\n\n" +
+                "%s",
+                escapeHtml(fullName),
+                escapeHtml(phone),
+                gender != null && gender.equalsIgnoreCase("FEMALE") ? "Nữ (Trợ giá)" : "Nam",
+                typeLabel,
+                "PENDING_FIXED".equalsIgnoreCase(membershipType)
+                        ? "👉 <i>Vui lòng vào mục Thành viên trên Web để phê duyệt cho thành viên này!</i>"
+                        : "✅ <i>Tài khoản đã kích hoạt sẵn sàng tham gia ca đánh.</i>"
+        );
+        sendNotification(msg);
+    }
+
+    /**
      * Template: Password Reset Request Notice
      */
     public void notifyForgotPasswordRequest(String playerName, String phone, String defaultPassword) {
