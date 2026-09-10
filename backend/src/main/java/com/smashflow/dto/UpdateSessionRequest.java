@@ -26,6 +26,11 @@ public class UpdateSessionRequest {
     private BigDecimal guestMalePrice;
     private BigDecimal guestFemalePrice;
 
+    private BigDecimal memberMalePrice2h;
+    private BigDecimal memberFemalePrice2h;
+    private BigDecimal guestMalePrice2h;
+    private BigDecimal guestFemalePrice2h;
+
     private BigDecimal depositAmount;
     private BigDecimal costCourt;
     private BigDecimal costShuttlecock;

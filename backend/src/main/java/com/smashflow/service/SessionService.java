@@ -416,6 +416,10 @@ public class SessionService {
         if (request.getMemberFemalePrice() != null) session.setMemberFemalePrice(request.getMemberFemalePrice());
         if (request.getGuestMalePrice() != null) session.setGuestMalePrice(request.getGuestMalePrice());
         if (request.getGuestFemalePrice() != null) session.setGuestFemalePrice(request.getGuestFemalePrice());
+        if (request.getMemberMalePrice2h() != null) session.setMemberMalePrice2h(request.getMemberMalePrice2h());
+        if (request.getMemberFemalePrice2h() != null) session.setMemberFemalePrice2h(request.getMemberFemalePrice2h());
+        if (request.getGuestMalePrice2h() != null) session.setGuestMalePrice2h(request.getGuestMalePrice2h());
+        if (request.getGuestFemalePrice2h() != null) session.setGuestFemalePrice2h(request.getGuestFemalePrice2h());
         if (request.getDepositAmount() != null) session.setDepositAmount(request.getDepositAmount());
         if (request.getCostCourt() != null) session.setCostCourt(request.getCostCourt());
         if (request.getCostShuttlecock() != null) session.setCostShuttlecock(request.getCostShuttlecock());

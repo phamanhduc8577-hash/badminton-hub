@@ -36,9 +36,19 @@ export const SessionListView: React.FC = () => {
   // State modal chỉnh sửa nhanh ca đánh (dành cho Host)
   const [editingSession, setEditingSession] = useState<SessionItem | null>(null)
   const [editForm, setEditForm] = useState({
+    title: '',
     courtNames: '',
     maxSlots: 8,
-    title: '',
+    venueName: '',
+    venueAddress: '',
+    memberMalePrice: 0,
+    memberFemalePrice: 0,
+    guestMalePrice: 0,
+    guestFemalePrice: 0,
+    memberMalePrice2h: 0,
+    memberFemalePrice2h: 0,
+    guestMalePrice2h: 0,
+    guestFemalePrice2h: 0,
   })
 
   const { data: sessions, isLoading, error } = useQuery<SessionItem[]>({
@@ -49,30 +59,22 @@ export const SessionListView: React.FC = () => {
     },
   })
 
-  // Mutation cập nhật sân & slot trực tiếp
+  // Mutation cập nhật sân, slot, địa điểm & bảng giá trực tiếp
   const updateSessionMutation = useMutation({
     mutationFn: async ({
       sessionId,
-      courtNames,
-      maxSlots,
-      title,
+      payload,
     }: {
       sessionId: number
-      courtNames: string
-      maxSlots: number
-      title: string
+      payload: any
     }) => {
-      const res = await api.put(`/sessions/${sessionId}`, {
-        title,
-        courtNames,
-        maxSlots,
-      })
+      const res = await api.put(`/sessions/${sessionId}`, payload)
       return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] })
       setEditingSession(null)
-      showToast('Đã cập nhật sân và số slot thành công!', 'success')
+      showToast('Đã cập nhật thông tin ca đánh thành công!', 'success')
     },
     onError: (err: any) => {
       showToast(err.response?.data?.message || 'Không thể cập nhật ca đánh!', 'error')
@@ -83,9 +85,19 @@ export const SessionListView: React.FC = () => {
     e.stopPropagation()
     setEditingSession(session)
     setEditForm({
+      title: session.title,
       courtNames: session.courtNames || 'Sân 1, Sân 2',
       maxSlots: session.maxSlots || 8,
-      title: session.title,
+      venueName: session.venueName || '',
+      venueAddress: session.venueAddress || '',
+      memberMalePrice: session.memberMalePrice || 0,
+      memberFemalePrice: session.memberFemalePrice || 0,
+      guestMalePrice: session.guestMalePrice || 0,
+      guestFemalePrice: session.guestFemalePrice || 0,
+      memberMalePrice2h: session.memberMalePrice2h || 0,
+      memberFemalePrice2h: session.memberFemalePrice2h || 0,
+      guestMalePrice2h: session.guestMalePrice2h || 0,
+      guestFemalePrice2h: session.guestFemalePrice2h || 0,
     })
   }
 
@@ -103,9 +115,21 @@ export const SessionListView: React.FC = () => {
 
     updateSessionMutation.mutate({
       sessionId: editingSession.id,
-      courtNames: editForm.courtNames,
-      maxSlots: Number(editForm.maxSlots),
-      title: editForm.title || editingSession.title,
+      payload: {
+        title: editForm.title || editingSession.title,
+        courtNames: editForm.courtNames,
+        maxSlots: Number(editForm.maxSlots),
+        venueName: editForm.venueName,
+        venueAddress: editForm.venueAddress,
+        memberMalePrice: Number(editForm.memberMalePrice),
+        memberFemalePrice: Number(editForm.memberFemalePrice),
+        guestMalePrice: Number(editForm.guestMalePrice),
+        guestFemalePrice: Number(editForm.guestFemalePrice),
+        memberMalePrice2h: editForm.memberMalePrice2h ? Number(editForm.memberMalePrice2h) : null,
+        memberFemalePrice2h: editForm.memberFemalePrice2h ? Number(editForm.memberFemalePrice2h) : null,
+        guestMalePrice2h: editForm.guestMalePrice2h ? Number(editForm.guestMalePrice2h) : null,
+        guestFemalePrice2h: editForm.guestFemalePrice2h ? Number(editForm.guestFemalePrice2h) : null,
+      },
     })
   }
 
@@ -426,7 +450,7 @@ export const SessionListView: React.FC = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6 relative"
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl border border-slate-200 space-y-5 relative max-h-[90vh] overflow-y-auto"
           >
             <button
               onClick={() => setEditingSession(null)}
@@ -440,61 +464,172 @@ export const SessionListView: React.FC = () => {
                 <Layers size={13} className="text-slate-900" />
                 <span>Host Fast Editor</span>
               </div>
-              <h3 className="text-xl font-black text-slate-950">Chỉnh sửa sân & Quân số ca đánh</h3>
+              <h3 className="text-xl font-black text-slate-950">Chỉnh sửa thông tin ca đánh</h3>
               <p className="text-xs text-slate-500 font-medium">
-                Cập nhật nhanh danh sách sân và nâng giới hạn slot người tham gia
+                Cập nhật nhanh danh sách sân, quân số, địa điểm và bảng giá slot
               </p>
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4">
-              <div className="space-y-1.5">
+              {/* Tiêu đề */}
+              <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-700 block">Tiêu đề ca đánh</label>
                 <input
                   type="text"
                   value={editForm.title}
                   onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                   placeholder="Ví dụ: Giao lưu cầu lông tối..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 block">
-                  Danh sách sân (Phân tách bằng dấu phẩy)
-                </label>
-                <input
-                  type="text"
-                  value={editForm.courtNames}
-                  onChange={(e) => setEditForm({ ...editForm, courtNames: e.target.value })}
-                  placeholder="Ví dụ: Sân 1, Sân 2, Sân 3"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
-                  required
-                />
-                <span className="text-[10px] text-slate-500 font-medium block">
-                  Mỗi sân tương ứng ~4-8 người chơi. Ví dụ 3 sân thì nhập: <code>Sân 1, Sân 2, Sân 3</code>
-                </span>
+              {/* Địa điểm sân & Địa chỉ */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block">Tên sân cầu lông</label>
+                  <input
+                    type="text"
+                    value={editForm.venueName}
+                    onChange={(e) => setEditForm({ ...editForm, venueName: e.target.value })}
+                    placeholder="VD: Sân Cầu Lông Đại Phát"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block">Địa chỉ chi tiết</label>
+                  <input
+                    type="text"
+                    value={editForm.venueAddress}
+                    onChange={(e) => setEditForm({ ...editForm, venueAddress: e.target.value })}
+                    placeholder="VD: 123 Đường ABC, Quận..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                  <span>Tổng số slot tối đa (Max Slots)</span>
-                  <span className="text-slate-500 text-[11px]">Hiện có: <b>{editingSession.bookedSlots} người</b></span>
-                </label>
-                <input
-                  type="number"
-                  min={editingSession.bookedSlots || 1}
-                  max={60}
-                  value={editForm.maxSlots}
-                  onChange={(e) => setEditForm({ ...editForm, maxSlots: Number(e.target.value) })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
-                  required
-                />
-                <span className="text-[10px] text-slate-500 font-medium block">
-                  Có thể nâng từ 8 lên 12, 14, 16 slots khi mở thêm sân mới để nhận thêm người đăng ký.
-                </span>
+              {/* Danh sách sân & Max slots */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 block">
+                    Danh sách sân
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.courtNames}
+                    onChange={(e) => setEditForm({ ...editForm, courtNames: e.target.value })}
+                    placeholder="Ví dụ: Sân 1, Sân 2"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>Tổng slot (Max)</span>
+                    <span className="text-slate-500 text-[10px]">Hiện: <b>{editingSession.bookedSlots} người</b></span>
+                  </label>
+                  <input
+                    type="number"
+                    min={editingSession.bookedSlots || 1}
+                    max={60}
+                    value={editForm.maxSlots}
+                    onChange={(e) => setEditForm({ ...editForm, maxSlots: Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              {/* Bảng giá Full Ca */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                <div className="text-[11px] font-black uppercase text-slate-800 tracking-wider">
+                  💰 Giá Full Ca (VNĐ)
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Cố định Nam</label>
+                    <input
+                      type="number"
+                      value={editForm.memberMalePrice}
+                      onChange={(e) => setEditForm({ ...editForm, memberMalePrice: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Cố định Nữ</label>
+                    <input
+                      type="number"
+                      value={editForm.memberFemalePrice}
+                      onChange={(e) => setEditForm({ ...editForm, memberFemalePrice: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Vãng lai Nam</label>
+                    <input
+                      type="number"
+                      value={editForm.guestMalePrice}
+                      onChange={(e) => setEditForm({ ...editForm, guestMalePrice: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Vãng lai Nữ</label>
+                    <input
+                      type="number"
+                      value={editForm.guestFemalePrice}
+                      onChange={(e) => setEditForm({ ...editForm, guestFemalePrice: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bảng giá Ca 2 Tiếng (Tùy chọn) */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
+                <div className="text-[11px] font-black uppercase text-slate-800 tracking-wider">
+                  ⏱️ Giá Ca 2 Tiếng (Tùy chọn - VNĐ)
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Cố định Nam</label>
+                    <input
+                      type="number"
+                      value={editForm.memberMalePrice2h || 0}
+                      onChange={(e) => setEditForm({ ...editForm, memberMalePrice2h: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Cố định Nữ</label>
+                    <input
+                      type="number"
+                      value={editForm.memberFemalePrice2h || 0}
+                      onChange={(e) => setEditForm({ ...editForm, memberFemalePrice2h: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Vãng lai Nam</label>
+                    <input
+                      type="number"
+                      value={editForm.guestMalePrice2h || 0}
+                      onChange={(e) => setEditForm({ ...editForm, guestMalePrice2h: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Vãng lai Nữ</label>
+                    <input
+                      type="number"
+                      value={editForm.guestFemalePrice2h || 0}
+                      onChange={(e) => setEditForm({ ...editForm, guestFemalePrice2h: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setEditingSession(null)}
