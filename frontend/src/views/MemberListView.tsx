@@ -228,7 +228,7 @@ export const MemberListView: React.FC = () => {
               Danh Sách Thành Viên Làng Địa Ngục
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 font-medium">
-              Quản lý danh sách thành viên Cố Định & Vãng Lai • Chống bịp bợm giá slot và gian lận quyền lợi CLB.
+              Quản lý danh sách thành viên Cố Định & Vãng Lai • Đảm bảo quyền lợi và thông tin minh bạch.
             </p>
           </div>
 
