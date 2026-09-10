@@ -506,16 +506,6 @@ export const HostDashboardView: React.FC = () => {
 
         <div className="flex items-center gap-2.5">
           <button
-            disabled={autoSeedMutation.isPending}
-            onClick={() => autoSeedMutation.mutate()}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-sm active:scale-95 disabled:opacity-50"
-            title="Tự động nạp 8 thành viên ảo, điểm danh và xếp 6 set đấu"
-          >
-            <Sparkles size={13} className="text-amber-300" />
-            <span>{autoSeedMutation.isPending ? 'Đang mô phỏng...' : '⚡ Test nhanh 8 người & 6 set'}</span>
-          </button>
-
-          <button
             onClick={() => queryClient.invalidateQueries({ queryKey: ['session', id] })}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition shadow-sm"
           >
