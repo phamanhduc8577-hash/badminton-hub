@@ -395,34 +395,31 @@ export const SessionListView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Pricing Matrix Bottom Bar */}
-                  <div className="mt-5 pt-4 border-t border-slate-200 flex items-center justify-between text-xs">
-                    <div>
+                  {/* Perks & Benefits Bottom Bar (Option 1) */}
+                  <div className="mt-5 pt-3.5 border-t border-slate-200 flex items-center justify-between text-xs">
+                    <div className="space-y-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-500 font-bold">Slot Nam / Nữ (Trợ giá):</span>
+                        <Sparkles size={13} className="text-amber-500 shrink-0" />
+                        <span className="text-[11px] text-slate-800 font-black">Ưu đãi ca đánh:</span>
                         {session.startTime && session.endTime && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                            {Math.round(((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60)) * 10) / 10}h
+                            Ca {Math.round(((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60)) * 10) / 10}h
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="font-black text-slate-950 text-sm">
-                          {Number(session.memberMalePrice).toLocaleString('vi-VN')}đ
-                        </span>
-                        <span className="text-slate-300 font-bold">/</span>
-                        <span className="font-black text-rose-600 text-sm">
-                          {Number(session.memberFemalePrice).toLocaleString('vi-VN')}đ
-                        </span>
+                      <div className="flex items-center gap-1 text-[11px] text-slate-600 font-medium">
+                        <span className="text-rose-600 font-bold">Trợ giá Nữ</span>
+                        <span>•</span>
+                        <span>Tích điểm đổi nước & voucher</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {user?.role === 'HOST' && (
                         <button
                           onClick={(e) => handleOpenEditModal(e, session)}
                           className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-300 rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-bold z-10"
-                          title="Sửa nhanh sân & slot ca đánh này"
+                          title="Sửa nhanh thông tin & bảng giá ca đánh này"
                         >
                           <Settings size={13} className="text-slate-600" />
                           <span>Sửa ca</span>
