@@ -68,15 +68,15 @@ export const LeaderboardView: React.FC = () => {
           <div className="space-y-4 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-950 text-white text-xs font-bold shadow-md">
               <Trophy size={14} className="text-amber-400" />
-              <span>Hệ Thống Phân Hạng Elo LMHT • CLB Làng Địa Ngục</span>
+              <span>Hệ Thống Phân Hạng</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-950 tracking-tight">
-              Bảng xếp hạng & Bậc Rank
+              Bảng xếp hạng
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-              Vinh danh các tay vợt theo hệ thống 10 Bậc Rank & Đoàn (III, II, I) Liên Minh Huyền Thoại chuẩn Riot: 100 LP mỗi đoàn, chuỗi thắng thưởng LP, và 5 trận phân hạng khởi đầu.
+              Vinh danh các tay vợt theo hệ thống 10 Bậc Rank & Đoàn (III, II, I): 100 Điểm mỗi đoàn, chuỗi thắng thưởng thêm điểm, và 5 trận phân hạng khởi đầu.
             </p>
 
             {/* Quick Rank Crest Strip Preview */}
@@ -131,13 +131,13 @@ export const LeaderboardView: React.FC = () => {
           </div>
         </div>
 
-        {/* 10 LOL Tier Showcase Grid */}
+        {/* 10 Tier Showcase Grid */}
         {showTierSystem && (
           <div className="mt-8 pt-6 border-t border-slate-200 space-y-4 animate-in fade-in duration-300">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-sm text-slate-950 uppercase tracking-wider flex items-center gap-2">
                 <Shield size={16} className="text-amber-500" />
-                <span>Huy Hiệu Giáp Trụ & Điểm Chuẩn 10 Bậc Rank LMHT</span>
+                <span>Huy Hiệu & Điểm Chuẩn 10 Bậc Rank</span>
               </h3>
               <span className="text-[11px] text-slate-500 font-bold">
                 Tự động thăng cấp sau mỗi trận đấu
