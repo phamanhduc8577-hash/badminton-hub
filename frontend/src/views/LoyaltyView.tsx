@@ -462,7 +462,7 @@ export const LoyaltyView: React.FC = () => {
               return (
                 <div
                   key={dateKey}
-                  className={`min-h-[85px] sm:min-h-[105px] rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between transition-all duration-200 border relative group ${
+                  className={`min-h-[72px] sm:min-h-[105px] rounded-2xl p-1.5 sm:p-3 flex flex-col justify-between transition-all duration-200 border relative group ${
                     isAttended
                       ? 'bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-600 text-white border-emerald-400 shadow-lg shadow-emerald-600/20 hover:scale-[1.03] hover:shadow-xl hover:z-20'
                       : isToday
@@ -471,9 +471,9 @@ export const LoyaltyView: React.FC = () => {
                   }`}
                 >
                   {/* Top Bar of Cell */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 items-start">
                     <span
-                      className={`text-sm sm:text-base font-black tracking-tight ${
+                      className={`text-xs sm:text-base font-black tracking-tight leading-none ${
                         isAttended ? 'text-white' : isToday ? 'text-slate-950' : 'text-slate-700 group-hover:text-slate-950'
                       }`}
                     >
@@ -482,7 +482,7 @@ export const LoyaltyView: React.FC = () => {
 
                     {isToday && (
                       <span
-                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider shadow-xs ${
+                        className={`text-[8px] sm:text-[9px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-md tracking-tight leading-none whitespace-nowrap shadow-xs ${
                           isAttended ? 'bg-white text-emerald-900' : 'bg-slate-950 text-white'
                         }`}
                       >
@@ -491,7 +491,7 @@ export const LoyaltyView: React.FC = () => {
                     )}
 
                     {isAttended && !isToday && (
-                      <span className="text-xs animate-pulse">✨</span>
+                      <span className="text-[10px] sm:text-xs animate-pulse hidden sm:inline">✨</span>
                     )}
                   </div>
 

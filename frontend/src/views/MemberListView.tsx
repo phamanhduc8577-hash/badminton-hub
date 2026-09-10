@@ -387,7 +387,7 @@ export const MemberListView: React.FC = () => {
 
                     <td className="py-3.5 px-3">
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block whitespace-nowrap text-center ${
                           m.gender === 'FEMALE'
                             ? 'bg-rose-50 text-rose-700 border border-rose-200'
                             : 'bg-blue-50 text-blue-700 border border-blue-200'
@@ -399,21 +399,21 @@ export const MemberListView: React.FC = () => {
 
                     <td className="py-3.5 px-3">
                       {m.role === 'HOST' ? (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white shadow-2xs">
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white shadow-2xs inline-block whitespace-nowrap text-center">
                           Quản trị viên
                         </span>
                       ) : m.membershipType === 'FIXED' ? (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 w-fit">
-                          <CheckCircle2 size={12} className="text-emerald-600" />
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1 w-fit whitespace-nowrap">
+                          <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
                           <span>Cố định (Chính thức)</span>
                         </span>
                       ) : m.membershipType === 'PENDING_FIXED' ? (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1 w-fit animate-pulse">
-                          <Clock size={12} className="text-amber-600" />
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1 w-fit animate-pulse whitespace-nowrap">
+                          <Clock size={12} className="text-amber-600 shrink-0" />
                           <span>Chờ Host duyệt</span>
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1 w-fit">
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1 w-fit whitespace-nowrap">
                           <span>Vãng lai</span>
                         </span>
                       )}
