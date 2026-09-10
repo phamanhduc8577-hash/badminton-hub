@@ -108,6 +108,12 @@ export const HostDashboardView: React.FC = () => {
 
   const currentCourtName = courtList[activeCourtIndex] || courtList[0] || 'Sân 1'
 
+  // Checkin Direct URL for QR code (Scannable via Camera or Zalo)
+  const checkinDirectUrl = useMemo(() => {
+    if (!session?.id || !session?.checkinToken) return ''
+    return `${window.location.origin}/sessions/${session.id}?token=${session.checkinToken}`
+  }, [session?.id, session?.checkinToken])
+
   // Current draft for the selected court
   const currentDraft = useMemo<CourtDraft>(() => {
     return (
@@ -579,7 +585,7 @@ export const HostDashboardView: React.FC = () => {
               className="w-16 h-16 bg-white p-1.5 rounded-xl flex items-center justify-center cursor-pointer shadow border border-slate-200 hover:scale-105 transition"
               title="Nhấn để phóng to QR cho thành viên quét"
             >
-              <QRCodeSVG value={session.checkinToken || 'NONE'} size={56} />
+              <QRCodeSVG value={checkinDirectUrl || session.checkinToken || 'NONE'} size={56} />
             </div>
 
             <div>
@@ -1578,7 +1584,7 @@ export const HostDashboardView: React.FC = () => {
             </div>
 
             <div className="bg-white p-4 rounded-2xl shadow-inner border border-slate-200 inline-block">
-              <QRCodeSVG value={session.checkinToken || 'NONE'} size={240} />
+              <QRCodeSVG value={checkinDirectUrl || session.checkinToken || 'NONE'} size={240} />
             </div>
 
             <div className="space-y-1">
@@ -1586,7 +1592,7 @@ export const HostDashboardView: React.FC = () => {
                 {session.checkinToken}
               </span>
               <p className="text-xs text-slate-500 font-medium">
-                Mã làm mới mỗi 15 phút. Yêu cầu bật định vị GPS tại sân.
+                Mã làm mới mỗi 15 phút. Quét bằng Camera / Zalo hoặc bật GPS tại sân.
               </p>
             </div>
 

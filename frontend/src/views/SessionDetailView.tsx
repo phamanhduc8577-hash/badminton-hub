@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { SessionItem, Participant } from '../types'
@@ -28,6 +28,7 @@ import {
 
 export const SessionDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
@@ -50,6 +51,7 @@ export const SessionDetailView: React.FC = () => {
   const [checkinError, setCheckinError] = useState('')
   const [checkinSuccess, setCheckinSuccess] = useState(false)
   const [locatingGps, setLocatingGps] = useState(false)
+  const autoCheckinTriggered = useRef(false)
 
   const { data: session, isLoading } = useQuery<SessionItem>({
     queryKey: ['session', id],
@@ -194,6 +196,7 @@ export const SessionDetailView: React.FC = () => {
           })
           setLocatingGps(false)
           setCheckinSuccess(true)
+          showToast('Điểm danh thành công! Chúc bạn chơi vui vẻ 🏸', 'success')
           queryClient.invalidateQueries({ queryKey: ['session', id] })
         } catch (err: any) {
           setLocatingGps(false)
@@ -202,17 +205,42 @@ export const SessionDetailView: React.FC = () => {
       },
       () => {
         setLocatingGps(false)
-        setCheckinError('Không thể lấy vị trí GPS (vui lòng cho phép quyền truy cập vị trí)!')
+        setCheckinError('Không thể lấy vị trí GPS (vui lòng cho phép quyền truy cập vị trí trên điện thoại)!')
       },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }
 
+  // Auto handle URL token parameter (?token=4ECDACC6 or /sessions/1?token=4ECDACC6)
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get('token')
+    if (tokenFromUrl && session && !autoCheckinTriggered.current) {
+      const cleanToken = tokenFromUrl.trim().toUpperCase()
+      setCheckinTokenInput(cleanToken)
+      setShowCheckinModal(true)
+
+      // If user is already registered in this session and hasn't checked in yet, auto-trigger checkin
+      const currentUserParticipant = session.participants?.find((p) => user?.id && p.userId === user.id)
+      if (currentUserParticipant && currentUserParticipant.checkinStatus !== 'CHECKED_IN') {
+        autoCheckinTriggered.current = true
+        handleCheckinSubmit(cleanToken)
+      }
+    }
+  }, [searchParams, session, user])
+
   // Handle Scan QR from Camera
   const handleScanSuccess = (scannedText: string) => {
     setShowCameraScanner(false)
-    setCheckinTokenInput(scannedText)
-    handleCheckinSubmit(scannedText)
+    let token = scannedText.trim()
+    try {
+      if (token.startsWith('http')) {
+        const url = new URL(token)
+        const paramToken = url.searchParams.get('token')
+        if (paramToken) token = paramToken
+      }
+    } catch (_) {}
+    setCheckinTokenInput(token.toUpperCase())
+    handleCheckinSubmit(token.toUpperCase())
   }
 
   const handleOpenFinalPaymentQr = async (participantId: number) => {
