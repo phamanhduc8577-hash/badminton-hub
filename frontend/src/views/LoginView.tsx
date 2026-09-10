@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
+import { notifyNewUserRegisteredDirect } from '../lib/telegram'
 import {
   LogIn,
   UserPlus,
@@ -129,6 +130,15 @@ export const LoginView: React.FC = () => {
           avatarUrl: payloadAvatar,
         })
         setAuth(res.data, res.data.token)
+
+        // Instant direct Telegram notification pipeline
+        notifyNewUserRegisteredDirect(
+          fullName.trim(),
+          cleanPhone,
+          gender,
+          membershipChoice
+        ).catch(() => {})
+
         if (membershipChoice === 'FIXED') {
           showToast('Đăng ký thành công! Yêu cầu "Cố định" đang chờ Host duyệt.', 'info')
         } else {

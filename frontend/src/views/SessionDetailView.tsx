@@ -7,6 +7,7 @@ import { useAuthStore } from '../store/useAuthStore'
 import { QrCameraScanner } from '../components/QrCameraScanner'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
+import { notifyNewBookingDirect } from '../lib/telegram'
 import {
   Clock,
   MapPin,
@@ -129,6 +130,25 @@ export const SessionDetailView: React.FC = () => {
     },
     onSuccess: async (participant) => {
       setShowJoinOptionModal(false)
+
+      // Direct instant Telegram alert to Host
+      try {
+        const timeRange = session?.startTime && session?.endTime
+          ? `${new Date(session.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${new Date(session.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`
+          : 'Ca đánh'
+        const isOfficialFixed = user?.role === 'HOST' || user?.membershipType === 'FIXED'
+        const feeNote = Number(participant.depositAmount) > 0 ? 'Cần cọc 20.000đ (Khách vãng lai lần 1)' : 'Miễn cọc'
+        notifyNewBookingDirect(
+          session?.title || 'Ca đánh SmashHub',
+          timeRange,
+          user?.fullName || participant.name,
+          user?.phone || participant.phone,
+          user?.gender || participant.gender,
+          isOfficialFixed ? 'Thành viên Cố định' : 'Thành viên CLB',
+          feeNote
+        ).catch(() => {})
+      } catch (_) {}
+
       // Nếu là thành viên vãng lai lần đầu (có yêu cầu cọc > 0)
       if (Number(participant.depositAmount) > 0) {
         try {
