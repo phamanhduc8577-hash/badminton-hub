@@ -120,6 +120,12 @@ public class CheckinAndPricingService {
 
         participant.setPaymentStatus(PaymentStatus.PAID);
         participant.setPaymentMethod(request.getPaymentMethod());
+
+        // Tự động chuyển trạng thái cọc sang PAID nếu trước đó đang chờ duyệt cọc
+        if (participant.getDepositStatus() == DepositStatus.PENDING) {
+            participant.setDepositStatus(DepositStatus.PAID);
+        }
+
         participantRepository.save(participant);
 
         try {

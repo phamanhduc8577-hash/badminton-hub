@@ -789,6 +789,11 @@ export const HostDashboardView: React.FC = () => {
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
                               Đã hủy (Giữ cọc)
                             </span>
+                          ) : isPaid ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap flex items-center gap-1 w-fit">
+                              <CheckCircle2 size={10} className="text-emerald-600" />
+                              <span>Hoàn tất</span>
+                            </span>
                           ) : !p.isGuest ? (
                             <span className="text-slate-400 text-[10px] whitespace-nowrap font-medium">Cố định</span>
                           ) : Number(p.depositAmount) === 0 || p.depositStatus === 'NONE' ? (
@@ -859,7 +864,7 @@ export const HostDashboardView: React.FC = () => {
 
                         <td className="py-3.5 px-3 text-right">
                           <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                            {!isCheckedIn && (
+                            {!isCheckedIn && !isPaid && (
                               <button
                                 onClick={() => manualCheckinMutation.mutate(p.id)}
                                 disabled={manualCheckinMutation.isPending}
@@ -871,7 +876,7 @@ export const HostDashboardView: React.FC = () => {
                               </button>
                             )}
 
-                            {p.isGuest && Number(p.depositAmount) > 0 && p.depositStatus !== 'PAID' && (
+                            {!isPaid && p.isGuest && Number(p.depositAmount) > 0 && p.depositStatus !== 'PAID' && (
                               <button
                                 onClick={() => confirmDepositMutation.mutate(p.id)}
                                 className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-bold transition"
