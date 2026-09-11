@@ -26,7 +26,7 @@ export const RankEmblem: React.FC<RankEmblemProps> = ({
   tier,
   size = 'md',
   showLabel = false,
-  showGlow = false,
+  showGlow = true,
   className = '',
 }) => {
   const glowColor = GLOW_COLORS[tier.tier] || GLOW_COLORS.IRON
@@ -34,10 +34,10 @@ export const RankEmblem: React.FC<RankEmblemProps> = ({
   // Dimensions configuration for 3D shield emblems
   const sizeConfig = {
     sm: { box: 44, label: 'text-[9px]' },
-    md: { box: 60, label: 'text-[11px]' },
-    lg: { box: 92, label: 'text-xs' },
-    xl: { box: 124, label: 'text-sm' },
-    '2xl': { box: 156, label: 'text-base' },
+    md: { box: 64, label: 'text-[11px]' },
+    lg: { box: 96, label: 'text-xs' },
+    xl: { box: 128, label: 'text-sm' },
+    '2xl': { box: 160, label: 'text-base' },
   }[size]
 
   return (
@@ -46,12 +46,13 @@ export const RankEmblem: React.FC<RankEmblemProps> = ({
         className="relative flex items-center justify-center"
         style={{ width: sizeConfig.box, height: sizeConfig.box }}
       >
-        {/* Soft Glow */}
+        {/* Soft Aura Glow */}
         {showGlow && (
           <div
-            className="absolute inset-0 rounded-full blur-md opacity-40 group-hover:opacity-80 transition-opacity duration-300 pointer-events-none"
+            className="absolute inset-0 rounded-full blur-lg opacity-60 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
             style={{
               background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
+              transform: 'scale(1.15)',
             }}
           />
         )}
@@ -60,7 +61,7 @@ export const RankEmblem: React.FC<RankEmblemProps> = ({
         <img
           src={tier.imagePath}
           alt={tier.name}
-          className="relative z-10 w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-md"
+          className="relative z-10 w-full h-full object-contain transition-transform duration-300 group-hover:scale-110 drop-shadow-lg"
           loading="lazy"
         />
       </div>
