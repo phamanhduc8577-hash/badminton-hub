@@ -493,6 +493,15 @@ export const HostDashboardView: React.FC = () => {
     }
   }
 
+  if (isLoading || !session) {
+    return (
+      <div className="text-center py-24 text-slate-600 text-sm animate-pulse space-y-3">
+        <DuckMascot size={48} rounded="xl" className="mx-auto" />
+        <p className="font-semibold">Đang tải trung tâm điều khiển Host...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       {/* Top Action Bar */}
