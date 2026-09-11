@@ -1792,10 +1792,13 @@ export const HostDashboardView: React.FC = () => {
                 onClick={() => {
                   const target = confirmRemoveCourt
                   setConfirmRemoveCourt(null)
-                  const updatedList = courtList.filter((c) => c !== target).join(', ')
+                  const remainingCourts = courtList.filter((c) => c !== target)
+                  const updatedList = remainingCourts.join(', ')
+                  const newCourtCount = remainingCourts.length
+                  const newMaxSlots = Math.max(8, newCourtCount * 8)
                   setActiveCourtIndex(0)
-                  updateCourtsMutation.mutate({ newCourtNames: updatedList })
-                  showToast(`Đã xóa [${target}] khỏi ca!`, 'info')
+                  updateCourtsMutation.mutate({ newCourtNames: updatedList, newMaxSlots })
+                  showToast(`Đã xóa [${target}] & giảm về ${newMaxSlots} slots!`, 'info')
                 }}
                 className="px-4 py-2 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow active:scale-95 transition"
               >
