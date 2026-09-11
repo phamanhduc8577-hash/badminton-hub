@@ -153,7 +153,7 @@ export const LeaderboardView: React.FC = () => {
                   <RankEmblem tier={tier} size="lg" />
                   <h4 className={`font-black text-xs mt-2 ${tier.textColor}`}>{tier.name}</h4>
                   <span className="text-[10px] font-extrabold text-slate-700 mt-1 bg-white/90 px-2.5 py-0.5 rounded-full border border-slate-200 shadow-2xs">
-                    {tier.maxScore > 9000 ? `&ge; ${tier.minScore} LP` : `${tier.minScore} - ${tier.maxScore} LP`}
+                    {tier.maxScore > 9000 ? `≥ ${tier.minScore} LP` : `${tier.minScore} - ${tier.maxScore} LP`}
                   </span>
                   <span className="text-[9px] text-slate-500 mt-0.5 font-bold">
                     {tier.tier === 'MASTER' || tier.tier === 'GRANDMASTER' || tier.tier === 'CHALLENGER' ? 'Không chia Đoàn' : '100 LP / Đoàn (III -> I)'}
