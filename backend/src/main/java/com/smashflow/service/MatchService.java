@@ -36,14 +36,6 @@ public class MatchService {
         Session session = sessionRepository.findById(request.getSessionId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
 
-        // 0. Time Validation: Cannot record matches for sessions in the future
-        LocalDateTime now = LocalDateTime.now();
-        if (now.isBefore(session.getStartTime())) {
-            throw new RuntimeException("Ca đánh này chưa bắt đầu (Thời gian bắt đầu: "
-                    + session.getStartTime().toString().replace("T", " ")
-                    + "). Không thể ghi nhận kết quả trước giờ thực tế!");
-        }
-
         Long pA1Id = request.getTeamAPlayer1Id();
         Long pA2Id = request.getTeamAPlayer2Id();
         Long pB1Id = request.getTeamBPlayer1Id();
