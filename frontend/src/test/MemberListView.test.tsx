@@ -109,7 +109,6 @@ describe('MemberListView - Management & Single Deletion', () => {
   })
 
   it('triggers delete API for single user ID when confirmed', async () => {
-    vi.stubGlobal('confirm', () => true)
     ;(api.delete as any).mockResolvedValue({
       data: { message: 'Đã xóa tài khoản thành công!' },
     })
@@ -117,10 +116,13 @@ describe('MemberListView - Management & Single Deletion', () => {
     const Wrapper = createWrapper()
     render(<MemberListView />, { wrapper: Wrapper })
 
-    const deleteButtons = await screen.findAllByTitle(/Xóa vĩnh viễn tài khoản thành viên này/i)
+    const deleteButtons = await screen.findAllByTitle(/Xóa tài khoản thành viên này/i)
     expect(deleteButtons.length).toBeGreaterThan(0)
 
     fireEvent.click(deleteButtons[0])
+
+    const confirmBtn = await screen.findByRole('button', { name: /Đồng ý xóa/i })
+    fireEvent.click(confirmBtn)
 
     await waitFor(() => {
       expect(api.delete).toHaveBeenCalledWith('/members/1')

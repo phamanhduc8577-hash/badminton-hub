@@ -238,16 +238,22 @@ export const MemberListView: React.FC = () => {
         </div>
 
         {/* Quick Stats Grid */}
-        <div className="grid grid-cols-3 gap-3 pt-6 mt-6 border-t border-slate-200/80 text-xs">
+        <div
+          className={`grid gap-3 pt-6 mt-6 border-t border-slate-200/80 text-xs ${
+            user?.role === 'HOST' ? 'grid-cols-3' : 'grid-cols-2'
+          }`}
+        >
           <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl">
             <span className="text-[11px] font-bold text-emerald-800 block">🟢 Thành viên Cố định</span>
             <span className="text-xl font-black text-emerald-950 mt-0.5 block">{fixedMembers.length} người</span>
           </div>
 
-          <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl">
-            <span className="text-[11px] font-bold text-amber-800 block">⏳ Đang chờ duyệt</span>
-            <span className="text-xl font-black text-amber-950 mt-0.5 block">{pendingMembers.length} người</span>
-          </div>
+          {user?.role === 'HOST' && (
+            <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl">
+              <span className="text-[11px] font-bold text-amber-800 block">⏳ Đang chờ duyệt</span>
+              <span className="text-xl font-black text-amber-950 mt-0.5 block">{pendingMembers.length} người</span>
+            </div>
+          )}
 
           <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl">
             <span className="text-[11px] font-bold text-blue-800 block">🟡 Khách vãng lai</span>
@@ -274,21 +280,23 @@ export const MemberListView: React.FC = () => {
             </span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('PENDING')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              activeTab === 'PENDING'
-                ? 'bg-amber-600 text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <span>⏳ Chờ duyệt cố định</span>
-            {pendingMembers.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black animate-pulse">
-                {pendingMembers.length}
-              </span>
-            )}
-          </button>
+          {user?.role === 'HOST' && (
+            <button
+              onClick={() => setActiveTab('PENDING')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                activeTab === 'PENDING'
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <span>⏳ Chờ duyệt cố định</span>
+              {pendingMembers.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black animate-pulse">
+                  {pendingMembers.length}
+                </span>
+              )}
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('CASUAL')}
