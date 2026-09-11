@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
@@ -28,14 +28,16 @@ import {
 export const LoginView: React.FC = () => {
   const { user, token, setAuth } = useAuthStore()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirectPath = searchParams.get('redirect') || '/'
   const { showToast } = useToast()
 
-  // If already logged in, redirect to home
+  // If already logged in, redirect to target or home
   useEffect(() => {
     if (user && token) {
-      navigate('/', { replace: true })
+      navigate(redirectPath, { replace: true })
     }
-  }, [user, token, navigate])
+  }, [user, token, navigate, redirectPath])
 
   const [isRegister, setIsRegister] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
@@ -144,14 +146,14 @@ export const LoginView: React.FC = () => {
         } else {
           showToast('Đăng ký tài khoản thành công!', 'success')
         }
-        navigate('/')
+        navigate(redirectPath)
       } else {
         const res = await api.post('/auth/login', {
           phone: phone.trim(),
           password: password,
         })
         setAuth(res.data, res.data.token)
-        navigate('/')
+        navigate(redirectPath)
       }
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Có lỗi xảy ra, vui lòng thử lại!')

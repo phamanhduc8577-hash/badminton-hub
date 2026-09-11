@@ -44,18 +44,7 @@ public class CheckinAndPricingService {
             throw new RuntimeException("Mã QR điểm danh đã hết hạn (quá 15 phút)! Vui lòng gặp Host để điểm danh.");
         }
 
-        // 2. Verify GPS Location (Haversine <= venue radius)
-        Venue venue = session.getVenue();
-        double distance = geoLocationService.calculateDistanceMeters(
-                request.getLatitude(), request.getLongitude(),
-                venue.getLatitude(), venue.getLongitude()
-        );
-
-        if (distance > venue.getRadiusMeters()) {
-            throw new RuntimeException(String.format("Bạn đang ở cách sân %.0fm (vượt quá bán kính cho phép %dm)!", distance, venue.getRadiusMeters()));
-        }
-
-        // 3. Find participant
+        // 2. Find participant (Strictly check user registration in this session)
         SessionParticipant participant = participantRepository.findBySessionIdAndUserId(sessionId, user.getId())
                 .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký tham gia ca đánh này!"));
 
@@ -72,7 +61,7 @@ public class CheckinAndPricingService {
         participant.setCheckinAt(LocalDateTime.now());
         participantRepository.save(participant);
 
-        // 4. Update user session attendance & trigger Loyalty
+        // 3. Update user session attendance & trigger Loyalty
         user.setSessionsAttended(user.getSessionsAttended() + 1);
         userRepository.save(user);
 

@@ -59,6 +59,13 @@ export const HostDashboardView: React.FC = () => {
   // Settle Payment Modal State (Replaces buggy window.confirm)
   const [settlingParticipant, setSettlingParticipant] = useState<Participant | null>(null)
 
+  // Custom UI Modals (Replaces native browser window.confirm / window.prompt)
+  const [confirmRemoveParticipant, setConfirmRemoveParticipant] = useState<Participant | null>(null)
+  const [confirmRemoveCourt, setConfirmRemoveCourt] = useState<string | null>(null)
+  const [showCourtEditModal, setShowCourtEditModal] = useState(false)
+  const [courtEditNamesInput, setCourtEditNamesInput] = useState('')
+  const [courtEditSlotsInput, setCourtEditSlotsInput] = useState<number>(8)
+
   // Active Court Selected for Multi-Court Matchmaking
   const [activeCourtIndex, setActiveCourtIndex] = useState<number>(0)
 
@@ -249,9 +256,19 @@ export const HostDashboardView: React.FC = () => {
       })
       return res.data
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
+      setSettlingParticipant(null)
       queryClient.invalidateQueries({ queryKey: ['session', id] })
       queryClient.invalidateQueries({ queryKey: ['report', id] })
+      showToast(
+        vars.method === 'CASH'
+          ? 'Đã xác nhận thu tiền mặt thành công!'
+          : 'Đã xác nhận thu tiền qua VietQR thành công!',
+        'success'
+      )
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Không thể cập nhật quyết toán!', 'error')
     },
   })
 
@@ -308,27 +325,17 @@ export const HostDashboardView: React.FC = () => {
 
   const handleAddCourt = () => {
     const nextNum = courtList.length + 1
-    const courtNameInput = window.prompt(`Nhập tên sân muốn mở thêm (ví dụ: Sân ${nextNum}):`, `Sân ${nextNum}`)
-    if (!courtNameInput || !courtNameInput.trim()) return
-
-    const newCourt = courtNameInput.trim()
+    const newCourt = `Sân ${nextNum}`
     if (courtList.includes(newCourt)) {
       showToast('Tên sân này đã tồn tại trong ca!', 'error')
       return
     }
-
     const newCourtCount = courtList.length + 1
     const currentMaxSlots = session?.maxSlots || 8
-    // Tự động gợi ý tăng slot (mỗi sân thêm tương ứng ~6-8 slots)
-    const suggestedSlots = Math.max(currentMaxSlots, newCourtCount * 8)
-    const slotsInput = window.prompt(
-      `Mở thêm sân thành công (${newCourtCount} sân).\nBạn có muốn nâng tổng số Slot tối đa của ca không? (Gợi ý: ${suggestedSlots} slots)`,
-      String(suggestedSlots)
-    )
-    const newMaxSlots = slotsInput && !isNaN(Number(slotsInput)) ? Number(slotsInput) : currentMaxSlots
-
+    const newMaxSlots = Math.max(currentMaxSlots, newCourtCount * 8)
     const updatedList = [...courtList, newCourt].join(', ')
     updateCourtsMutation.mutate({ newCourtNames: updatedList, newMaxSlots })
+    showToast(`Đã mở thêm [${newCourt}] & nâng lên ${newMaxSlots} slots!`, 'success')
   }
 
   const handleRemoveCourt = (courtToRemove: string) => {
@@ -336,14 +343,7 @@ export const HostDashboardView: React.FC = () => {
       showToast('Phải giữ lại tối thiểu 1 sân để tổ chức ca đánh!', 'error')
       return
     }
-
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa [${courtToRemove}] khỏi ca đánh này không?`)) {
-      return
-    }
-
-    const updatedList = courtList.filter((c) => c !== courtToRemove).join(', ')
-    setActiveCourtIndex(0)
-    updateCourtsMutation.mutate({ newCourtNames: updatedList })
+    setConfirmRemoveCourt(courtToRemove)
   }
 
   const handleRemoveParticipant = (p: Participant) => {
@@ -351,25 +351,7 @@ export const HostDashboardView: React.FC = () => {
       showToast('Người chơi này đã tới sân và điểm danh thành công, không thể xóa khỏi ca!', 'error')
       return
     }
-
-    if (p.isGuest && p.depositStatus === 'PAID') {
-      const choice = window.confirm(
-        `Người này đã cọc ${p.depositAmount.toLocaleString()}đ và không tới sân (Bỏ kèo).\n\n` +
-          `• Nhấn [OK] để: Hủy slot cho người khác đăng ký & GIỮ TIỀN CỌC TÍNH VÀO DOANH THU CA.\n` +
-          `• Nhấn [Cancel] để: Hoàn tiền và xóa hoàn toàn slot.`
-      )
-      removeParticipantMutation.mutate({
-        participantId: p.id,
-        forfeitDeposit: choice,
-      })
-    } else {
-      if (window.confirm(`Bạn có chắc chắn muốn hủy lượt đăng ký của [${p.name}] để nhường slot cho người khác?`)) {
-        removeParticipantMutation.mutate({
-          participantId: p.id,
-          forfeitDeposit: false,
-        })
-      }
-    }
+    setConfirmRemoveParticipant(p)
   }
 
   // Record Match Result Mutation
@@ -417,6 +399,19 @@ export const HostDashboardView: React.FC = () => {
   }
 
   const rosterUsers = session.participants || []
+
+  // Roster table sorting: Người chưa thanh toán (UNPAID) lên đầu, người đã thanh toán (PAID) đảo xuống cuối
+  const sortedParticipants = useMemo(() => {
+    if (!session?.participants) return []
+    return [...session.participants].sort((a, b) => {
+      const aPaid = a.paymentStatus === 'PAID'
+      const bPaid = b.paymentStatus === 'PAID'
+      if (aPaid !== bPaid) {
+        return aPaid ? 1 : -1
+      }
+      return a.id - b.id
+    })
+  }, [session?.participants])
 
   // Helper to get available users for a specific court dropdown
   const getAvailableUsersForCourt = (courtName: string, currentSelection: string) => {
@@ -540,22 +535,9 @@ export const HostDashboardView: React.FC = () => {
               <span className="text-xs text-slate-600 font-semibold">Sân: {session.venueName}</span>
               <button
                 onClick={() => {
-                  const newCourts = window.prompt(
-                    'Cập nhật danh sách sân (phân tách bằng dấu phẩy):',
-                    session.courtNames || 'Sân 1, Sân 2'
-                  )
-                  if (!newCourts || !newCourts.trim()) return
-
-                  const newSlots = window.prompt(
-                    'Cập nhật số Slot tối đa (Max Slots) của ca:',
-                    String(session.maxSlots || 8)
-                  )
-                  const parsedSlots = newSlots ? Number(newSlots) : session.maxSlots
-
-                  updateCourtsMutation.mutate({
-                    newCourtNames: newCourts.trim(),
-                    newMaxSlots: parsedSlots,
-                  })
+                  setCourtEditNamesInput(session.courtNames || 'Sân 1, Sân 2')
+                  setCourtEditSlotsInput(session.maxSlots || 8)
+                  setShowCourtEditModal(true)
                 }}
                 className="text-xs font-bold px-3 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-white shadow-xs flex items-center gap-1.5 transition cursor-pointer"
                 title="Nhấn để sửa tên sân hoặc nâng/giảm slot nhanh"
@@ -572,7 +554,7 @@ export const HostDashboardView: React.FC = () => {
                 <p className="text-xs sm:text-sm text-slate-600 font-normal">
                   {new Date(session.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} -{' '}
                   {new Date(session.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}{' '}
-                  • Mục tiêu: <b>Tối thiểu {minTargetSets} set/người</b> • Định vị GPS: &le; 150m
+                  • Mục tiêu: <b>Tối thiểu {minTargetSets} set/người</b>
                 </p>
               </div>
             </div>
@@ -706,7 +688,7 @@ export const HostDashboardView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {session.participants?.map((p, idx) => {
+                  {sortedParticipants.map((p, idx) => {
                     const isCheckedIn = p.checkinStatus === 'CHECKED_IN'
                     const isPaid = p.paymentStatus === 'PAID'
                     const pUid = String(p.userId || p.id)
@@ -1697,6 +1679,195 @@ export const HostDashboardView: React.FC = () => {
                 className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition"
               >
                 Đóng / Hủy bỏ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xóa / Hủy Slot Thành Viên (Replaces browser window.confirm) */}
+      {confirmRemoveParticipant && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100 text-rose-600">
+              <div className="p-2.5 bg-rose-50 rounded-2xl border border-rose-200">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-sm">Hủy lượt đăng ký slot ca</h3>
+                <p className="text-[11px] text-slate-500 font-medium">{confirmRemoveParticipant.name}</p>
+              </div>
+            </div>
+
+            {confirmRemoveParticipant.isGuest && confirmRemoveParticipant.depositStatus === 'PAID' ? (
+              <div className="space-y-3 text-xs">
+                <p className="text-slate-700 leading-relaxed">
+                  Người này là <b>Khách Vãng Lai</b> đã chuyển khoản cọc{' '}
+                  <b className="text-emerald-700">{confirmRemoveParticipant.depositAmount.toLocaleString()}đ</b> và không tới sân (Bỏ kèo).
+                </p>
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-950 text-[11px] space-y-1">
+                  <p className="font-bold">Lựa chọn cách xử lý tiền cọc:</p>
+                  <p>• <b>Giữ cọc vào quỹ:</b> Slot được mở lại, tiền cọc 20k được ghi nhận vào doanh thu ca.</p>
+                  <p>• <b>Hoàn tiền cọc:</b> Slot được mở lại và xóa hoàn toàn khỏi doanh thu.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                  <button
+                    disabled={removeParticipantMutation.isPending}
+                    onClick={() => {
+                      const pid = confirmRemoveParticipant.id
+                      setConfirmRemoveParticipant(null)
+                      removeParticipantMutation.mutate({ participantId: pid, forfeitDeposit: true })
+                    }}
+                    className="py-2.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-sm transition active:scale-95 text-center"
+                  >
+                    Giữ cọc vào quỹ ca
+                  </button>
+                  <button
+                    disabled={removeParticipantMutation.isPending}
+                    onClick={() => {
+                      const pid = confirmRemoveParticipant.id
+                      setConfirmRemoveParticipant(null)
+                      removeParticipantMutation.mutate({ participantId: pid, forfeitDeposit: false })
+                    }}
+                    className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition active:scale-95 text-center"
+                  >
+                    Hoàn tiền cọc & Hủy
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                <p className="text-slate-700 leading-relaxed">
+                  Bạn có chắc chắn muốn hủy lượt đăng ký của <b className="text-slate-900">[{confirmRemoveParticipant.name}]</b> để nhường slot trống cho người khác đăng ký không?
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setConfirmRemoveParticipant(null)}
+                    className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                  >
+                    Không hủy
+                  </button>
+                  <button
+                    disabled={removeParticipantMutation.isPending}
+                    onClick={() => {
+                      const pid = confirmRemoveParticipant.id
+                      setConfirmRemoveParticipant(null)
+                      removeParticipantMutation.mutate({ participantId: pid, forfeitDeposit: false })
+                    }}
+                    className="px-4 py-2 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-md shadow-rose-600/20 active:scale-95 transition"
+                  >
+                    Xác nhận hủy slot
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xác Nhận Xóa Sân (Replaces browser window.confirm) */}
+      {confirmRemoveCourt && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3 text-rose-600 pb-2 border-b border-slate-100">
+              <div className="p-2 bg-rose-50 rounded-xl border border-rose-200">
+                <Trash2 size={18} />
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm">Xóa sân khỏi ca</h3>
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed">
+              Bạn có chắc chắn muốn đóng và xóa <b>[{confirmRemoveCourt}]</b> khỏi ca đánh này không?
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setConfirmRemoveCourt(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Giữ lại
+              </button>
+              <button
+                onClick={() => {
+                  const target = confirmRemoveCourt
+                  setConfirmRemoveCourt(null)
+                  const updatedList = courtList.filter((c) => c !== target).join(', ')
+                  setActiveCourtIndex(0)
+                  updateCourtsMutation.mutate({ newCourtNames: updatedList })
+                  showToast(`Đã xóa [${target}] khỏi ca!`, 'info')
+                }}
+                className="px-4 py-2 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow active:scale-95 transition"
+              >
+                Xóa sân này
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cập Nhật Danh Sách Sân & Slot (Replaces browser window.prompt) */}
+      {showCourtEditModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Edit2 size={18} className="text-slate-900" />
+                <h3 className="font-black text-slate-900 text-sm">Cấu hình Sân & Số Slot của ca</h3>
+              </div>
+              <button
+                onClick={() => setShowCourtEditModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Danh sách sân (ngăn cách bằng dấu phẩy):
+                </label>
+                <input
+                  type="text"
+                  value={courtEditNamesInput}
+                  onChange={(e) => setCourtEditNamesInput(e.target.value)}
+                  placeholder="Sân 1, Sân 2, Sân 3"
+                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 font-medium focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Số lượng slot tối đa (Max Slots):
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={courtEditSlotsInput}
+                  onChange={(e) => setCourtEditSlotsInput(Number(e.target.value) || 8)}
+                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 font-bold focus:outline-none focus:border-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setShowCourtEditModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={updateCourtsMutation.isPending || !courtEditNamesInput.trim()}
+                onClick={() => {
+                  setShowCourtEditModal(false)
+                  updateCourtsMutation.mutate({
+                    newCourtNames: courtEditNamesInput.trim(),
+                    newMaxSlots: courtEditSlotsInput,
+                  })
+                }}
+                className="px-4 py-2 text-xs font-black bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow active:scale-95 transition"
+              >
+                Lưu cấu hình
               </button>
             </div>
           </div>

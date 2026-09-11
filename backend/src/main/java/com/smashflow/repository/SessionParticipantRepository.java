@@ -20,7 +20,7 @@ public interface SessionParticipantRepository extends JpaRepository<SessionParti
     @Query("SELECT COUNT(sp) FROM SessionParticipant sp WHERE sp.session.id = :sessionId AND sp.checkinStatus != com.smashflow.model.CheckinStatus.ABSENT")
     long countActiveBookedSlots(Long sessionId);
 
-    @Query("SELECT sp FROM SessionParticipant sp JOIN FETCH sp.session s LEFT JOIN FETCH sp.user u WHERE sp.session.id = :sessionId")
+    @Query("SELECT sp FROM SessionParticipant sp JOIN FETCH sp.session s LEFT JOIN FETCH sp.user u WHERE sp.session.id = :sessionId ORDER BY sp.id ASC")
     List<SessionParticipant> findBySessionIdWithDetails(Long sessionId);
 
     List<SessionParticipant> findByUserIdAndCheckinStatusOrderByCheckinAtDesc(Long userId, CheckinStatus status);

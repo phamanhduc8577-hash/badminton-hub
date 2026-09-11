@@ -170,8 +170,8 @@ export const SessionDetailView: React.FC = () => {
     },
   })
 
-  // GPS & Dynamic Token Checkin
-  const handleCheckinSubmit = (tokenToUse?: string) => {
+  // Instant Token Checkin (No GPS friction)
+  const handleCheckinSubmit = async (tokenToUse?: string) => {
     const tokenVal = (tokenToUse || checkinTokenInput).trim().toUpperCase()
     setCheckinError('')
     if (!tokenVal) {
@@ -179,36 +179,20 @@ export const SessionDetailView: React.FC = () => {
       return
     }
 
-    if (!navigator.geolocation) {
-      setCheckinError('Trình duyệt không hỗ trợ định vị GPS!')
-      return
-    }
-
     setLocatingGps(true)
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          await api.post(`/sessions/${id}/checkin`, {
-            token: tokenVal,
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            durationHours: checkinDurationHours,
-          })
-          setLocatingGps(false)
-          setCheckinSuccess(true)
-          showToast('Điểm danh thành công! Chúc bạn chơi vui vẻ 🏸', 'success')
-          queryClient.invalidateQueries({ queryKey: ['session', id] })
-        } catch (err: any) {
-          setLocatingGps(false)
-          setCheckinError(err.response?.data?.message || 'Điểm danh thất bại!')
-        }
-      },
-      () => {
-        setLocatingGps(false)
-        setCheckinError('Không thể lấy vị trí GPS (vui lòng cho phép quyền truy cập vị trí trên điện thoại)!')
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    )
+    try {
+      await api.post(`/sessions/${id}/checkin`, {
+        token: tokenVal,
+        durationHours: checkinDurationHours,
+      })
+      setLocatingGps(false)
+      setCheckinSuccess(true)
+      showToast('Điểm danh thành công! Chúc bạn chơi vui vẻ 🏸', 'success')
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+    } catch (err: any) {
+      setLocatingGps(false)
+      setCheckinError(err.response?.data?.message || 'Điểm danh thất bại!')
+    }
   }
 
   // Auto handle URL token parameter (?token=4ECDACC6 or /sessions/1?token=4ECDACC6)
@@ -217,6 +201,14 @@ export const SessionDetailView: React.FC = () => {
     if (tokenFromUrl && session && !autoCheckinTriggered.current) {
       const cleanToken = tokenFromUrl.trim().toUpperCase()
       setCheckinTokenInput(cleanToken)
+
+      // If user not logged in yet, prompt and redirect to login preserving token
+      if (!user) {
+        showToast('Vui lòng đăng nhập để hoàn tất điểm danh ca đánh này!', 'info')
+        navigate(`/login?redirect=${encodeURIComponent(`/sessions/${id}?token=${cleanToken}`)}`)
+        return
+      }
+
       setShowCheckinModal(true)
 
       // If user is already registered in this session and hasn't checked in yet, auto-trigger checkin
@@ -476,7 +468,7 @@ export const SessionDetailView: React.FC = () => {
                       Bạn đã đăng ký slot thành công! Vui lòng hoàn tất chuyển khoản cọc.
                     </h4>
                     <p className="text-xs text-slate-600">
-                      Sau khi Host xác nhận đã nhận cọc, bạn sẽ được tự động mở đầy đủ chức năng Điểm danh GPS và Thanh toán tại sân.
+                      Sau khi Host xác nhận đã nhận cọc, bạn sẽ được tự động mở đầy đủ chức năng Điểm danh QR và Thanh toán tại sân.
                     </p>
                   </div>
 
@@ -528,7 +520,7 @@ export const SessionDetailView: React.FC = () => {
                           className="py-3 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition border border-slate-200 active:scale-95 shadow-sm"
                         >
                           <QrCode size={16} />
-                          <span>Nhập mã Token GPS</span>
+                          <span>Nhập mã Token</span>
                         </button>
                       </div>
                     </div>
@@ -782,9 +774,9 @@ export const SessionDetailView: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="text-center">
-              <h3 className="font-black text-base text-slate-900">Điểm danh GPS 1-Chạm</h3>
+              <h3 className="font-black text-base text-slate-900">Điểm danh 1-Chạm</h3>
               <p className="text-xs text-slate-600 mt-1">
-                Nhập mã Token hiển thị trên màn hình Host (Bán kính &le; 150m)
+                Nhập hoặc quét mã Token hiển thị trên màn hình Host
               </p>
             </div>
 

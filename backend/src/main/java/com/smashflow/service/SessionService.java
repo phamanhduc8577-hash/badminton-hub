@@ -426,6 +426,36 @@ public class SessionService {
         if (request.getCostDrinks() != null) session.setCostDrinks(request.getCostDrinks());
 
         sessionRepository.save(session);
+
+        // Tự động đồng bộ và tính toán lại giá vé cho tất cả người tham gia trong ca
+        List<SessionParticipant> participants = participantRepository.findBySessionId(sessionId);
+        for (SessionParticipant p : participants) {
+            boolean isOfficialFixed = !p.getIsGuest();
+            boolean is2hOption = p.getDurationHours() != null && p.getDurationHours().compareTo(new BigDecimal("2.0")) == 0;
+            BigDecimal newBaseFee;
+            if (isOfficialFixed) {
+                if (is2hOption && session.getMemberMalePrice2h() != null) {
+                    newBaseFee = p.getGender() == Gender.FEMALE
+                            ? (session.getMemberFemalePrice2h() != null ? session.getMemberFemalePrice2h() : session.getMemberFemalePrice())
+                            : (session.getMemberMalePrice2h() != null ? session.getMemberMalePrice2h() : session.getMemberMalePrice());
+                } else {
+                    newBaseFee = p.getGender() == Gender.FEMALE ? session.getMemberFemalePrice() : session.getMemberMalePrice();
+                }
+            } else {
+                if (is2hOption && session.getGuestMalePrice2h() != null) {
+                    newBaseFee = p.getGender() == Gender.FEMALE
+                            ? (session.getGuestFemalePrice2h() != null ? session.getGuestFemalePrice2h() : session.getGuestFemalePrice())
+                            : (session.getGuestMalePrice2h() != null ? session.getGuestMalePrice2h() : session.getGuestMalePrice());
+                } else {
+                    newBaseFee = p.getGender() == Gender.FEMALE ? session.getGuestFemalePrice() : session.getGuestMalePrice();
+                }
+            }
+            p.setBaseFee(newBaseFee);
+            BigDecimal adj = p.getAdjustmentAmount() != null ? p.getAdjustmentAmount() : BigDecimal.ZERO;
+            p.setFinalFee(newBaseFee.add(adj).max(BigDecimal.ZERO));
+            participantRepository.save(p);
+        }
+
         return toSessionResponseSummary(session);
     }
 
