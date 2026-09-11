@@ -586,7 +586,7 @@ export const HostDashboardView: React.FC = () => {
               </span>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[10px] text-slate-500 font-medium">
-                  Hết hạn: {new Date(session.tokenExpiresAt!).toLocaleTimeString()}
+                  {session.tokenExpiresAt ? `Hết hạn: ${new Date(session.tokenExpiresAt).toLocaleTimeString()}` : 'Chưa kích hoạt'}
                 </span>
                 <button
                   onClick={() => setShowQrModal(true)}
