@@ -204,6 +204,19 @@ export const HostDashboardView: React.FC = () => {
     return stats
   }, [session, matches])
 
+  // Roster table sorting: Người chưa thanh toán (UNPAID) lên đầu, người đã thanh toán (PAID) đảo xuống cuối
+  const sortedParticipants = useMemo(() => {
+    if (!session?.participants) return []
+    return [...session.participants].sort((a, b) => {
+      const aPaid = a.paymentStatus === 'PAID'
+      const bPaid = b.paymentStatus === 'PAID'
+      if (aPaid !== bPaid) {
+        return aPaid ? 1 : -1
+      }
+      return a.id - b.id
+    })
+  }, [session?.participants])
+
   // Fixed minimum target sets per player (Standard 6 sets per player for a regular badminton session)
   const minTargetSets = 6
 
@@ -389,29 +402,7 @@ export const HostDashboardView: React.FC = () => {
     },
   })
 
-  if (isLoading || !session) {
-    return (
-      <div className="text-center py-24 text-slate-600 text-sm animate-pulse space-y-3">
-        <DuckMascot size={56} rounded="2xl" className="mx-auto" />
-        <p className="font-semibold">Đang tải trung tâm điều khiển Host...</p>
-      </div>
-    )
-  }
-
-  const rosterUsers = session.participants || []
-
-  // Roster table sorting: Người chưa thanh toán (UNPAID) lên đầu, người đã thanh toán (PAID) đảo xuống cuối
-  const sortedParticipants = useMemo(() => {
-    if (!session?.participants) return []
-    return [...session.participants].sort((a, b) => {
-      const aPaid = a.paymentStatus === 'PAID'
-      const bPaid = b.paymentStatus === 'PAID'
-      if (aPaid !== bPaid) {
-        return aPaid ? 1 : -1
-      }
-      return a.id - b.id
-    })
-  }, [session?.participants])
+  const rosterUsers = session?.participants || []
 
   // Helper to get available users for a specific court dropdown
   const getAvailableUsersForCourt = (courtName: string, currentSelection: string) => {
@@ -496,7 +487,7 @@ export const HostDashboardView: React.FC = () => {
   if (isLoading || !session) {
     return (
       <div className="text-center py-24 text-slate-600 text-sm animate-pulse space-y-3">
-        <DuckMascot size={48} rounded="xl" className="mx-auto" />
+        <DuckMascot size={56} rounded="2xl" className="mx-auto" />
         <p className="font-semibold">Đang tải trung tâm điều khiển Host...</p>
       </div>
     )
