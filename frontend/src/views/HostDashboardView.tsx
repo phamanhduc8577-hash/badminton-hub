@@ -1029,53 +1029,51 @@ export const HostDashboardView: React.FC = () => {
           </div>
 
           {/* MULTI-COURT PARALLEL MANAGEMENT TABS */}
-          <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0 mr-1">
-                <Layers size={14} /> Chọn sân bắt kèo:
-              </span>
-              {courtList.map((cName, idx) => {
-                const draft = courtDrafts[cName]
-                const hasDraft = draft && (draft.teamAP1 || draft.teamBP1)
-                const isActive = activeCourtIndex === idx
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-1 -mx-2 px-2 scrollbar-thin">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0 mr-1">
+              <Layers size={14} /> Sân:
+            </span>
+            {courtList.map((cName, idx) => {
+              const draft = courtDrafts[cName]
+              const hasDraft = draft && (draft.teamAP1 || draft.teamBP1)
+              const isActive = activeCourtIndex === idx
 
-                return (
-                  <div key={cName} className="flex items-center gap-1">
-                    <button
-                      onClick={() => setActiveCourtIndex(idx)}
-                      className={`px-4 py-2 rounded-xl text-xs font-black transition flex items-center gap-2 shrink-0 border ${
-                        isActive
-                          ? 'bg-slate-950 text-white border-slate-950 shadow-md scale-102'
-                          : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200'
-                      }`}
-                    >
-                      <span>🏸 {cName}</span>
-                      {hasDraft && (
-                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" title="Đang xếp cặp" />
-                      )}
-                    </button>
-                    {isActive && courtList.length > 1 && (
-                      <button
-                        onClick={() => handleRemoveCourt(cName)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                        title={`Xóa ${cName}`}
-                      >
-                        <Trash2 size={13} />
-                      </button>
+              return (
+                <div key={cName} className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => setActiveCourtIndex(idx)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 shrink-0 border ${
+                      isActive
+                        ? 'bg-slate-950 text-white border-slate-950 shadow-md'
+                        : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200 shadow-2xs'
+                    }`}
+                  >
+                    <span>🏸 {cName}</span>
+                    {hasDraft && (
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" title="Đang xếp cặp" />
                     )}
-                  </div>
-                )
-              })}
-            </div>
+                  </button>
+                  {isActive && courtList.length > 1 && (
+                    <button
+                      onClick={() => handleRemoveCourt(cName)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition shrink-0"
+                      title={`Xóa ${cName}`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
 
-            {/* Add Court Button for Flexible Multi-court expansion */}
+            {/* Add Court Button for Flexible Multi-court expansion placed right alongside the courts */}
             <button
               onClick={handleAddCourt}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 rounded-xl text-xs font-black transition flex items-center gap-1.5 shrink-0 shadow-xs active:scale-95"
+              className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-black transition flex items-center gap-1 shrink-0 shadow-2xs active:scale-95"
               title="Mở thêm sân song song cho ca đấu này"
             >
-              <Plus size={14} className="text-rose-600 font-bold" />
-              <span>Thêm Sân (+Sân N)</span>
+              <Plus size={14} className="text-emerald-700 font-bold" />
+              <span>+ Sân {courtList.length + 1}</span>
             </button>
           </div>
 
