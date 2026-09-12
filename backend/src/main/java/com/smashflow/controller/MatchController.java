@@ -28,4 +28,20 @@ public class MatchController {
     public ResponseEntity<MatchResponse> recordMatchResult(@Valid @RequestBody CreateMatchRequest request) {
         return ResponseEntity.ok(matchService.recordMatchResult(request));
     }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<MatchResponse> updateMatch(
+            @PathVariable Long id,
+            @Valid @RequestBody com.smashflow.dto.UpdateMatchRequest request
+    ) {
+        return ResponseEntity.ok(matchService.updateMatch(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<java.util.Map<String, Object>> deleteMatch(@PathVariable Long id) {
+        matchService.deleteMatch(id);
+        return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Đã xóa trận đấu và hoàn tác toàn bộ tỉ số/Elo!"));
+    }
 }

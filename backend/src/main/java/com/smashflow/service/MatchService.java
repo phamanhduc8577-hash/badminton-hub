@@ -103,6 +103,146 @@ public class MatchService {
         return toMatchResponse(match);
     }
 
+    /**
+     * Delete (Undo) match: Reverts all win/loss and matches, restores Elo/Rank and cleans up record.
+     */
+    @Transactional
+    public void deleteMatch(Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu!"));
+
+        recalculateStatsForUsersInMatch(match, null);
+
+        matchRepository.delete(match);
+    }
+
+    /**
+     * Update match (Switch winner, modify players, change court)
+     */
+    @Transactional
+    public MatchResponse updateMatch(Long matchId, com.smashflow.dto.UpdateMatchRequest request) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu!"));
+
+        Long pA1Id = request.getTeamAPlayer1Id();
+        Long pA2Id = request.getTeamAPlayer2Id();
+        Long pB1Id = request.getTeamBPlayer1Id();
+        Long pB2Id = request.getTeamBPlayer2Id();
+
+        // Validation: distinct players
+        java.util.Set<Long> playerIds = new java.util.HashSet<>();
+        playerIds.add(pA1Id);
+        if (pA2Id != null && !playerIds.add(pA2Id)) {
+            throw new RuntimeException("Một người chơi không thể cùng lúc ở 2 vị trí trong một trận đấu!");
+        }
+        if (!playerIds.add(pB1Id)) {
+            throw new RuntimeException("Một người chơi không thể đối đầu với chính mình hoặc trùng lặp vị trí!");
+        }
+        if (pB2Id != null && !playerIds.add(pB2Id)) {
+            throw new RuntimeException("Một người chơi không thể cùng lúc ở 2 vị trí trong một trận đấu!");
+        }
+
+        User pA1 = userRepository.findById(pA1Id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy Player 1 Team A!"));
+        User pA2 = pA2Id != null ? userRepository.findById(pA2Id).orElse(null) : null;
+        User pB1 = userRepository.findById(pB1Id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy Player 1 Team B!"));
+        User pB2 = pB2Id != null ? userRepository.findById(pB2Id).orElse(null) : null;
+
+        validateRankDifference(pA1, pA2, pB1, pB2);
+
+        // Collect old and new user IDs for recalculation
+        java.util.Set<Long> affectedUserIds = new java.util.HashSet<>();
+        affectedUserIds.add(match.getTeamAPlayer1().getId());
+        if (match.getTeamAPlayer2() != null) affectedUserIds.add(match.getTeamAPlayer2().getId());
+        affectedUserIds.add(match.getTeamBPlayer1().getId());
+        if (match.getTeamBPlayer2() != null) affectedUserIds.add(match.getTeamBPlayer2().getId());
+
+        affectedUserIds.add(pA1.getId());
+        if (pA2 != null) affectedUserIds.add(pA2.getId());
+        affectedUserIds.add(pB1.getId());
+        if (pB2 != null) affectedUserIds.add(pB2.getId());
+
+        match.setTeamAPlayer1(pA1);
+        match.setTeamAPlayer2(pA2);
+        match.setTeamBPlayer1(pB1);
+        match.setTeamBPlayer2(pB2);
+        match.setWinningTeam(request.getWinningTeam());
+        if (request.getCourtName() != null && !request.getCourtName().isBlank()) {
+            match.setCourtName(request.getCourtName());
+        }
+
+        matchRepository.save(match);
+
+        // Replay/Recalculate entire match history for affected users to ensure exact LOL Elo/LP and win/loss parity
+        for (Long uId : affectedUserIds) {
+            recalculateUserHistory(uId);
+        }
+
+        return toMatchResponse(match);
+    }
+
+    private void recalculateStatsForUsersInMatch(Match matchToDelete, Match matchToUpdate) {
+        java.util.Set<Long> affectedUserIds = new java.util.HashSet<>();
+        if (matchToDelete != null) {
+            affectedUserIds.add(matchToDelete.getTeamAPlayer1().getId());
+            if (matchToDelete.getTeamAPlayer2() != null) affectedUserIds.add(matchToDelete.getTeamAPlayer2().getId());
+            affectedUserIds.add(matchToDelete.getTeamBPlayer1().getId());
+            if (matchToDelete.getTeamBPlayer2() != null) affectedUserIds.add(matchToDelete.getTeamBPlayer2().getId());
+        }
+
+        // Before deleting matchToDelete, we remove it or bypass it during replay
+        Long matchToDeleteId = matchToDelete != null ? matchToDelete.getId() : null;
+
+        for (Long uId : affectedUserIds) {
+            recalculateUserHistoryExcluding(uId, matchToDeleteId);
+        }
+    }
+
+    private void recalculateUserHistory(Long userId) {
+        recalculateUserHistoryExcluding(userId, null);
+    }
+
+    private void recalculateUserHistoryExcluding(Long userId, Long excludedMatchId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) return;
+
+        // Reset user stats to base
+        user.setWinCount(0);
+        user.setLossCount(0);
+        user.setEloScore(0);
+        user.setPlacementMatches(0);
+        user.setCurrentStreak(0);
+        user.setShieldMatches(0);
+
+        // Fetch all matches for this user ordered chronologically (createdAt ASC, id ASC)
+        List<Match> allUserMatches = matchRepository.findAllByUserId(userId).stream()
+                .filter(m -> excludedMatchId == null || !m.getId().equals(excludedMatchId))
+                .sorted((m1, m2) -> {
+                    int c = m1.getCreatedAt().compareTo(m2.getCreatedAt());
+                    if (c != 0) return c;
+                    return m1.getId().compareTo(m2.getId());
+                })
+                .collect(Collectors.toList());
+
+        for (Match m : allUserMatches) {
+            boolean isTeamA = m.getTeamAPlayer1().getId().equals(userId) ||
+                    (m.getTeamAPlayer2() != null && m.getTeamAPlayer2().getId().equals(userId));
+            boolean isWin = (isTeamA && m.getWinningTeam() == WinningTeam.A) ||
+                    (!isTeamA && m.getWinningTeam() == WinningTeam.B);
+
+            int teamALp = calculateTeamAvgLp(m.getTeamAPlayer1(), m.getTeamAPlayer2());
+            int teamBLp = calculateTeamAvgLp(m.getTeamBPlayer1(), m.getTeamBPlayer2());
+
+            int myTeamLp = isTeamA ? teamALp : teamBLp;
+            int oppTeamLp = isTeamA ? teamBLp : teamALp;
+
+            applyMatchOutcome(user, isWin, myTeamLp, oppTeamLp);
+        }
+
+        userRepository.save(user);
+    }
+
     private int calculateTeamAvgLp(User p1, User p2) {
         int lp1 = p1.getEloScore();
         if (p2 == null) return lp1;

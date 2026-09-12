@@ -68,6 +68,16 @@ export const HostDashboardView: React.FC = () => {
   const [courtEditNamesInput, setCourtEditNamesInput] = useState('')
   const [courtEditSlotsInput, setCourtEditSlotsInput] = useState<number>(8)
 
+  // Edit Match Modal State
+  const [editingMatch, setEditingMatch] = useState<Match | null>(null)
+  const [editMatchTeamAP1, setEditMatchTeamAP1] = useState<string>('')
+  const [editMatchTeamAP2, setEditMatchTeamAP2] = useState<string>('')
+  const [editMatchTeamBP1, setEditMatchTeamBP1] = useState<string>('')
+  const [editMatchTeamBP2, setEditMatchTeamBP2] = useState<string>('')
+  const [editMatchWinningTeam, setEditMatchWinningTeam] = useState<'A' | 'B'>('A')
+  const [editMatchCourtName, setEditMatchCourtName] = useState<string>('')
+  const [confirmDeleteMatchId, setConfirmDeleteMatchId] = useState<number | null>(null)
+
   // Active Court Selected for Multi-Court Matchmaking
   const [activeCourtIndex, setActiveCourtIndex] = useState<number>(0)
 
@@ -419,6 +429,99 @@ export const HostDashboardView: React.FC = () => {
       showToast(err.response?.data?.message || 'Không thể ghi nhận trận đấu!', 'error')
     },
   })
+
+  // Update Match Mutation (Edit Players / Switch Winner)
+  const updateMatchMutation = useMutation({
+    mutationFn: async ({
+      matchId,
+      teamAPlayer1Id,
+      teamAPlayer2Id,
+      teamBPlayer1Id,
+      teamBPlayer2Id,
+      winningTeam,
+      courtName,
+    }: {
+      matchId: number
+      teamAPlayer1Id: number
+      teamAPlayer2Id: number | null
+      teamBPlayer1Id: number
+      teamBPlayer2Id: number | null
+      winningTeam: 'A' | 'B'
+      courtName: string
+    }) => {
+      const res = await api.put(`/matches/${matchId}`, {
+        teamAPlayer1Id,
+        teamAPlayer2Id,
+        teamBPlayer1Id,
+        teamBPlayer2Id,
+        winningTeam,
+        courtName,
+      })
+      return res.data
+    },
+    onSuccess: () => {
+      setEditingMatch(null)
+      queryClient.invalidateQueries({ queryKey: ['matches', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      showToast('Đã cập nhật kết quả và đồng bộ lại Elo / Win-Lose thành công!', 'success')
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Không thể cập nhật trận đấu!', 'error')
+    },
+  })
+
+  // Delete Match Mutation (Undo / Hoàn tác trận đấu)
+  const deleteMatchMutation = useMutation({
+    mutationFn: async (matchId: number) => {
+      const res = await api.delete(`/matches/${matchId}`)
+      return res.data
+    },
+    onSuccess: () => {
+      setConfirmDeleteMatchId(null)
+      setEditingMatch(null)
+      queryClient.invalidateQueries({ queryKey: ['matches', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      showToast('Đã xóa trận đấu và hoàn tác toàn bộ số set / điểm rank thành công!', 'success')
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Không thể xóa trận đấu!', 'error')
+    },
+  })
+
+  const openEditMatchModal = (m: Match) => {
+    setEditingMatch(m)
+    setEditMatchTeamAP1(String(m.teamAPlayer1Id))
+    setEditMatchTeamAP2(m.teamAPlayer2Id ? String(m.teamAPlayer2Id) : '')
+    setEditMatchTeamBP1(String(m.teamBPlayer1Id))
+    setEditMatchTeamBP2(m.teamBPlayer2Id ? String(m.teamBPlayer2Id) : '')
+    setEditMatchWinningTeam(m.winningTeam)
+    setEditMatchCourtName(m.courtName || currentCourtName)
+  }
+
+  const handleSaveEditedMatch = () => {
+    if (!editingMatch) return
+    if (!editMatchTeamAP1 || !editMatchTeamBP1) {
+      showToast('Vui lòng chọn tối thiểu 1 người chơi cho mỗi đội!', 'error')
+      return
+    }
+    const selected = [editMatchTeamAP1, editMatchTeamAP2, editMatchTeamBP1, editMatchTeamBP2].filter(Boolean)
+    const unique = new Set(selected)
+    if (unique.size !== selected.length) {
+      showToast('Một người chơi không thể cùng lúc ở 2 vị trí!', 'error')
+      return
+    }
+    updateMatchMutation.mutate({
+      matchId: editingMatch.id,
+      teamAPlayer1Id: Number(editMatchTeamAP1),
+      teamAPlayer2Id: editMatchTeamAP2 ? Number(editMatchTeamAP2) : null,
+      teamBPlayer1Id: Number(editMatchTeamBP1),
+      teamBPlayer2Id: editMatchTeamBP2 ? Number(editMatchTeamBP2) : null,
+      winningTeam: editMatchWinningTeam,
+      courtName: editMatchCourtName || editingMatch.courtName || 'Sân 1',
+    })
+  }
 
   const rosterUsers = session?.participants || []
 
@@ -1311,12 +1414,22 @@ export const HostDashboardView: React.FC = () => {
                           <span className="font-bold px-2.5 py-0.5 bg-slate-100 text-slate-900 rounded-md text-[11px] border border-slate-200">
                             🏸 {m.courtName || 'Sân chính'}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {new Date(m.createdAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {new Date(m.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                            <button
+                              onClick={() => openEditMatchModal(m)}
+                              className="px-2 py-0.5 bg-slate-100 hover:bg-slate-900 text-slate-700 hover:text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer border border-slate-200 hover:border-slate-900 active:scale-95"
+                              title="Sửa trận đấu: Đổi đội thắng, đổi người chơi hoặc xóa trận"
+                            >
+                              <Edit2 size={10} />
+                              <span>Sửa</span>
+                            </button>
+                          </div>
                         </div>
 
                         <div className="space-y-1.5">
@@ -1974,6 +2087,274 @@ export const HostDashboardView: React.FC = () => {
                 className="px-4 py-2 text-xs font-black bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow active:scale-95 transition"
               >
                 Lưu cấu hình
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SỬA TRẬN ĐẤU (Đổi đội thắng, Đổi người chơi, Sân đấu, Xóa trận) */}
+      {editingMatch && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-slate-950 text-white flex items-center justify-center font-bold text-sm shadow">
+                  ✏️
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-sm">Chỉnh Sửa Trận Đấu</h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Đổi đội thắng, sửa tên người chơi hoặc xóa trận để hoàn tác
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingMatch(null)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Quick 1-Touch Toggle Winning Team */}
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                1. Đội Chiến Thắng (Nhấp để đổi):
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditMatchWinningTeam('A')}
+                  className={`py-3 px-4 rounded-2xl text-xs font-black transition flex items-center justify-center gap-2 border-2 cursor-pointer ${
+                    editMatchWinningTeam === 'A'
+                      ? 'bg-blue-50 border-blue-600 text-blue-900 shadow-md shadow-blue-500/10'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                  <span>Team Blue (Đội A)</span>
+                  {editMatchWinningTeam === 'A' && <span>👑</span>}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setEditMatchWinningTeam('B')}
+                  className={`py-3 px-4 rounded-2xl text-xs font-black transition flex items-center justify-center gap-2 border-2 cursor-pointer ${
+                    editMatchWinningTeam === 'B'
+                      ? 'bg-rose-50 border-rose-600 text-rose-900 shadow-md shadow-rose-500/10'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
+                  <span>Team Red (Đội B)</span>
+                  {editMatchWinningTeam === 'B' && <span>👑</span>}
+                </button>
+              </div>
+            </div>
+
+            {/* Edit Team Members */}
+            <div className="space-y-4 pt-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                2. Danh Sách Người Chơi Của 2 Đội:
+              </label>
+
+              {/* Team Blue */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-600" />
+                    <span>Team Blue (Đội A)</span>
+                  </span>
+                  {editMatchWinningTeam === 'A' && (
+                    <span className="text-[10px] font-black px-2 py-0.5 bg-blue-600 text-white rounded-md">
+                      👑 Thắng
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Vị trí 1 (Bắt buộc):</label>
+                    <select
+                      value={editMatchTeamAP1}
+                      onChange={(e) => setEditMatchTeamAP1(e.target.value)}
+                      className="w-full bg-white border border-blue-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="">-- Chọn Người 1 --</option>
+                      {rosterUsers.map((p) => {
+                        const uid = String(p.userId || p.id)
+                        return (
+                          <option key={uid} value={uid}>
+                            {p.name} ({p.eloScore || 0} LP)
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Vị trí 2 (Đánh đôi):</label>
+                    <select
+                      value={editMatchTeamAP2}
+                      onChange={(e) => setEditMatchTeamAP2(e.target.value)}
+                      className="w-full bg-white border border-blue-300 rounded-xl p-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="">-- Trống (Đánh đơn) --</option>
+                      {rosterUsers.map((p) => {
+                        const uid = String(p.userId || p.id)
+                        return (
+                          <option key={uid} value={uid}>
+                            {p.name} ({p.eloScore || 0} LP)
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Team Red */}
+              <div className="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-rose-600" />
+                    <span>Team Red (Đội B)</span>
+                  </span>
+                  {editMatchWinningTeam === 'B' && (
+                    <span className="text-[10px] font-black px-2 py-0.5 bg-rose-600 text-white rounded-md">
+                      👑 Thắng
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Vị trí 1 (Bắt buộc):</label>
+                    <select
+                      value={editMatchTeamBP1}
+                      onChange={(e) => setEditMatchTeamBP1(e.target.value)}
+                      className="w-full bg-white border border-rose-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-rose-600"
+                    >
+                      <option value="">-- Chọn Người 1 --</option>
+                      {rosterUsers.map((p) => {
+                        const uid = String(p.userId || p.id)
+                        return (
+                          <option key={uid} value={uid}>
+                            {p.name} ({p.eloScore || 0} LP)
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Vị trí 2 (Đánh đôi):</label>
+                    <select
+                      value={editMatchTeamBP2}
+                      onChange={(e) => setEditMatchTeamBP2(e.target.value)}
+                      className="w-full bg-white border border-rose-300 rounded-xl p-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:border-rose-600"
+                    >
+                      <option value="">-- Trống (Đánh đơn) --</option>
+                      {rosterUsers.map((p) => {
+                        const uid = String(p.userId || p.id)
+                        return (
+                          <option key={uid} value={uid}>
+                            {p.name} ({p.eloScore || 0} LP)
+                          </option>
+                        )
+                      })}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Court Selection */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Sân thi đấu:</label>
+                <select
+                  value={editMatchCourtName}
+                  onChange={(e) => setEditMatchCourtName(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-slate-900"
+                >
+                  {courtList.map((c) => (
+                    <option key={c} value={c}>
+                      🏸 {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Bottom Modal Actions */}
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteMatchId(editingMatch.id)}
+                className="px-3 py-2.5 text-xs font-bold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 rounded-xl transition flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                title="Xóa trận đấu này và hoàn tác số set/rank"
+              >
+                <Trash2 size={14} />
+                <span>Xóa trận này</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingMatch(null)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={updateMatchMutation.isPending}
+                  onClick={handleSaveEditedMatch}
+                  className="px-5 py-2.5 text-xs font-black bg-slate-950 hover:bg-slate-800 text-white rounded-xl shadow-md active:scale-95 transition cursor-pointer disabled:opacity-50"
+                >
+                  {updateMatchMutation.isPending ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL XÁC NHẬN XÓA / HOÀN TÁC TRẬN ĐẤU */}
+      {confirmDeleteMatchId && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold shrink-0">
+                <Trash2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 text-sm">Xác nhận xóa trận đấu</h3>
+                <p className="text-[11px] text-slate-500 font-medium">Hoàn tác hoàn toàn lượt trận</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-rose-50 border border-rose-200/80 rounded-2xl text-rose-950 space-y-1.5 text-xs">
+              <p className="font-bold">⚡ Sau khi xóa trận:</p>
+              <ul className="list-disc pl-4 space-y-1 text-[11px] text-rose-900 font-medium">
+                <li>Trận đấu sẽ bị xóa khỏi lịch sử của sân.</li>
+                <li>Số set đã đánh (-1 set) của 4 người chơi được hoàn tác.</li>
+                <li>Tỉ số Thắng / Thua và điểm Elo/Rank được tính lại chuẩn xác.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteMatchId(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={deleteMatchMutation.isPending}
+                onClick={() => deleteMatchMutation.mutate(confirmDeleteMatchId)}
+                className="px-4 py-2 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-md shadow-rose-600/20 active:scale-95 transition cursor-pointer"
+              >
+                {deleteMatchMutation.isPending ? 'Đang xóa...' : 'Đồng ý Xóa'}
               </button>
             </div>
           </div>
