@@ -824,16 +824,16 @@ export const HostDashboardView: React.FC = () => {
                             {p.finalFee?.toLocaleString()}đ
                           </span>
                           {p.slotWindow ? (
-                            <span className="text-[10px] text-indigo-700 font-bold block whitespace-nowrap bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.5 rounded mt-0.5" title={`Khung giờ đăng ký: ${p.slotWindow}`}>
+                            <span className="text-[10px] text-slate-900 font-extrabold block whitespace-nowrap bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded mt-0.5" title={`Khung giờ đăng ký: ${p.slotWindow}`}>
                               ⏱️ {p.slotWindow}
                             </span>
                           ) : p.durationHours ? (
-                            <span className="text-[10px] text-indigo-700 font-bold block whitespace-nowrap bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.5 rounded mt-0.5">
+                            <span className="text-[10px] text-slate-900 font-extrabold block whitespace-nowrap bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded mt-0.5">
                               ⏱️ Đánh {p.durationHours}h
                             </span>
                           ) : null}
                           {p.adjustmentAmount !== 0 && (
-                            <span className="text-[10px] text-amber-600 block whitespace-nowrap">
+                            <span className="text-[10px] text-amber-700 font-bold block whitespace-nowrap">
                               Điều chỉnh: {p.adjustmentAmount > 0 ? '+' : ''}
                               {p.adjustmentAmount?.toLocaleString()}đ
                             </span>

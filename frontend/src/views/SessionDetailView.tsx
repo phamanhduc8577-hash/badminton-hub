@@ -699,7 +699,7 @@ export const SessionDetailView: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-slate-500 font-medium">{user?.role === 'HOST' ? p.phone : p.phone.slice(0, 4) + '***' + p.phone.slice(-3)}</span>
                           {p.slotWindow && (
-                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1 rounded">
+                            <span className="text-[9px] font-extrabold text-slate-900 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded">
                               ⏱️ {p.slotWindow}
                             </span>
                           )}
