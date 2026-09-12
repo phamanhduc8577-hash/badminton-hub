@@ -823,11 +823,15 @@ export const HostDashboardView: React.FC = () => {
                           <span className="font-mono font-bold text-slate-900 block text-xs whitespace-nowrap">
                             {p.finalFee?.toLocaleString()}đ
                           </span>
-                          {p.durationHours && (
-                            <span className="text-[10px] text-indigo-700 font-bold block whitespace-nowrap">
+                          {p.slotWindow ? (
+                            <span className="text-[10px] text-indigo-700 font-bold block whitespace-nowrap bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.5 rounded mt-0.5" title={`Khung giờ đăng ký: ${p.slotWindow}`}>
+                              ⏱️ {p.slotWindow}
+                            </span>
+                          ) : p.durationHours ? (
+                            <span className="text-[10px] text-indigo-700 font-bold block whitespace-nowrap bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.5 rounded mt-0.5">
                               ⏱️ Đánh {p.durationHours}h
                             </span>
-                          )}
+                          ) : null}
                           {p.adjustmentAmount !== 0 && (
                             <span className="text-[10px] text-amber-600 block whitespace-nowrap">
                               Điều chỉnh: {p.adjustmentAmount > 0 ? '+' : ''}

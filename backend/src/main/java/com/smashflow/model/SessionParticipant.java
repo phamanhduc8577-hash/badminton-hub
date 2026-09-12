@@ -67,6 +67,9 @@ public class SessionParticipant {
     @Column(precision = 5, scale = 1)
     private BigDecimal durationHours; // e.g. 2.0 or full ca
 
+    @Column(length = 50)
+    private String slotWindow; // e.g. "13:00 - 15:00 (Về sớm)" or "14:00 - 16:00 (Đến muộn)" or "FULL"
+
     @Column(nullable = false, precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal adjustmentAmount = BigDecimal.ZERO;

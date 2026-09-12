@@ -27,6 +27,7 @@ public class ParticipantResponse {
     private BigDecimal depositAmount;
     private BigDecimal baseFee;
     private BigDecimal durationHours;
+    private String slotWindow;
     private BigDecimal adjustmentAmount;
     private String adjustmentReason;
     private BigDecimal finalFee;

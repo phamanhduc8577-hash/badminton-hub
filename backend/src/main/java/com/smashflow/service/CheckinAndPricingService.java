@@ -199,6 +199,7 @@ public class CheckinAndPricingService {
                 .phone(phone)
                 .gender(p.getGender())
                 .durationHours(p.getDurationHours())
+                .slotWindow(p.getSlotWindow())
                 .checkinStatus(p.getCheckinStatus())
                 .checkinAt(p.getCheckinAt())
                 .depositStatus(p.getDepositStatus())

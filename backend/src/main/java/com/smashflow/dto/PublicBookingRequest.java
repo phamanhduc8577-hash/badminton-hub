@@ -18,4 +18,5 @@ public class PublicBookingRequest {
     private Gender gender;
 
     private java.math.BigDecimal durationHours; // e.g. 2.0 or null for full ca
+    private String slotWindow; // e.g. "13:00 - 15:00 (Về sớm)"
 }

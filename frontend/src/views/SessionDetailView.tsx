@@ -124,9 +124,10 @@ export const SessionDetailView: React.FC = () => {
 
   // Member join mutation
   const memberJoinMutation = useMutation({
-    mutationFn: async (opts?: { durationHours?: number }) => {
+    mutationFn: async (opts?: { durationHours?: number; slotWindow?: string }) => {
       const res = await api.post(`/sessions/${id}/join`, {
         durationHours: opts?.durationHours,
+        slotWindow: opts?.slotWindow,
       })
       return res.data as Participant
     },
@@ -695,7 +696,14 @@ export const SessionDetailView: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-500 font-medium">{user?.role === 'HOST' ? p.phone : p.phone.slice(0, 4) + '***' + p.phone.slice(-3)}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-500 font-medium">{user?.role === 'HOST' ? p.phone : p.phone.slice(0, 4) + '***' + p.phone.slice(-3)}</span>
+                          {p.slotWindow && (
+                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1 rounded">
+                              ⏱️ {p.slotWindow}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -963,7 +971,14 @@ export const SessionDetailView: React.FC = () => {
                 type="button"
                 disabled={memberJoinMutation.isPending}
                 onClick={() => {
-                  memberJoinMutation.mutate({ durationHours: selectedDurationHours })
+                  const chosenWindow = subSlotWindows.find((w) => w.key === selectedSlotWindow)
+                  const slotWindowStr = chosenWindow && chosenWindow.key !== 'FULL'
+                    ? `${chosenWindow.timeRange} (${chosenWindow.key === 'EARLY_2H' ? 'Về sớm' : 'Đến muộn'})`
+                    : undefined
+                  memberJoinMutation.mutate({
+                    durationHours: selectedDurationHours,
+                    slotWindow: slotWindowStr,
+                  })
                 }}
                 className="flex-1 py-3 bg-slate-950 hover:bg-slate-800 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2"
               >

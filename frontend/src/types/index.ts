@@ -89,6 +89,7 @@ export interface Participant {
   depositAmount: number
   baseFee: number
   durationHours?: number
+  slotWindow?: string
   adjustmentAmount: number
   adjustmentReason?: string
   finalFee: number
