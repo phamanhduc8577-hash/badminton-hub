@@ -62,6 +62,8 @@ export const HostDashboardView: React.FC = () => {
   // Custom UI Modals (Replaces native browser window.confirm / window.prompt)
   const [confirmRemoveParticipant, setConfirmRemoveParticipant] = useState<Participant | null>(null)
   const [confirmRemoveCourt, setConfirmRemoveCourt] = useState<string | null>(null)
+  const [showAddCourtModal, setShowAddCourtModal] = useState(false)
+  const [newCourtNameInput, setNewCourtNameInput] = useState('')
   const [showCourtEditModal, setShowCourtEditModal] = useState(false)
   const [courtEditNamesInput, setCourtEditNamesInput] = useState('')
   const [courtEditSlotsInput, setCourtEditSlotsInput] = useState<number>(8)
@@ -336,19 +338,35 @@ export const HostDashboardView: React.FC = () => {
     },
   })
 
-  const handleAddCourt = () => {
-    const nextNum = courtList.length + 1
-    const newCourt = `Sân ${nextNum}`
-    if (courtList.includes(newCourt)) {
-      showToast('Tên sân này đã tồn tại trong ca!', 'error')
+  const handleAddCourt = (customName?: string) => {
+    let newCourt = (customName || newCourtNameInput).trim()
+    if (!newCourt) {
+      // Find smallest unused number: Sân 1, Sân 2, ...
+      const existingNums = courtList
+        .map((c) => {
+          const m = c.match(/(\d+)/)
+          return m ? parseInt(m[1], 10) : 0
+        })
+        .filter((n) => n > 0)
+      let nextNum = 1
+      while (existingNums.includes(nextNum)) {
+        nextNum++
+      }
+      newCourt = `Sân ${nextNum}`
+    }
+
+    if (courtList.some((c) => c.toLowerCase() === newCourt.toLowerCase())) {
+      showToast(`Tên [${newCourt}] đã tồn tại trong ca!`, 'error')
       return
     }
+
     const newCourtCount = courtList.length + 1
-    const currentMaxSlots = session?.maxSlots || 8
-    const newMaxSlots = Math.max(currentMaxSlots, newCourtCount * 8)
+    const newMaxSlots = newCourtCount * 8
     const updatedList = [...courtList, newCourt].join(', ')
+    setShowAddCourtModal(false)
+    setNewCourtNameInput('')
     updateCourtsMutation.mutate({ newCourtNames: updatedList, newMaxSlots })
-    showToast(`Đã mở thêm [${newCourt}] & nâng lên ${newMaxSlots} slots!`, 'success')
+    showToast(`Đã mở thêm [${newCourt}] & cập nhật quân số tối đa thành ${newMaxSlots} người!`, 'success')
   }
 
   const handleRemoveCourt = (courtToRemove: string) => {
@@ -1075,14 +1093,27 @@ export const HostDashboardView: React.FC = () => {
               )
             })}
 
-            {/* Add Court Button for Flexible Multi-court expansion placed right alongside the courts */}
+            {/* Add Court Button opens modal to enter specific court name or auto-increment */}
             <button
-              onClick={handleAddCourt}
+              onClick={() => {
+                const existingNums = courtList
+                  .map((c) => {
+                    const m = c.match(/(\d+)/)
+                    return m ? parseInt(m[1], 10) : 0
+                  })
+                  .filter((n) => n > 0)
+                let nextNum = 1
+                while (existingNums.includes(nextNum)) {
+                  nextNum++
+                }
+                setNewCourtNameInput(`Sân ${nextNum}`)
+                setShowAddCourtModal(true)
+              }}
               className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-black transition flex items-center gap-1 shrink-0 shadow-2xs active:scale-95"
               title="Mở thêm sân song song cho ca đấu này"
             >
               <Plus size={14} className="text-emerald-700 font-bold" />
-              <span>+ Sân {courtList.length + 1}</span>
+              <span>+ Thêm sân</span>
             </button>
           </div>
 
@@ -1768,6 +1799,71 @@ export const HostDashboardView: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Thêm Sân (Nhập tên sân tùy ý hoặc tự động + 8 slot) */}
+      {showAddCourtModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Plus size={18} className="text-emerald-600 font-bold" />
+                <h3 className="font-black text-slate-900 text-sm">Thêm Sân Mới Vào Ca</h3>
+              </div>
+              <button
+                onClick={() => setShowAddCourtModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5">
+                  Tên sân muốn thêm (VD: Sân 3, Sân 9, Sân VIP...):
+                </label>
+                <input
+                  type="text"
+                  value={newCourtNameInput}
+                  onChange={(e) => setNewCourtNameInput(e.target.value)}
+                  placeholder="Nhập tên sân (VD: Sân 3)"
+                  autoFocus
+                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 font-bold text-sm focus:outline-none focus:border-slate-900"
+                />
+              </div>
+
+              <div className="p-3 bg-emerald-50 border border-emerald-200/80 rounded-xl text-emerald-950 space-y-1 text-[11px]">
+                <p className="font-bold flex items-center gap-1">
+                  <span>⚡ Tự động tính toán quân số:</span>
+                </p>
+                <p>
+                  • Hiện tại: <b>{courtList.length} Sân ({session.maxSlots} người)</b>
+                </p>
+                <p>
+                  • Sau khi thêm: <b>{courtList.length + 1} Sân ({(courtList.length + 1) * 8} người)</b> (Mỗi sân +8 slots)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowAddCourtModal(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAddCourt()}
+                className="px-4 py-2 text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md shadow-emerald-600/20 active:scale-95 transition"
+              >
+                Xác nhận thêm sân
+              </button>
+            </div>
           </div>
         </div>
       )}
