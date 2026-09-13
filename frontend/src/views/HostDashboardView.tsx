@@ -1479,42 +1479,51 @@ export const HostDashboardView: React.FC = () => {
         <div className="space-y-6">
           {/* Session MVP Highlight Box */}
           {report.mvpUserId && report.mvpWins && report.mvpWins > 0 && (
-            <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 rounded-3xl p-5 sm:p-8 text-slate-950 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-5 relative overflow-hidden">
-              <div className="flex items-center gap-3.5 sm:gap-4 relative z-10 w-full sm:w-auto">
-                <div className="relative shrink-0">
-                  <DuckMascot
-                    src={report.mvpAvatarUrl || '/duck-mascot.png'}
-                    size={56}
-                    rounded="2xl"
-                    className="border-2 border-slate-950/80 shadow-xl"
-                  />
-                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-xl bg-slate-950 text-amber-300 flex items-center justify-center text-xs shadow-md border border-amber-400">
-                    👑
-                  </div>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-950 text-amber-300 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1">
-                    <span>Vinh danh MVP Ca Đấu</span>
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-black truncate">{report.mvpName}</h3>
-                  <p className="text-xs font-bold text-slate-900 mt-0.5">
-                    Thắng nhiều nhất: <b>{report.mvpWins} Thắng</b> (-{report.mvpLosses} Thua)
-                  </p>
-                </div>
-              </div>
+            (() => {
+              const mvpParticipant = session?.participants?.find(
+                (p) => String(p.userId || p.id) === String(report.mvpUserId) || p.name === report.mvpName
+              )
+              const mvpAvatar = report.mvpAvatarUrl || mvpParticipant?.avatarUrl || '/duck-mascot.png'
 
-              <div className="w-full sm:w-auto bg-white/90 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-yellow-200 text-center sm:text-right shrink-0 shadow-md relative z-10">
-                <span className="text-[10px] sm:text-[11px] font-black uppercase text-amber-900 block">
-                  Phần thưởng MVP Ca Đấu
-                </span>
-                <span className="font-black text-xs sm:text-sm text-slate-950 block mt-0.5">
-                  🥤 Tặng 01 Nước giải khát Revive / Pocari
-                </span>
-                <span className="text-[9px] sm:text-[10px] text-slate-600 block mt-0.5 sm:mt-1 font-semibold">
-                  (Host trao tặng trực tiếp tại sân)
-                </span>
-              </div>
-            </div>
+              return (
+                <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 rounded-3xl p-5 sm:p-8 text-slate-950 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-5 relative overflow-hidden">
+                  <div className="flex items-center gap-3.5 sm:gap-4 relative z-10 w-full sm:w-auto">
+                    <div className="relative shrink-0">
+                      <DuckMascot
+                        src={mvpAvatar}
+                        size={56}
+                        rounded="2xl"
+                        className="border-2 border-slate-950/80 shadow-xl"
+                      />
+                      <div className="absolute -top-2 -right-2 w-6 h-6 rounded-xl bg-slate-950 text-amber-300 flex items-center justify-center text-xs shadow-md border border-amber-400">
+                        👑
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-950 text-amber-300 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1">
+                        <span>Vinh danh MVP Ca Đấu</span>
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-black truncate">{report.mvpName}</h3>
+                      <p className="text-xs font-bold text-slate-900 mt-0.5">
+                        Thắng nhiều nhất: <b>{report.mvpWins} Thắng</b> (-{report.mvpLosses} Thua)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="w-full sm:w-auto bg-white/90 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-yellow-200 text-center sm:text-right shrink-0 shadow-md relative z-10">
+                    <span className="text-[10px] sm:text-[11px] font-black uppercase text-amber-900 block">
+                      Phần thưởng MVP Ca Đấu
+                    </span>
+                    <span className="font-black text-xs sm:text-sm text-slate-950 block mt-0.5">
+                      🥤 Tặng 01 Nước giải khát Revive / Pocari
+                    </span>
+                    <span className="text-[9px] sm:text-[10px] text-slate-600 block mt-0.5 sm:mt-1 font-semibold">
+                      (Host trao tặng trực tiếp tại sân)
+                    </span>
+                  </div>
+                </div>
+              )
+            })()
           )}
 
           <div className="saas-card rounded-3xl p-6 sm:p-8 md:p-10 space-y-6">
