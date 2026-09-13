@@ -85,7 +85,20 @@ export const HostDashboardView: React.FC = () => {
   const [courtDrafts, setCourtDrafts] = useState<Record<string, CourtDraft>>(() => {
     try {
       const saved = localStorage.getItem(`smashflow_drafts_${id}`)
-      return saved ? JSON.parse(saved) : {}
+      if (!saved) return {}
+      const parsed: Record<string, CourtDraft> = JSON.parse(saved)
+      const seen = new Set<string>()
+      const cleaned: Record<string, CourtDraft> = {}
+      for (const [court, draft] of Object.entries(parsed)) {
+        if (!draft) continue
+        const d: CourtDraft = { teamAP1: '', teamAP2: '', teamBP1: '', teamBP2: '' }
+        if (draft.teamAP1 && !seen.has(draft.teamAP1)) { d.teamAP1 = draft.teamAP1; seen.add(draft.teamAP1) }
+        if (draft.teamAP2 && !seen.has(draft.teamAP2)) { d.teamAP2 = draft.teamAP2; seen.add(draft.teamAP2) }
+        if (draft.teamBP1 && !seen.has(draft.teamBP1)) { d.teamBP1 = draft.teamBP1; seen.add(draft.teamBP1) }
+        if (draft.teamBP2 && !seen.has(draft.teamBP2)) { d.teamBP2 = draft.teamBP2; seen.add(draft.teamBP2) }
+        cleaned[court] = d
+      }
+      return cleaned
     } catch {
       return {}
     }
@@ -558,7 +571,9 @@ export const HostDashboardView: React.FC = () => {
     })
   }
 
-  const rosterUsers = session?.participants || []
+  const rosterUsers = useMemo(() => {
+    return (session?.participants || []).filter((p) => p.checkinStatus !== 'ABSENT')
+  }, [session?.participants])
 
   // Helper to get available users for a specific court dropdown (Excludes players assigned in this court AND all other parallel courts)
   const getAvailableUsersForCourt = (courtName: string, currentSelection: string) => {

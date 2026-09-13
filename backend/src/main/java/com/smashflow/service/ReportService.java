@@ -25,27 +25,30 @@ public class ReportService {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
 
-        List<SessionParticipant> participants = participantRepository.findBySessionId(sessionId);
+        List<SessionParticipant> allParticipants = participantRepository.findBySessionId(sessionId);
+        List<SessionParticipant> activeParticipants = allParticipants.stream()
+                .filter(p -> p.getCheckinStatus() != CheckinStatus.ABSENT)
+                .toList();
 
-        int totalPlayers = participants.size();
-        int checkedIn = (int) participants.stream().filter(p -> p.getCheckinStatus() == CheckinStatus.CHECKED_IN).count();
-        int paid = (int) participants.stream().filter(p -> p.getPaymentStatus() == PaymentStatus.PAID).count();
+        int totalPlayers = activeParticipants.size();
+        int checkedIn = (int) activeParticipants.stream().filter(p -> p.getCheckinStatus() == CheckinStatus.CHECKED_IN).count();
+        int paid = (int) activeParticipants.stream().filter(p -> p.getPaymentStatus() == PaymentStatus.PAID).count();
         int unpaid = totalPlayers - paid;
 
-        // Total revenue = Paid final fees + Forfeited deposits from no-shows
-        BigDecimal paidFees = participants.stream()
+        // Total revenue = Paid final fees from active players + Forfeited deposits from cancelled no-shows
+        BigDecimal paidFees = activeParticipants.stream()
                 .filter(p -> p.getPaymentStatus() == PaymentStatus.PAID)
                 .map(SessionParticipant::getFinalFee)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal forfeitedDeposits = participants.stream()
+        BigDecimal forfeitedDeposits = allParticipants.stream()
                 .filter(p -> p.getDepositStatus() == DepositStatus.FORFEITED)
                 .map(SessionParticipant::getDepositAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalRevenue = paidFees.add(forfeitedDeposits);
 
-        BigDecimal totalDepositCollected = participants.stream()
+        BigDecimal totalDepositCollected = allParticipants.stream()
                 .filter(p -> p.getDepositStatus() == DepositStatus.PAID || p.getDepositStatus() == DepositStatus.FORFEITED)
                 .map(SessionParticipant::getDepositAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
