@@ -81,8 +81,24 @@ export const HostDashboardView: React.FC = () => {
   // Active Court Selected for Multi-Court Matchmaking
   const [activeCourtIndex, setActiveCourtIndex] = useState<number>(0)
 
-  // Multi-court drafts: Court Name -> CourtDraft
-  const [courtDrafts, setCourtDrafts] = useState<Record<string, CourtDraft>>({})
+  // Multi-court drafts: Court Name -> CourtDraft (Persisted in localStorage across F5)
+  const [courtDrafts, setCourtDrafts] = useState<Record<string, CourtDraft>>(() => {
+    try {
+      const saved = localStorage.getItem(`smashflow_drafts_${id}`)
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  // Auto-sync courtDrafts to localStorage
+  useEffect(() => {
+    if (id) {
+      try {
+        localStorage.setItem(`smashflow_drafts_${id}`, JSON.stringify(courtDrafts))
+      } catch {}
+    }
+  }, [courtDrafts, id])
 
   const { data: session, isLoading } = useQuery<SessionItem>({
     queryKey: ['session', id],
@@ -525,20 +541,25 @@ export const HostDashboardView: React.FC = () => {
 
   const rosterUsers = session?.participants || []
 
-  // Helper to get available users for a specific court dropdown
+  // Helper to get available users for a specific court dropdown (Excludes players assigned in this court AND all other parallel courts)
   const getAvailableUsersForCourt = (courtName: string, currentSelection: string) => {
-    const draft = courtDrafts[courtName] || currentDraft
-    const selectedInThisCourt = new Set(
-      [draft.teamAP1, draft.teamAP2, draft.teamBP1, draft.teamBP2].filter(
-        (pid) => pid && pid !== currentSelection
-      )
-    )
+    const selectedEverywhere = new Set<string>()
+
+    // Collect all players drafted across ALL active courts (except current dropdown slot)
+    Object.entries(courtDrafts).forEach(([cName, draft]) => {
+      if (draft) {
+        if (draft.teamAP1 && !(cName === courtName && draft.teamAP1 === currentSelection)) selectedEverywhere.add(draft.teamAP1)
+        if (draft.teamAP2 && !(cName === courtName && draft.teamAP2 === currentSelection)) selectedEverywhere.add(draft.teamAP2)
+        if (draft.teamBP1 && !(cName === courtName && draft.teamBP1 === currentSelection)) selectedEverywhere.add(draft.teamBP1)
+        if (draft.teamBP2 && !(cName === courtName && draft.teamBP2 === currentSelection)) selectedEverywhere.add(draft.teamBP2)
+      }
+    })
 
     // Sort by lowest sets played first to promote fair-play rotation
     return [...rosterUsers]
       .filter((u) => {
         const idKey = String(u.userId || u.id)
-        return !selectedInThisCourt.has(idKey)
+        return !selectedEverywhere.has(idKey)
       })
       .sort((a, b) => {
         const statsA = playerStatsMap[String(a.userId || a.id)]?.totalSets || 0
