@@ -83,9 +83,9 @@ public class CheckinAndPricingService {
         participant.setCheckinAt(LocalDateTime.now());
         participantRepository.save(participant);
 
-        if (!participant.getIsGuest() && participant.getUser() != null) {
+        if (participant.getUser() != null) {
             User user = participant.getUser();
-            user.setSessionsAttended(user.getSessionsAttended() + 1);
+            user.setSessionsAttended((user.getSessionsAttended() != null ? user.getSessionsAttended() : 0) + 1);
             userRepository.save(user);
             checkAndGrantLoyaltyRewards(user);
         }

@@ -19,7 +19,6 @@ public class LeaderboardService {
         List<User> users = userRepository.findAll().stream()
                 .filter(u -> !Boolean.TRUE.equals(u.getDeleted()))
                 .sorted((a, b) -> Integer.compare(b.getSessionsAttended(), a.getSessionsAttended()))
-                .limit(20)
                 .toList();
 
         List<LeaderboardEntry> result = new ArrayList<>();
@@ -55,7 +54,6 @@ public class LeaderboardService {
                     if (eloCompare != 0) return eloCompare;
                     return Integer.compare(b.getWinCount(), a.getWinCount());
                 })
-                .limit(20)
                 .toList();
 
         List<LeaderboardEntry> result = new ArrayList<>();
