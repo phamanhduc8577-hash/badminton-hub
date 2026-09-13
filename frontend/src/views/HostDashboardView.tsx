@@ -162,18 +162,37 @@ export const HostDashboardView: React.FC = () => {
   }, [courtDrafts, currentCourtName])
 
   const updateCurrentDraft = (field: keyof CourtDraft, value: string) => {
-    setCourtDrafts((prev) => ({
-      ...prev,
-      [currentCourtName]: {
-        ...(prev[currentCourtName] || {
-          teamAP1: '',
-          teamAP2: '',
-          teamBP1: '',
-          teamBP2: '',
-        }),
-        [field]: value,
-      },
-    }))
+    setCourtDrafts((prev) => {
+      const updated = { ...prev }
+
+      // Proactive cross-court eviction: If player selected, purge from other courts and duplicate slots
+      if (value) {
+        Object.keys(updated).forEach((cName) => {
+          if (cName !== currentCourtName && updated[cName]) {
+            const d = { ...updated[cName] }
+            let changed = false
+            if (d.teamAP1 === value) { d.teamAP1 = ''; changed = true }
+            if (d.teamAP2 === value) { d.teamAP2 = ''; changed = true }
+            if (d.teamBP1 === value) { d.teamBP1 = ''; changed = true }
+            if (d.teamBP2 === value) { d.teamBP2 = ''; changed = true }
+            if (changed) updated[cName] = d
+          }
+        })
+      }
+
+      const current = { ...(updated[currentCourtName] || { teamAP1: '', teamAP2: '', teamBP1: '', teamBP2: '' }) }
+      // Avoid duplicate inside same court
+      if (value) {
+        if (field !== 'teamAP1' && current.teamAP1 === value) current.teamAP1 = ''
+        if (field !== 'teamAP2' && current.teamAP2 === value) current.teamAP2 = ''
+        if (field !== 'teamBP1' && current.teamBP1 === value) current.teamBP1 = ''
+        if (field !== 'teamBP2' && current.teamBP2 === value) current.teamBP2 = ''
+      }
+      current[field] = value
+      updated[currentCourtName] = current
+
+      return updated
+    })
   }
 
   // Calculate stats for Fair-Play Sets Distribution in this session (with audit logs of courts)
@@ -600,29 +619,45 @@ export const HostDashboardView: React.FC = () => {
       const p2 = String(pool[3].userId || pool[3].id)
       const p3 = String(pool[1].userId || pool[1].id)
       const p4 = String(pool[2].userId || pool[2].id)
+      const chosen = new Set([p1, p2, p3, p4])
 
-      setCourtDrafts((prev) => ({
-        ...prev,
-        [courtName]: {
-          teamAP1: p1,
-          teamAP2: p2,
-          teamBP1: p3,
-          teamBP2: p4,
-        },
-      }))
+      setCourtDrafts((prev) => {
+        const updated = { ...prev }
+        Object.keys(updated).forEach((cName) => {
+          if (cName !== courtName && updated[cName]) {
+            const d = { ...updated[cName] }
+            let changed = false
+            if (chosen.has(d.teamAP1)) { d.teamAP1 = ''; changed = true }
+            if (chosen.has(d.teamAP2)) { d.teamAP2 = ''; changed = true }
+            if (chosen.has(d.teamBP1)) { d.teamBP1 = ''; changed = true }
+            if (chosen.has(d.teamBP2)) { d.teamBP2 = ''; changed = true }
+            if (changed) updated[cName] = d
+          }
+        })
+        updated[courtName] = { teamAP1: p1, teamAP2: p2, teamBP1: p3, teamBP2: p4 }
+        return updated
+      })
     } else {
       const p1 = String(pool[0].userId || pool[0].id)
       const p2 = String(pool[1].userId || pool[1].id)
+      const chosen = new Set([p1, p2])
 
-      setCourtDrafts((prev) => ({
-        ...prev,
-        [courtName]: {
-          teamAP1: p1,
-          teamAP2: '',
-          teamBP1: p2,
-          teamBP2: '',
-        },
-      }))
+      setCourtDrafts((prev) => {
+        const updated = { ...prev }
+        Object.keys(updated).forEach((cName) => {
+          if (cName !== courtName && updated[cName]) {
+            const d = { ...updated[cName] }
+            let changed = false
+            if (chosen.has(d.teamAP1)) { d.teamAP1 = ''; changed = true }
+            if (chosen.has(d.teamAP2)) { d.teamAP2 = ''; changed = true }
+            if (chosen.has(d.teamBP1)) { d.teamBP1 = ''; changed = true }
+            if (chosen.has(d.teamBP2)) { d.teamBP2 = ''; changed = true }
+            if (changed) updated[cName] = d
+          }
+        })
+        updated[courtName] = { teamAP1: p1, teamAP2: '', teamBP1: p2, teamBP2: '' }
+        return updated
+      })
     }
   }
 
