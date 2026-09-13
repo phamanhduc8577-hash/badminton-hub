@@ -26,6 +26,7 @@ public class HostSessionReport {
     // MVP of the session
     private Long mvpUserId;
     private String mvpName;
+    private String mvpAvatarUrl;
     private Integer mvpWins;
     private Integer mvpLosses;
     private Boolean mvpRewardGiven;

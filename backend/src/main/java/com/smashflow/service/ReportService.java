@@ -60,17 +60,19 @@ public class ReportService {
         List<Match> matches = matchRepository.findBySessionIdOrderByCreatedAtDesc(sessionId);
         Map<Long, int[]> playerStats = new HashMap<>(); // userId -> [wins, losses]
         Map<Long, String> playerNames = new HashMap<>();
+        Map<Long, String> playerAvatars = new HashMap<>();
 
         for (Match m : matches) {
             boolean teamAWon = m.getWinningTeam() == WinningTeam.A;
-            recordPlayerStats(playerStats, playerNames, m.getTeamAPlayer1(), teamAWon);
-            if (m.getTeamAPlayer2() != null) recordPlayerStats(playerStats, playerNames, m.getTeamAPlayer2(), teamAWon);
-            recordPlayerStats(playerStats, playerNames, m.getTeamBPlayer1(), !teamAWon);
-            if (m.getTeamBPlayer2() != null) recordPlayerStats(playerStats, playerNames, m.getTeamBPlayer2(), !teamAWon);
+            recordPlayerStats(playerStats, playerNames, playerAvatars, m.getTeamAPlayer1(), teamAWon);
+            if (m.getTeamAPlayer2() != null) recordPlayerStats(playerStats, playerNames, playerAvatars, m.getTeamAPlayer2(), teamAWon);
+            recordPlayerStats(playerStats, playerNames, playerAvatars, m.getTeamBPlayer1(), !teamAWon);
+            if (m.getTeamBPlayer2() != null) recordPlayerStats(playerStats, playerNames, playerAvatars, m.getTeamBPlayer2(), !teamAWon);
         }
 
         Long mvpId = null;
         String mvpName = null;
+        String mvpAvatarUrl = null;
         int maxWins = 0;
         int mvpLosses = 0;
 
@@ -82,6 +84,7 @@ public class ReportService {
                 mvpLosses = losses;
                 mvpId = entry.getKey();
                 mvpName = playerNames.get(mvpId);
+                mvpAvatarUrl = playerAvatars.get(mvpId);
             }
         }
 
@@ -101,14 +104,18 @@ public class ReportService {
                 .netProfit(netProfit)
                 .mvpUserId(mvpId)
                 .mvpName(mvpName)
+                .mvpAvatarUrl(mvpAvatarUrl)
                 .mvpWins(maxWins)
                 .mvpLosses(mvpLosses)
                 .build();
     }
 
-    private void recordPlayerStats(Map<Long, int[]> stats, Map<Long, String> names, User player, boolean won) {
+    private void recordPlayerStats(Map<Long, int[]> stats, Map<Long, String> names, Map<Long, String> avatars, User player, boolean won) {
         if (player == null) return;
         names.put(player.getId(), player.getFullName());
+        if (player.getAvatarUrl() != null && !player.getAvatarUrl().isBlank()) {
+            avatars.put(player.getId(), player.getAvatarUrl());
+        }
         int[] st = stats.computeIfAbsent(player.getId(), k -> new int[2]);
         if (won) {
             st[0]++;

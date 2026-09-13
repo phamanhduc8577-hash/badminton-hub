@@ -169,6 +169,7 @@ export interface HostReport {
   netProfit: number
   mvpUserId?: number
   mvpName?: string
+  mvpAvatarUrl?: string
   mvpWins?: number
   mvpLosses?: number
 }
