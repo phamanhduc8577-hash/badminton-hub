@@ -240,6 +240,10 @@ public class MemberManagementService {
     }
 
     private MemberProfileResponse toResponse(User u, boolean isHost) {
+        int attended = u.getSessionsAttended() != null ? u.getSessionsAttended() : 0;
+        if (attended == 0 && ((u.getWinCount() != null && u.getWinCount() > 0) || (u.getLossCount() != null && u.getLossCount() > 0))) {
+            attended = 1;
+        }
         return MemberProfileResponse.builder()
                 .id(u.getId())
                 .phone(isHost ? u.getPhone() : null)
@@ -248,7 +252,7 @@ public class MemberManagementService {
                 .role(u.getRole())
                 .membershipType(u.getMembershipType() != null ? u.getMembershipType() : MembershipType.CASUAL)
                 .avatarUrl(u.getAvatarUrl() != null ? u.getAvatarUrl() : (u.getRole() == Role.HOST ? "/duck-host-sassy.png" : "/duck-mascot.png"))
-                .sessionsAttended(u.getSessionsAttended() != null ? u.getSessionsAttended() : 0)
+                .sessionsAttended(attended)
                 .winCount(u.getWinCount() != null ? u.getWinCount() : 0)
                 .lossCount(u.getLossCount() != null ? u.getLossCount() : 0)
                 .winRate(u.getWinRate())

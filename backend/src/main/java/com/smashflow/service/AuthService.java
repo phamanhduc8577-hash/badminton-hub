@@ -133,6 +133,10 @@ public class AuthService {
     }
 
     private AuthResponse toAuthResponse(User user, String token) {
+        int attended = user.getSessionsAttended() != null ? user.getSessionsAttended() : 0;
+        if (attended == 0 && ((user.getWinCount() != null && user.getWinCount() > 0) || (user.getLossCount() != null && user.getLossCount() > 0))) {
+            attended = 1;
+        }
         return AuthResponse.builder()
                 .token(token)
                 .id(user.getId())
@@ -142,7 +146,7 @@ public class AuthService {
                 .role(user.getRole())
                 .membershipType(user.getMembershipType())
                 .avatarUrl(user.getAvatarUrl() != null ? user.getAvatarUrl() : (user.getRole() == Role.HOST ? "/duck-host-sassy.png" : "/duck-mascot.png"))
-                .sessionsAttended(user.getSessionsAttended())
+                .sessionsAttended(attended)
                 .winCount(user.getWinCount())
                 .lossCount(user.getLossCount())
                 .winRate(user.getWinRate())
