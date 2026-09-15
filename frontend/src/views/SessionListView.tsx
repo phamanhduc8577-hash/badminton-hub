@@ -39,6 +39,8 @@ export const SessionListView: React.FC = () => {
     title: '',
     courtNames: '',
     maxSlots: 8,
+    startTime: '',
+    endTime: '',
     venueName: '',
     venueAddress: '',
     memberMalePrice: 0,
@@ -81,6 +83,14 @@ export const SessionListView: React.FC = () => {
     },
   })
 
+  const formatForDateTimeLocal = (dStr: string) => {
+    if (!dStr) return ''
+    const d = new Date(dStr)
+    if (isNaN(d.getTime())) return ''
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+
   const handleOpenEditModal = (e: React.MouseEvent, session: SessionItem) => {
     e.stopPropagation()
     setEditingSession(session)
@@ -88,6 +98,8 @@ export const SessionListView: React.FC = () => {
       title: session.title,
       courtNames: session.courtNames || 'Sân 1, Sân 2',
       maxSlots: session.maxSlots || 8,
+      startTime: formatForDateTimeLocal(session.startTime),
+      endTime: formatForDateTimeLocal(session.endTime),
       venueName: session.venueName || '',
       venueAddress: session.venueAddress || '',
       memberMalePrice: session.memberMalePrice || 0,
@@ -112,6 +124,14 @@ export const SessionListView: React.FC = () => {
       showToast(`Số slot không được nhỏ hơn số người đã đăng ký (${editingSession.bookedSlots} người)!`, 'error')
       return
     }
+    if (editForm.startTime && editForm.endTime) {
+      const s = new Date(editForm.startTime).getTime()
+      const end = new Date(editForm.endTime).getTime()
+      if (end <= s) {
+        showToast('Giờ kết thúc phải sau giờ bắt đầu!', 'error')
+        return
+      }
+    }
 
     updateSessionMutation.mutate({
       sessionId: editingSession.id,
@@ -119,6 +139,8 @@ export const SessionListView: React.FC = () => {
         title: editForm.title || editingSession.title,
         courtNames: editForm.courtNames,
         maxSlots: Number(editForm.maxSlots),
+        startTime: editForm.startTime ? new Date(editForm.startTime).toISOString() : undefined,
+        endTime: editForm.endTime ? new Date(editForm.endTime).toISOString() : undefined,
         venueName: editForm.venueName,
         venueAddress: editForm.venueAddress,
         memberMalePrice: Number(editForm.memberMalePrice),
@@ -416,14 +438,28 @@ export const SessionListView: React.FC = () => {
 
                     <div className="flex items-center gap-2 shrink-0">
                       {user?.role === 'HOST' && (
-                        <button
-                          onClick={(e) => handleOpenEditModal(e, session)}
-                          className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-300 rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-bold z-10"
-                          title="Sửa nhanh thông tin & bảng giá ca đánh này"
-                        >
-                          <Settings size={13} className="text-slate-600" />
-                          <span>Sửa ca</span>
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/host/session/${session.id}`)
+                            }}
+                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-black z-10"
+                            title="Mở ngay Bảng điều khiển Host (Bắt kèo, Điểm danh, Thu tiền)"
+                          >
+                            <ShieldCheck size={13} />
+                            <span>Host Panel</span>
+                          </button>
+
+                          <button
+                            onClick={(e) => handleOpenEditModal(e, session)}
+                            className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-300 rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-bold z-10"
+                            title="Sửa nhanh ngày giờ, sân & bảng giá ca đánh này"
+                          >
+                            <Settings size={13} className="text-slate-600" />
+                            <span>Sửa ca</span>
+                          </button>
+                        </>
                       )}
 
                       <div className="flex items-center gap-1 text-slate-950 font-black text-xs group-hover:translate-x-1 transition bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
@@ -478,6 +514,36 @@ export const SessionListView: React.FC = () => {
                   placeholder="Ví dụ: Giao lưu cầu lông tối..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-950 focus:outline-none transition"
                 />
+              </div>
+
+              {/* Ngày & Khung giờ ca đánh */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-rose-50/50 border border-rose-200/80 rounded-2xl">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Clock size={13} className="text-rose-600" />
+                    <span>Thời gian bắt đầu</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.startTime}
+                    onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+                    className="w-full bg-white border border-rose-300 rounded-xl p-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Clock size={13} className="text-rose-600" />
+                    <span>Thời gian kết thúc</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.endTime}
+                    onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+                    className="w-full bg-white border border-rose-300 rounded-xl p-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                    required
+                  />
+                </div>
               </div>
 
               {/* Địa điểm sân & Địa chỉ */}
