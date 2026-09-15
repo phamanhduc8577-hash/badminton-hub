@@ -436,37 +436,30 @@ export const SessionListView: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {user?.role === 'HOST' && (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              navigate(`/host/session/${session.id}`)
-                            }}
-                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-black z-10"
-                            title="Mở ngay Bảng điều khiển Host (Bắt kèo, Điểm danh, Thu tiền)"
-                          >
-                            <ShieldCheck size={13} />
-                            <span>Host Panel</span>
-                          </button>
+                    {user?.role === 'HOST' && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/host/session/${session.id}`)
+                          }}
+                          className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-black z-10"
+                          title="Mở ngay Bảng điều khiển Host (Bắt kèo, Điểm danh, Thu tiền)"
+                        >
+                          <ShieldCheck size={13} />
+                          <span>Host Panel</span>
+                        </button>
 
-                          <button
-                            onClick={(e) => handleOpenEditModal(e, session)}
-                            className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-300 rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-bold z-10"
-                            title="Sửa nhanh ngày giờ, sân & bảng giá ca đánh này"
-                          >
-                            <Settings size={13} className="text-slate-600" />
-                            <span>Sửa ca</span>
-                          </button>
-                        </>
-                      )}
-
-                      <div className="flex items-center gap-1 text-slate-950 font-black text-xs group-hover:translate-x-1 transition bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                        <span>Vào ca</span>
-                        <ChevronRight size={15} />
+                        <button
+                          onClick={(e) => handleOpenEditModal(e, session)}
+                          className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-300 rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-bold z-10"
+                          title="Sửa nhanh ngày giờ, sân & bảng giá ca đánh này"
+                        >
+                          <Settings size={13} className="text-slate-600" />
+                          <span>Sửa ca</span>
+                        </button>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )
