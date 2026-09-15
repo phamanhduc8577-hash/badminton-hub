@@ -1,18 +1,27 @@
 /**
  * Helper to safely parse ISO dates from backend (with or without timezone offset)
  * Ensures standard local representation across all browsers/devices.
+ *
+ * Note: Database timestamps saved in UTC without timezone offset (e.g. "2026-08-30T09:05:00")
+ * will be treated as UTC ISO string to accurately convert to Vietnam Local Time (GMT+7).
  */
 export function parseServerDate(dateStr: string | Date | null | undefined): Date {
   if (!dateStr) return new Date(NaN)
   if (dateStr instanceof Date) return dateStr
 
-  // If date string contains space like "2026-09-15 15:52:00", convert to ISO "2026-09-15T15:52:00"
-  let formatted = dateStr.trim().replace(' ', 'T')
+  let formatted = String(dateStr).trim().replace(' ', 'T')
+
+  // If no timezone offset (no 'Z' and no '+/-HH:mm'), append 'Z' to treat as UTC from database
+  const hasTimezone = /Z|[+-]\d{2}(:\d{2})?$/.test(formatted)
+  if (!hasTimezone) {
+    formatted = `${formatted}Z`
+  }
+
   return new Date(formatted)
 }
 
 /**
- * Format time to "HH:mm" (e.g. "15:30") or "hh:mm a" (e.g. "03:30 PM")
+ * Format time to "HH:mm" (e.g. "16:05") or "hh:mm a" (e.g. "04:05 PM")
  */
 export function formatMatchTime(dateStr: string | Date | null | undefined): string {
   const d = parseServerDate(dateStr)
@@ -24,7 +33,7 @@ export function formatMatchTime(dateStr: string | Date | null | undefined): stri
 }
 
 /**
- * Format full date time for display (e.g. "Thứ Ba, 15/09", "15:00")
+ * Format full date time for display (e.g. "Thứ Ba, 15/09", "16:05")
  */
 export function formatSessionDateTime(dateStr: string | Date | null | undefined): { day: string; time: string } {
   const d = parseServerDate(dateStr)
