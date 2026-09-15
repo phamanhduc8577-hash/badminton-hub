@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAuthStore } from '../store/useAuthStore'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081'
 
@@ -21,9 +22,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('smashflow_token')
-      localStorage.removeItem('smashflow_user')
+      // Sync zustand store state immediately so UI updates right away
+      useAuthStore.getState().logout()
     }
     return Promise.reject(error)
   }
 )
+

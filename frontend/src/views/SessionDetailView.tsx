@@ -168,7 +168,12 @@ export const SessionDetailView: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['session', id] })
     },
     onError: (err: any) => {
-      showToast(err.response?.data?.message || 'Không thể tham gia ca!', 'error')
+      const msg = err.response?.data?.message || err.message || 'Không thể tham gia ca!'
+      if (err.response?.status === 401) {
+        showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!', 'error')
+      } else {
+        showToast(msg, 'error')
+      }
     },
   })
 
