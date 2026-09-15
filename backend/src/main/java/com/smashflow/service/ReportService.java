@@ -227,12 +227,26 @@ public class ReportService {
                 }
             }
 
+            // Determine dynamic real-time status based on current time
+            java.time.LocalDateTime nowTime = java.time.LocalDateTime.now();
+            String effectiveStatus = session.getStatus().name();
+            if (session.getStatus() != SessionStatus.CANCELLED) {
+                if (session.getEndTime() != null && nowTime.isAfter(session.getEndTime())) {
+                    effectiveStatus = "COMPLETED";
+                } else if (session.getStartTime() != null && session.getEndTime() != null &&
+                        !nowTime.isBefore(session.getStartTime()) && !nowTime.isAfter(session.getEndTime())) {
+                    effectiveStatus = "ACTIVE";
+                } else {
+                    effectiveStatus = "UPCOMING";
+                }
+            }
+
             summaries.add(com.smashflow.dto.MonthlyFinancialReport.SessionFinancialSummary.builder()
                     .sessionId(session.getId())
                     .title(session.getTitle())
                     .startTime(session.getStartTime() != null ? session.getStartTime().toString() : null)
                     .endTime(session.getEndTime() != null ? session.getEndTime().toString() : null)
-                    .status(session.getStatus().name())
+                    .status(effectiveStatus)
                     .totalPlayers(sRep.getTotalPlayers())
                     .checkedInPlayers(sRep.getCheckedInPlayers())
                     .totalRevenue(sRep.getTotalRevenue())

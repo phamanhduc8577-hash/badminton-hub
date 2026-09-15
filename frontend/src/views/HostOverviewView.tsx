@@ -63,6 +63,17 @@ export const HostOverviewView: React.FC = () => {
     }
   }
 
+  const getEffectiveStatus = (s: { startTime?: string; endTime?: string; status?: string }) => {
+    if (s.status === 'CANCELLED') return 'CANCELLED'
+    if (!s.startTime || !s.endTime) return s.status || 'UPCOMING'
+    const nowMs = new Date().getTime()
+    const startMs = new Date(s.startTime).getTime()
+    const endMs = new Date(s.endTime).getTime()
+    if (nowMs > endMs) return 'COMPLETED'
+    if (nowMs >= startMs && nowMs <= endMs) return 'ACTIVE'
+    return 'UPCOMING'
+  }
+
   const formatVnd = (num?: number) => {
     if (num === undefined || num === null) return '0 ₫'
     return `${num.toLocaleString('vi-VN')} ₫`
@@ -377,29 +388,31 @@ export const HostOverviewView: React.FC = () => {
 
             {report?.sessionSummaries && report.sessionSummaries.length > 0 ? (
               <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
-                {report.sessionSummaries.map((s) => (
-                  <div
-                    key={s.sessionId}
-                    onClick={() => navigate(`/host/session/${s.sessionId}`)}
-                    className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-slate-50/80 transition cursor-pointer group"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-rose-600 transition">
-                          {s.title}
-                        </span>
-                        <span
-                          className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
-                            s.status === 'COMPLETED'
-                              ? 'bg-slate-100 text-slate-700'
-                              : s.status === 'ACTIVE'
-                              ? 'bg-emerald-100 text-emerald-800 animate-pulse'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}
-                        >
-                          {s.status === 'COMPLETED' ? 'Đã xong' : s.status === 'ACTIVE' ? 'Đang diễn ra' : 'Sắp tới'}
-                        </span>
-                      </div>
+                {report.sessionSummaries.map((s) => {
+                  const effStatus = getEffectiveStatus(s)
+                  return (
+                    <div
+                      key={s.sessionId}
+                      onClick={() => navigate(`/host/session/${s.sessionId}`)}
+                      className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-slate-50/80 transition cursor-pointer group"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-rose-600 transition">
+                            {s.title}
+                          </span>
+                          <span
+                            className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              effStatus === 'COMPLETED'
+                                ? 'bg-slate-100 text-slate-700'
+                                : effStatus === 'ACTIVE'
+                                ? 'bg-emerald-100 text-emerald-800 animate-pulse'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {effStatus === 'COMPLETED' ? 'Đã xong' : effStatus === 'ACTIVE' ? 'Đang diễn ra' : 'Sắp tới'}
+                          </span>
+                        </div>
                       <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-slate-500 font-medium flex-wrap">
                         <span className="flex items-center gap-1">
                           <Calendar size={12} className="text-slate-400" />
@@ -434,7 +447,8 @@ export const HostOverviewView: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                )
+              })}
               </div>
             ) : (
               <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
