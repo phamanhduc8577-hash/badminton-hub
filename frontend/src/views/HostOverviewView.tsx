@@ -71,16 +71,16 @@ export const HostOverviewView: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950 rounded-3xl p-5 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 bg-rose-600/20 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-600/30 border border-rose-500/40 text-rose-300 text-xs font-bold tracking-wide">
-              <ShieldCheck size={14} />
-              <span>Host Financial & Management Console</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600/30 border border-rose-500/40 text-rose-300 text-[11px] sm:text-xs font-bold tracking-wide">
+              <ShieldCheck size={13} />
+              <span>Host Financial Console</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+            <h1 className="text-xl sm:text-3xl font-black tracking-tight">
               Báo Cáo Tổng Quan CLB
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-medium">
@@ -89,25 +89,25 @@ export const HostOverviewView: React.FC = () => {
           </div>
 
           {/* Month Navigator */}
-          <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/15">
+          <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-3 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/15">
             <button
               onClick={handlePrevMonth}
-              className="p-2 hover:bg-white/20 rounded-xl transition text-white"
+              className="p-2 hover:bg-white/20 rounded-xl transition text-white active:scale-95"
               title="Tháng trước"
             >
               <ChevronLeft size={18} />
             </button>
-            <div className="px-3 text-center">
-              <span className="text-[10px] text-slate-300 block font-bold uppercase tracking-wider">
+            <div className="px-3 text-center flex-1 sm:flex-initial">
+              <span className="text-[9px] sm:text-[10px] text-slate-300 block font-bold uppercase tracking-wider">
                 Tháng thống kê
               </span>
-              <span className="text-base font-black text-white">
+              <span className="text-sm sm:text-base font-black text-white">
                 {selectedMonth.toString().padStart(2, '0')}/{selectedYear}
               </span>
             </div>
             <button
               onClick={handleNextMonth}
-              className="p-2 hover:bg-white/20 rounded-xl transition text-white"
+              className="p-2 hover:bg-white/20 rounded-xl transition text-white active:scale-95"
               title="Tháng sau"
             >
               <ChevronRight size={18} />
@@ -357,19 +357,19 @@ export const HostOverviewView: React.FC = () => {
           </div>
 
           {/* Detailed Session Summaries Table / Live List */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden space-y-4 p-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden space-y-4 p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-950">
+                <h3 className="text-sm sm:text-base font-black text-slate-950">
                   Lịch Sử & Báo Cáo Từng Ca Đánh ({selectedMonth}/{selectedYear})
                 </h3>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">
                   Bấm vào ca đánh bất kỳ để mở Host Panel điều hành trực tiếp
                 </p>
               </div>
               <button
                 onClick={() => navigate('/host/create-session')}
-                className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                className="w-full sm:w-auto px-4 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow-sm text-center"
               >
                 + Tạo ca mới
               </button>
@@ -381,15 +381,15 @@ export const HostOverviewView: React.FC = () => {
                   <div
                     key={s.sessionId}
                     onClick={() => navigate(`/host/session/${s.sessionId}`)}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/80 transition cursor-pointer group"
+                    className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-slate-50/80 transition cursor-pointer group"
                   >
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-slate-900 group-hover:text-rose-600 transition">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-rose-600 transition">
                           {s.title}
                         </span>
                         <span
-                          className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                          className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
                             s.status === 'COMPLETED'
                               ? 'bg-slate-100 text-slate-700'
                               : s.status === 'ACTIVE'
@@ -400,14 +400,14 @@ export const HostOverviewView: React.FC = () => {
                           {s.status === 'COMPLETED' ? 'Đã xong' : s.status === 'ACTIVE' ? 'Đang diễn ra' : 'Sắp tới'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+                      <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-slate-500 font-medium flex-wrap">
                         <span className="flex items-center gap-1">
-                          <Calendar size={13} className="text-slate-400" />
+                          <Calendar size={12} className="text-slate-400" />
                           {s.startTime ? new Date(s.startTime).toLocaleDateString('vi-VN') : '--'}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
-                          <Clock size={13} className="text-slate-400" />
+                          <Clock size={12} className="text-slate-400" />
                           {s.startTime ? new Date(s.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--'}
                         </span>
                         <span>•</span>
@@ -415,12 +415,12 @@ export const HostOverviewView: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-6">
+                    <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                       <div className="text-left sm:text-right">
-                        <div className="text-xs text-slate-500">
+                        <div className="text-[11px] sm:text-xs text-slate-500">
                           Thu: <b className="text-slate-800">{formatVnd(s.totalRevenue)}</b> | Chi: <b className="text-rose-600">{formatVnd(s.totalExpenses)}</b>
                         </div>
-                        <div className="text-sm font-black mt-0.5">
+                        <div className="text-xs sm:text-sm font-black mt-0.5">
                           Lãi ròng:{' '}
                           <span className={(s.netProfit || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
                             {formatVnd(s.netProfit)}
@@ -428,9 +428,9 @@ export const HostOverviewView: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold group-hover:bg-rose-700 transition shadow-xs">
+                      <div className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-rose-600 text-white text-[11px] sm:text-xs font-bold group-hover:bg-rose-700 transition shadow-xs shrink-0">
                         <span>Host Panel</span>
-                        <ArrowUpRight size={14} />
+                        <ArrowUpRight size={13} />
                       </div>
                     </div>
                   </div>
