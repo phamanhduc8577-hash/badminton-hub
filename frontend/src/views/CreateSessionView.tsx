@@ -105,12 +105,17 @@ export const CreateSessionView: React.FC = () => {
       if (sessionHours < 2) {
         throw new Error('Thời lượng ca đánh phải tối thiểu 2 tiếng (120 phút)!')
       }
+      const formatToFullIso = (val: string) => {
+        if (!val) return val
+        return val.length === 16 ? `${val}:00` : val
+      }
+
       const res = await api.post('/sessions', {
         title,
         venueName: venueName.trim(),
         venueAddress: venueAddress.trim(),
-        startTime,
-        endTime,
+        startTime: formatToFullIso(startTime),
+        endTime: formatToFullIso(endTime),
         maxSlots,
         courtCount,
         courtNames,

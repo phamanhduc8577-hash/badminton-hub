@@ -149,14 +149,20 @@ export const SessionListView: React.FC = () => {
       }
     }
 
+    // Đảm bảo định dạng chuẩn ISO giây "YYYY-MM-DDTHH:mm:ss" tương thích 100% mọi API Backend
+    const formatToFullIso = (val: string) => {
+      if (!val) return undefined
+      return val.length === 16 ? `${val}:00` : val
+    }
+
     updateSessionMutation.mutate({
       sessionId: editingSession.id,
       payload: {
         title: editForm.title || editingSession.title,
         courtNames: editForm.courtNames,
         maxSlots: Number(editForm.maxSlots),
-        startTime: editForm.startTime || undefined,
-        endTime: editForm.endTime || undefined,
+        startTime: formatToFullIso(editForm.startTime),
+        endTime: formatToFullIso(editForm.endTime),
         venueName: editForm.venueName,
         venueAddress: editForm.venueAddress,
         memberMalePrice: Number(editForm.memberMalePrice),
