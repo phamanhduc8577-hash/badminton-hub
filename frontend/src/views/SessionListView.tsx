@@ -26,6 +26,10 @@ import {
   Gift,
   Coins,
   Swords,
+  Filter,
+  Calendar,
+  History,
+  CheckCircle,
 } from 'lucide-react'
 
 export const SessionListView: React.FC = () => {
@@ -57,6 +61,9 @@ export const SessionListView: React.FC = () => {
     costDrinks: 0,
     depositAmount: 0,
   })
+
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE_UPCOMING' | 'COMPLETED'>('ALL')
+  const [showAllCompleted, setShowAllCompleted] = useState(false)
 
   const { data: sessions, isLoading, error } = useQuery<SessionItem[]>({
     queryKey: ['sessions'],
@@ -182,6 +189,66 @@ export const SessionListView: React.FC = () => {
   const formatDateTime = (dateStr: string) => {
     return formatSessionDateTime(dateStr)
   }
+
+  // Phân loại & sắp xếp ca đánh tối ưu UX (Ưu tiên Sắp diễn ra/Đang diễn ra lên đầu)
+  const sortedAndFilteredSessions = React.useMemo(() => {
+    if (!sessions) return []
+
+    const listWithStatus = sessions.map((s) => ({
+      ...s,
+      effectiveStatus: getEffectiveStatus(s),
+    }))
+
+    // Sắp xếp: ACTIVE (0) -> UPCOMING (1) -> COMPLETED (2) -> CANCELLED (3)
+    // Cùng nhóm ACTIVE/UPCOMING thì ca nào bắt đầu sớm hơn xếp trước
+    // Nhóm COMPLETED thì ca nào mới kết thúc nhất xếp trước
+    const sorted = [...listWithStatus].sort((a, b) => {
+      const orderMap: Record<string, number> = {
+        ACTIVE: 0,
+        UPCOMING: 1,
+        COMPLETED: 2,
+        CANCELLED: 3,
+      }
+      const orderA = orderMap[a.effectiveStatus] ?? 99
+      const orderB = orderMap[b.effectiveStatus] ?? 99
+
+      if (orderA !== orderB) return orderA - orderB
+
+      const timeA = new Date(a.startTime).getTime()
+      const timeB = new Date(b.startTime).getTime()
+
+      if (a.effectiveStatus === 'COMPLETED' || a.effectiveStatus === 'CANCELLED') {
+        return timeB - timeA // Ca mới kết thúc xếp trên
+      }
+      return timeA - timeB // Ca sắp tới gần nhất xếp trên
+    })
+
+    if (statusFilter === 'ACTIVE_UPCOMING') {
+      return sorted.filter((s) => s.effectiveStatus === 'ACTIVE' || s.effectiveStatus === 'UPCOMING')
+    }
+    if (statusFilter === 'COMPLETED') {
+      return sorted.filter((s) => s.effectiveStatus === 'COMPLETED' || s.effectiveStatus === 'CANCELLED')
+    }
+
+    return sorted
+  }, [sessions, statusFilter])
+
+  // Thống kê nhanh số lượng theo trạng thái
+  const counts = React.useMemo(() => {
+    if (!sessions) return { total: 0, activeUpcoming: 0, completed: 0 }
+    let activeUpcoming = 0
+    let completed = 0
+    sessions.forEach((s) => {
+      const st = getEffectiveStatus(s)
+      if (st === 'ACTIVE' || st === 'UPCOMING') activeUpcoming++
+      else completed++
+    })
+    return {
+      total: sessions.length,
+      activeUpcoming,
+      completed,
+    }
+  }, [sessions])
 
   return (
     <div className="space-y-10">
@@ -320,7 +387,7 @@ export const SessionListView: React.FC = () => {
 
       {/* 2. Main Sessions Grid Feed */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl font-black text-slate-950 flex items-center gap-2.5 tracking-tight">
               <Sparkles size={22} className="text-rose-600" />
@@ -330,10 +397,45 @@ export const SessionListView: React.FC = () => {
               Đăng ký slot, điểm danh QR GPS và bắt kèo trực tiếp trên hệ thống
             </p>
           </div>
-          <span className="text-xs text-slate-600 font-bold hidden sm:flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Cập nhật thời gian thực</span>
-          </span>
+
+          {/* Status Filter Tabs - Mobile Responsive Pill Group */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-200/80 rounded-2xl w-full sm:w-auto overflow-x-auto shadow-inner">
+            <button
+              onClick={() => setStatusFilter('ALL')}
+              className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                statusFilter === 'ALL'
+                  ? 'bg-white text-slate-950 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              <Calendar size={13} />
+              <span>Tất cả ({counts.total})</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('ACTIVE_UPCOMING')}
+              className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                statusFilter === 'ACTIVE_UPCOMING'
+                  ? 'bg-slate-950 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              <Zap size={13} className={statusFilter === 'ACTIVE_UPCOMING' ? 'text-amber-400' : 'text-amber-600'} />
+              <span>Sắp tới ({counts.activeUpcoming})</span>
+            </button>
+
+            <button
+              onClick={() => setStatusFilter('COMPLETED')}
+              className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                statusFilter === 'COMPLETED'
+                  ? 'bg-white text-slate-950 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              <History size={13} />
+              <span>Lịch sử ({counts.completed})</span>
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -345,37 +447,61 @@ export const SessionListView: React.FC = () => {
           <div className="text-center py-16 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-sm font-bold">
             Không thể kết nối máy chủ backend. Vui lòng kiểm tra lại.
           </div>
-        ) : sessions?.length === 0 ? (
-          <div className="text-center py-20 saas-card rounded-2xl space-y-3 border border-slate-200">
+        ) : sortedAndFilteredSessions.length === 0 ? (
+          <div className="text-center py-16 saas-card rounded-3xl space-y-3 border border-slate-200">
             <DuckMascot size={64} rounded="2xl" className="mx-auto opacity-70" />
-            <p className="text-slate-950 font-black text-lg">Hiện chưa có ca đánh nào được mở</p>
-            <p className="text-slate-500 text-xs font-semibold">Vui lòng quay lại sau hoặc liên hệ Host anhduck.</p>
+            <p className="text-slate-950 font-black text-lg">
+              {statusFilter === 'ACTIVE_UPCOMING'
+                ? 'Không có ca đánh nào đang mở hoặc sắp diễn ra'
+                : statusFilter === 'COMPLETED'
+                ? 'Chưa có ca đánh nào kết thúc'
+                : 'Hiện chưa có ca đánh nào được mở'}
+            </p>
+            <p className="text-slate-500 text-xs font-semibold">
+              {statusFilter !== 'ALL'
+                ? 'Bạn có thể chọn tab "Tất cả" để xem toàn bộ lịch hoạt động.'
+                : 'Vui lòng quay lại sau hoặc liên hệ Host.'}
+            </p>
+            {statusFilter !== 'ALL' && (
+              <button
+                onClick={() => setStatusFilter('ALL')}
+                className="mt-2 px-4 py-2 bg-slate-950 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition"
+              >
+                Xem tất cả ca
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sessions?.map((session) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            {sortedAndFilteredSessions.map((session) => {
               const start = formatDateTime(session.startTime)
               const end = formatDateTime(session.endTime)
               const isFull = session.bookedSlots >= session.maxSlots
-              const effectiveStatus = getEffectiveStatus(session)
+              const effectiveStatus = session.effectiveStatus
 
               return (
                 <div
                   key={session.id}
                   onClick={() => navigate(`/sessions/${session.id}`)}
-                  className="saas-card-interactive rounded-2xl p-6 cursor-pointer flex flex-col justify-between group relative border border-slate-300 shadow-lg shadow-slate-900/[0.04]"
+                  className={`saas-card-interactive rounded-3xl p-5 sm:p-6 cursor-pointer flex flex-col justify-between group relative border transition-all duration-200 ${
+                    effectiveStatus === 'ACTIVE'
+                      ? 'border-rose-400/80 shadow-xl shadow-rose-600/10 ring-2 ring-rose-500/20 bg-gradient-to-b from-rose-50/20 to-white'
+                      : effectiveStatus === 'UPCOMING'
+                      ? 'border-slate-300 shadow-lg shadow-slate-900/[0.04]'
+                      : 'border-slate-200/80 bg-slate-50/50 opacity-90 hover:opacity-100 shadow-sm'
+                  }`}
                 >
-                  <div className="space-y-4">
+                  <div className="space-y-3.5 sm:space-y-4">
                     {/* Header Badges */}
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                         <span
-                          className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${
+                          className={`text-[10px] font-black uppercase px-2.5 sm:px-3 py-1 rounded-full border ${
                             effectiveStatus === 'ACTIVE'
                               ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-sm animate-pulse'
                               : effectiveStatus === 'UPCOMING'
                               ? 'bg-slate-950 text-white border-slate-950 shadow-sm'
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                              : 'bg-slate-200/80 text-slate-600 border-slate-300'
                           }`}
                         >
                           {effectiveStatus === 'ACTIVE'
@@ -386,14 +512,14 @@ export const SessionListView: React.FC = () => {
                         </span>
 
                         {session.courtNames && (
-                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-300">
+                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white text-slate-800 border border-slate-200 shadow-2xs">
                             🏸 {session.courtNames}
                           </span>
                         )}
                       </div>
 
                       <span
-                        className={`text-xs font-black px-3 py-1 rounded-lg border ${
+                        className={`text-[11px] sm:text-xs font-black px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-lg border ${
                           isFull
                             ? 'bg-rose-50 text-rose-700 border-rose-300'
                             : 'bg-emerald-50 text-emerald-800 border-emerald-300'
@@ -404,69 +530,69 @@ export const SessionListView: React.FC = () => {
                     </div>
 
                     {/* Title */}
-                    <h3 className="font-black text-lg text-slate-950 group-hover:text-rose-700 transition leading-snug">
+                    <h3 className="font-black text-base sm:text-lg text-slate-950 group-hover:text-rose-700 transition leading-snug line-clamp-2">
                       {session.title}
                     </h3>
 
                     {/* Venue & Location Details Box */}
-                    <div className="space-y-2 text-xs text-slate-700 bg-slate-50/90 p-4 rounded-xl border border-slate-200">
+                    <div className="space-y-2 text-xs text-slate-700 bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200/80">
                       <div className="flex items-center gap-2">
-                        <MapPin size={15} className="text-slate-950 shrink-0" />
+                        <MapPin size={14} className="text-slate-950 shrink-0" />
                         <span className="truncate font-bold text-slate-950">{session.venueName}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Clock size={15} className="text-slate-500 shrink-0" />
+                        <Clock size={14} className="text-slate-500 shrink-0" />
                         <span className="text-slate-800 font-semibold">
                           {start.day}, {start.time} - {end.time}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-slate-600 text-[11px] font-medium pt-0.5">
-                        <Users size={14} className="text-slate-500 shrink-0" />
+                        <Users size={13} className="text-slate-500 shrink-0" />
                         <span>Host: <b className="text-slate-950 font-bold">{session.hostName}</b></span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Perks & Benefits Bottom Bar (Option 1) */}
-                  <div className="mt-5 pt-3.5 border-t border-slate-200 flex items-center justify-between text-xs">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
+                  {/* Perks & Benefits Bottom Bar */}
+                  <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs gap-2">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <Sparkles size={13} className="text-amber-500 shrink-0" />
-                        <span className="text-[11px] text-slate-800 font-black">Ưu đãi ca đánh:</span>
+                        <span className="text-[10px] sm:text-[11px] text-slate-800 font-black">Ưu đãi:</span>
                         {session.startTime && session.endTime && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white text-slate-700 border border-slate-200">
                             Ca {Math.round(((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60)) * 10) / 10}h
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 text-[11px] text-slate-600 font-medium">
+                      <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
                         <span className="text-rose-600 font-bold">Trợ giá Nữ</span>
                         <span>•</span>
-                        <span>Tích điểm đổi nước & voucher</span>
+                        <span>Tích điểm đổi nước</span>
                       </div>
                     </div>
 
                     {user?.role === 'HOST' && (
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             navigate(`/host/session/${session.id}`)
                           }}
-                          className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-black z-10"
-                          title="Mở ngay Bảng điều khiển Host (Bắt kèo, Điểm danh, Thu tiền)"
+                          className="px-2 sm:px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition flex items-center gap-1 text-[10px] sm:text-[11px] font-black z-10 active:scale-95 cursor-pointer"
+                          title="Mở Bảng điều khiển Host (Bắt kèo, Điểm danh, Thu tiền)"
                         >
-                          <ShieldCheck size={13} />
-                          <span>Host Panel</span>
+                          <ShieldCheck size={12} />
+                          <span className="hidden xs:inline">Host Panel</span>
                         </button>
 
                         <button
                           onClick={(e) => handleOpenEditModal(e, session)}
-                          className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-300 rounded-lg shadow-xs transition flex items-center gap-1 text-[11px] font-bold z-10"
+                          className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-200 rounded-xl shadow-2xs transition flex items-center gap-1 text-[10px] sm:text-[11px] font-bold z-10 active:scale-95 cursor-pointer"
                           title="Sửa nhanh ngày giờ, sân & bảng giá ca đánh này"
                         >
-                          <Settings size={13} className="text-slate-600" />
-                          <span>Sửa ca</span>
+                          <Settings size={12} className="text-slate-600" />
+                          <span className="hidden sm:inline">Sửa ca</span>
                         </button>
                       </div>
                     )}
