@@ -17,6 +17,9 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     List<Session> findByStatusOrderByStartTimeDesc(SessionStatus status);
     List<Session> findAllByOrderByStartTimeDesc();
 
+    @Query("SELECT s FROM Session s WHERE s.startTime >= :start AND s.startTime <= :end ORDER BY s.startTime DESC")
+    List<Session> findByStartTimeBetweenOrderByStartTimeDesc(@Param("start") java.time.LocalDateTime start, @Param("end") java.time.LocalDateTime end);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Session s WHERE s.id = :id")
     Optional<Session> findByIdWithLock(@Param("id") Long id);

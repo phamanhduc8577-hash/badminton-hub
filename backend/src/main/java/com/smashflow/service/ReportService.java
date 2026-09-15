@@ -126,4 +126,138 @@ public class ReportService {
             st[1]++;
         }
     }
+
+    public com.smashflow.dto.MonthlyFinancialReport getMonthlyFinancialReport(int year, int month) {
+        java.time.LocalDateTime start = java.time.LocalDateTime.of(year, month, 1, 0, 0, 0);
+        java.time.YearMonth ym = java.time.YearMonth.of(year, month);
+        java.time.LocalDateTime end = ym.atEndOfMonth().atTime(23, 59, 59);
+
+        List<Session> sessions = sessionRepository.findByStartTimeBetweenOrderByStartTimeDesc(start, end);
+
+        BigDecimal totalRevenue = BigDecimal.ZERO;
+        BigDecimal totalExpenses = BigDecimal.ZERO;
+        BigDecimal totalDepositCollected = BigDecimal.ZERO;
+        BigDecimal totalCourt = BigDecimal.ZERO;
+        BigDecimal totalShuttle = BigDecimal.ZERO;
+        BigDecimal totalDrinks = BigDecimal.ZERO;
+
+        int totalPlayerTurnout = 0;
+        int totalCheckedIn = 0;
+        int fixedMemberTurnout = 0;
+        int guestTurnout = 0;
+        int maleTurnout = 0;
+        int femaleTurnout = 0;
+        int vietQrPayments = 0;
+        int cashPayments = 0;
+        int unpaidCount = 0;
+
+        List<com.smashflow.dto.MonthlyFinancialReport.SessionFinancialSummary> summaries = new java.util.ArrayList<>();
+        Map<Long, com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.TopActivePlayerBuilder> userActiveMap = new HashMap<>();
+
+        for (Session session : sessions) {
+            HostSessionReport sRep = getSessionFinancialReport(session.getId());
+
+            totalRevenue = totalRevenue.add(sRep.getTotalRevenue());
+            totalExpenses = totalExpenses.add(sRep.getTotalExpenses());
+            totalDepositCollected = totalDepositCollected.add(sRep.getTotalDepositCollected());
+            totalCourt = totalCourt.add(sRep.getCostCourt());
+            totalShuttle = totalShuttle.add(sRep.getCostShuttlecock());
+            totalDrinks = totalDrinks.add(sRep.getCostDrinks() != null ? sRep.getCostDrinks() : BigDecimal.ZERO);
+
+            totalPlayerTurnout += sRep.getTotalPlayers();
+            totalCheckedIn += sRep.getCheckedInPlayers();
+
+            List<SessionParticipant> parts = participantRepository.findBySessionId(session.getId());
+            for (SessionParticipant p : parts) {
+                if (p.getCheckinStatus() != CheckinStatus.ABSENT) {
+                    if (p.getIsGuest() != null && p.getIsGuest()) {
+                        guestTurnout++;
+                    } else {
+                        fixedMemberTurnout++;
+                    }
+
+                    if (p.getGender() == Gender.FEMALE) {
+                        femaleTurnout++;
+                    } else {
+                        maleTurnout++;
+                    }
+
+                    if (p.getPaymentStatus() == PaymentStatus.PAID) {
+                        if (p.getPaymentMethod() == PaymentMethod.CASH) {
+                            cashPayments++;
+                        } else {
+                            vietQrPayments++;
+                        }
+                    } else {
+                        unpaidCount++;
+                    }
+
+                    if (p.getUser() != null) {
+                        User u = p.getUser();
+                        userActiveMap.computeIfAbsent(u.getId(), k -> com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.builder()
+                                .userId(u.getId())
+                                .fullName(u.getFullName())
+                                .avatarUrl(u.getAvatarUrl())
+                                .membershipType(u.getMembershipType() != null ? u.getMembershipType().name() : "CASUAL")
+                                .sessionsAttended(0)
+                                .winCount(u.getWinCount() != null ? u.getWinCount() : 0)
+                                .lossCount(u.getLossCount() != null ? u.getLossCount() : 0)
+                        );
+                        if (p.getCheckinStatus() == CheckinStatus.CHECKED_IN) {
+                            com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.TopActivePlayerBuilder b = userActiveMap.get(u.getId());
+                            // increment attended in month
+                        }
+                    }
+                }
+            }
+
+            summaries.add(com.smashflow.dto.MonthlyFinancialReport.SessionFinancialSummary.builder()
+                    .sessionId(session.getId())
+                    .title(session.getTitle())
+                    .startTime(session.getStartTime() != null ? session.getStartTime().toString() : null)
+                    .endTime(session.getEndTime() != null ? session.getEndTime().toString() : null)
+                    .status(session.getStatus().name())
+                    .totalPlayers(sRep.getTotalPlayers())
+                    .checkedInPlayers(sRep.getCheckedInPlayers())
+                    .totalRevenue(sRep.getTotalRevenue())
+                    .totalExpenses(sRep.getTotalExpenses())
+                    .netProfit(sRep.getNetProfit())
+                    .mvpName(sRep.getMvpName())
+                    .build());
+        }
+
+        BigDecimal netProfit = totalRevenue.subtract(totalExpenses);
+        double attRate = totalPlayerTurnout > 0 ? (double) totalCheckedIn / totalPlayerTurnout * 100.0 : 0.0;
+
+        List<com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer> topPlayers = userActiveMap.values().stream()
+                .map(com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.TopActivePlayerBuilder::build)
+                .sorted((a, b) -> Integer.compare(b.getWinCount(), a.getWinCount()))
+                .limit(8)
+                .toList();
+
+        return com.smashflow.dto.MonthlyFinancialReport.builder()
+                .year(year)
+                .month(month)
+                .totalRevenue(totalRevenue)
+                .totalExpenses(totalExpenses)
+                .netProfit(netProfit)
+                .totalDepositCollected(totalDepositCollected)
+                .costCourt(totalCourt)
+                .costShuttlecock(totalShuttle)
+                .costDrinks(totalDrinks)
+                .totalSessions(sessions.size())
+                .totalPlayerTurnout(totalPlayerTurnout)
+                .checkedInPlayers(totalCheckedIn)
+                .attendanceRate(Math.round(attRate * 10.0) / 10.0)
+                .fixedMemberTurnout(fixedMemberTurnout)
+                .guestTurnout(guestTurnout)
+                .maleTurnout(maleTurnout)
+                .femaleTurnout(femaleTurnout)
+                .vietQrPayments(vietQrPayments)
+                .cashPayments(cashPayments)
+                .unpaidCount(unpaidCount)
+                .sessionSummaries(summaries)
+                .topPlayers(topPlayers)
+                .build();
+    }
 }

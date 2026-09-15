@@ -22,4 +22,16 @@ public class ReportController {
     public ResponseEntity<HostSessionReport> getSessionFinancialReport(@PathVariable Long sessionId) {
         return ResponseEntity.ok(reportService.getSessionFinancialReport(sessionId));
     }
+
+    @GetMapping("/monthly")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<com.smashflow.dto.MonthlyFinancialReport> getMonthlyFinancialReport(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer year,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer month
+    ) {
+        java.time.LocalDate now = java.time.LocalDate.now();
+        int targetYear = (year != null && year > 2000) ? year : now.getYear();
+        int targetMonth = (month != null && month >= 1 && month <= 12) ? month : now.getMonthValue();
+        return ResponseEntity.ok(reportService.getMonthlyFinancialReport(targetYear, targetMonth));
+    }
 }

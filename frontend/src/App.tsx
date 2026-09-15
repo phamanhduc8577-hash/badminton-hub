@@ -7,6 +7,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { SessionListView } from './views/SessionListView'
 import { SessionDetailView } from './views/SessionDetailView'
 import { HostDashboardView } from './views/HostDashboardView'
+import { HostOverviewView } from './views/HostOverviewView'
 import { CreateSessionView } from './views/CreateSessionView'
 import { LeaderboardView } from './views/LeaderboardView'
 import { LoyaltyView } from './views/LoyaltyView'
@@ -46,7 +47,7 @@ function App() {
                   path="host"
                   element={
                     user?.role === 'HOST' ? (
-                      <SessionListView />
+                      <HostOverviewView />
                     ) : (
                       <Navigate to="/login" replace />
                     )

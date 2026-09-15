@@ -173,3 +173,48 @@ export interface HostReport {
   mvpWins?: number
   mvpLosses?: number
 }
+
+export interface MonthlyReport {
+  year: number
+  month: number
+  totalRevenue: number
+  totalExpenses: number
+  netProfit: number
+  totalDepositCollected: number
+  costCourt: number
+  costShuttlecock: number
+  costDrinks: number
+  totalSessions: number
+  totalPlayerTurnout: number
+  checkedInPlayers: number
+  attendanceRate: number
+  fixedMemberTurnout: number
+  guestTurnout: number
+  maleTurnout: number
+  femaleTurnout: number
+  vietQrPayments: number
+  cashPayments: number
+  unpaidCount: number
+  sessionSummaries: {
+    sessionId: number
+    title: string
+    startTime?: string
+    endTime?: string
+    status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
+    totalPlayers: number
+    checkedInPlayers: number
+    totalRevenue: number
+    totalExpenses: number
+    netProfit: number
+    mvpName?: string
+  }[]
+  topPlayers: {
+    userId: number
+    fullName: string
+    avatarUrl?: string
+    membershipType: string
+    sessionsAttended: number
+    winCount: number
+    lossCount: number
+  }[]
+}
