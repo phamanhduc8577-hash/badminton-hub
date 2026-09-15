@@ -6,6 +6,7 @@ import { SessionItem } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
+import { formatSessionDateTime } from '../lib/dateUtils'
 import {
   Clock,
   MapPin,
@@ -179,10 +180,7 @@ export const SessionListView: React.FC = () => {
   }
 
   const formatDateTime = (dateStr: string) => {
-    const d = new Date(dateStr)
-    const day = d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })
-    const time = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-    return { day, time }
+    return formatSessionDateTime(dateStr)
   }
 
   return (

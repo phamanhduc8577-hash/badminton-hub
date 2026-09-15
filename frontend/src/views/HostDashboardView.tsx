@@ -8,6 +8,7 @@ import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
 import { getPlayerRankDisplay, getLolRank } from '../lib/ranks'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { formatMatchTime } from '../lib/dateUtils'
 import {
   Users,
   Swords,
@@ -1487,10 +1488,7 @@ export const HostDashboardView: React.FC = () => {
                           </span>
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-400 font-mono">
-                              {new Date(m.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                              {formatMatchTime(m.createdAt)}
                             </span>
                             <button
                               onClick={() => openEditMatchModal(m)}

@@ -8,6 +8,7 @@ import { QrCameraScanner } from '../components/QrCameraScanner'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
 import { notifyNewBookingDirect } from '../lib/telegram'
+import { formatSessionDateTime } from '../lib/dateUtils'
 import {
   Clock,
   MapPin,
@@ -353,15 +354,10 @@ export const SessionDetailView: React.FC = () => {
                   <span>Khung giờ ca đánh</span>
                 </div>
                 <p className="text-slate-900 font-bold text-sm mt-1">
-                  {new Date(session.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} -{' '}
-                  {new Date(session.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  {formatSessionDateTime(session.startTime).time} - {formatSessionDateTime(session.endTime).time}
                 </p>
                 <p className="text-slate-600 text-[11px] font-medium">
-                  {new Date(session.startTime).toLocaleDateString('vi-VN', {
-                    weekday: 'long',
-                    day: '2-digit',
-                    month: '2-digit',
-                  })}
+                  {formatSessionDateTime(session.startTime).day}
                 </p>
               </div>
             </div>
