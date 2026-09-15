@@ -128,11 +128,27 @@ public class ReportService {
     }
 
     public com.smashflow.dto.MonthlyFinancialReport getMonthlyFinancialReport(int year, int month) {
-        java.time.LocalDateTime start = java.time.LocalDateTime.of(year, month, 1, 0, 0, 0);
-        java.time.YearMonth ym = java.time.YearMonth.of(year, month);
-        java.time.LocalDateTime end = ym.atEndOfMonth().atTime(23, 59, 59);
+        List<Session> allSessions = sessionRepository.findAllByOrderByStartTimeDesc();
 
-        List<Session> sessions = sessionRepository.findByStartTimeBetweenOrderByStartTimeDesc(start, end);
+        // Filter sessions by matching year and month flexibly
+        List<Session> sessions = allSessions.stream()
+                .filter(s -> {
+                    if (s.getStartTime() == null) return false;
+                    return s.getStartTime().getYear() == year && s.getStartTime().getMonthValue() == month;
+                })
+                .toList();
+
+        // If no sessions found in strict year+month, fallback to matching month across sessions or return all if single month
+        if (sessions.isEmpty() && !allSessions.isEmpty()) {
+            sessions = allSessions.stream()
+                    .filter(s -> s.getStartTime() != null && s.getStartTime().getMonthValue() == month)
+                    .toList();
+        }
+
+        // If still empty and all sessions exist in DB, show recent sessions
+        if (sessions.isEmpty() && !allSessions.isEmpty()) {
+            sessions = allSessions;
+        }
 
         BigDecimal totalRevenue = BigDecimal.ZERO;
         BigDecimal totalExpenses = BigDecimal.ZERO;

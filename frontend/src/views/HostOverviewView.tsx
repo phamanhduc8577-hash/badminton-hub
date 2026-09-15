@@ -27,8 +27,13 @@ import { DuckMascot } from '../components/DuckMascot'
 export const HostOverviewView: React.FC = () => {
   const navigate = useNavigate()
   const now = new Date()
-  const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1)
+  const [selectedYear, setSelectedYear] = useState<number>(() => {
+    // If year is 2026/2025
+    return now.getFullYear()
+  })
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => {
+    return now.getMonth() + 1
+  })
 
   const { data: report, isLoading } = useQuery<MonthlyReport>({
     queryKey: ['monthly-report', selectedYear, selectedMonth],
