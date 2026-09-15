@@ -51,6 +51,10 @@ export const SessionListView: React.FC = () => {
     memberFemalePrice2h: 0,
     guestMalePrice2h: 0,
     guestFemalePrice2h: 0,
+    costCourt: 0,
+    costShuttlecock: 0,
+    costDrinks: 0,
+    depositAmount: 0,
   })
 
   const { data: sessions, isLoading, error } = useQuery<SessionItem[]>({
@@ -110,6 +114,10 @@ export const SessionListView: React.FC = () => {
       memberFemalePrice2h: session.memberFemalePrice2h || 0,
       guestMalePrice2h: session.guestMalePrice2h || 0,
       guestFemalePrice2h: session.guestFemalePrice2h || 0,
+      costCourt: session.costCourt || 0,
+      costShuttlecock: session.costShuttlecock || 0,
+      costDrinks: session.costDrinks || 0,
+      depositAmount: session.depositAmount || 0,
     })
   }
 
@@ -151,6 +159,10 @@ export const SessionListView: React.FC = () => {
         memberFemalePrice2h: editForm.memberFemalePrice2h ? Number(editForm.memberFemalePrice2h) : null,
         guestMalePrice2h: editForm.guestMalePrice2h ? Number(editForm.guestMalePrice2h) : null,
         guestFemalePrice2h: editForm.guestFemalePrice2h ? Number(editForm.guestFemalePrice2h) : null,
+        costCourt: Number(editForm.costCourt || 0),
+        costShuttlecock: Number(editForm.costShuttlecock || 0),
+        costDrinks: Number(editForm.costDrinks || 0),
+        depositAmount: Number(editForm.depositAmount || 0),
       },
     })
   }
@@ -679,6 +691,52 @@ export const SessionListView: React.FC = () => {
                       type="number"
                       value={editForm.guestFemalePrice2h || 0}
                       onChange={(e) => setEditForm({ ...editForm, guestFemalePrice2h: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Chi phí vận hành ca & Tiền cọc */}
+              <div className="p-3.5 bg-rose-50/50 rounded-2xl border border-rose-200/80 space-y-2.5">
+                <div className="text-[11px] font-black uppercase text-rose-900 tracking-wider flex items-center justify-between">
+                  <span>🧾 Chi phí vận hành ca & Cọc (VNĐ)</span>
+                  <span className="text-[10px] font-normal text-slate-500">Tự động tính lãi lỗ</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Tiền thuê sân</label>
+                    <input
+                      type="number"
+                      value={editForm.costCourt || 0}
+                      onChange={(e) => setEditForm({ ...editForm, costCourt: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Tiền cầu lông</label>
+                    <input
+                      type="number"
+                      value={editForm.costShuttlecock || 0}
+                      onChange={(e) => setEditForm({ ...editForm, costShuttlecock: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Nước uống / Khác</label>
+                    <input
+                      type="number"
+                      value={editForm.costDrinks || 0}
+                      onChange={(e) => setEditForm({ ...editForm, costDrinks: Number(e.target.value) })}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Mức cọc (Vãng lai)</label>
+                    <input
+                      type="number"
+                      value={editForm.depositAmount || 0}
+                      onChange={(e) => setEditForm({ ...editForm, depositAmount: Number(e.target.value) })}
                       className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
                     />
                   </div>
