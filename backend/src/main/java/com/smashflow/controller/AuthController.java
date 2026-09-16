@@ -29,9 +29,8 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<java.util.Map<String, String>> forgotPassword(@Valid @RequestBody com.smashflow.dto.ForgotPasswordRequest request) {
-        String message = authService.requestForgotPassword(request.getPhone());
-        return ResponseEntity.ok(java.util.Map.of("message", message));
+    public ResponseEntity<com.smashflow.dto.ForgotPasswordResponse> forgotPassword(@Valid @RequestBody com.smashflow.dto.ForgotPasswordRequest request) {
+        return ResponseEntity.ok(authService.requestForgotPassword(request.getPhone()));
     }
 
     @GetMapping("/me")

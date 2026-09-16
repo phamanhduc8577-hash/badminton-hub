@@ -110,7 +110,9 @@ export const LoginView: React.FC = () => {
         setForgotSuccess(res.data?.message || 'Đã gửi yêu cầu cấp lại mật khẩu đến Host qua Telegram!')
 
         // Gửi thông báo trực tiếp qua Telegram (Direct Channel) để đảm bảo 100% Host nhận được tức thì
-        notifyForgotPasswordDirect('Thành viên SmashFlow', cleanPhone).catch(() => {})
+        const userFoundName = res.data?.fullName || 'Thành viên CLB'
+        const tempPass = res.data?.tempPassword
+        notifyForgotPasswordDirect(userFoundName, cleanPhone, tempPass).catch(() => {})
       } else if (isRegister) {
         const cleanPhone = phone.trim()
         const phoneRegex = /^(0[35789])[0-9]{8}$/

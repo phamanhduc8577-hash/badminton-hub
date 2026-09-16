@@ -23,7 +23,7 @@ public class AuthService {
     private final TelegramNotificationService telegramNotificationService;
 
     @Transactional
-    public String requestForgotPassword(String rawPhone) {
+    public com.smashflow.dto.ForgotPasswordResponse requestForgotPassword(String rawPhone) {
         String cleanPhone = rawPhone != null ? rawPhone.trim() : "";
         User user = userRepository.findByPhone(cleanPhone)
                 .orElseThrow(() -> new RuntimeException("Số điện thoại này chưa được đăng ký trong hệ thống SmashFlow!"));
@@ -38,7 +38,11 @@ public class AuthService {
             telegramNotificationService.notifyForgotPasswordRequest(user.getFullName(), user.getPhone(), defaultTempPassword);
         } catch (Exception ignored) {}
 
-        return "Yêu cầu khôi phục mật khẩu đã được gửi đến Host qua Telegram! Vui lòng liên hệ Host hoặc kiểm tra tin nhắn với Host để nhận mật khẩu tạm thời.";
+        return com.smashflow.dto.ForgotPasswordResponse.builder()
+                .message("Yêu cầu khôi phục mật khẩu đã được gửi đến Host qua Telegram! Vui lòng liên hệ Host hoặc kiểm tra tin nhắn với Host để nhận mật khẩu tạm thời.")
+                .fullName(user.getFullName())
+                .tempPassword(defaultTempPassword)
+                .build();
     }
 
     @Transactional
