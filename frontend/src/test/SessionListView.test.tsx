@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
@@ -72,6 +72,8 @@ const createWrapper = () => {
 describe('SessionListView - Tabs & Responsive Filtering', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-15T16:00:00.000Z'))
     useAuthStore.getState().setAuth(
       {
         id: 'host-1',
@@ -83,6 +85,10 @@ describe('SessionListView - Tabs & Responsive Filtering', () => {
       'token-xyz'
     )
     ;(api.get as any).mockResolvedValue({ data: mockSessions })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('renders status filter tabs and counters correctly', async () => {

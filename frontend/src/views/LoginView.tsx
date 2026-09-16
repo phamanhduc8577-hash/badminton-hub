@@ -4,7 +4,7 @@ import { api } from '../lib/api'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
-import { notifyNewUserRegisteredDirect } from '../lib/telegram'
+import { notifyNewUserRegisteredDirect, notifyForgotPasswordDirect } from '../lib/telegram'
 import {
   LogIn,
   UserPlus,
@@ -108,6 +108,9 @@ export const LoginView: React.FC = () => {
         }
         const res = await api.post('/auth/forgot-password', { phone: cleanPhone })
         setForgotSuccess(res.data?.message || 'Đã gửi yêu cầu cấp lại mật khẩu đến Host qua Telegram!')
+
+        // Gửi thông báo trực tiếp qua Telegram (Direct Channel) để đảm bảo 100% Host nhận được tức thì
+        notifyForgotPasswordDirect('Thành viên SmashFlow', cleanPhone).catch(() => {})
       } else if (isRegister) {
         const cleanPhone = phone.trim()
         const phoneRegex = /^(0[35789])[0-9]{8}$/

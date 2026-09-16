@@ -93,6 +93,21 @@ export function notifyDepositReceivedDirect(
   return sendDirectTelegramNotification(msg)
 }
 
+export function notifyForgotPasswordDirect(
+  fullName: string,
+  phone: string,
+  tempPassword?: string
+) {
+  const msg =
+    `🔐 <b>[SmashFlow] YÊU CẦU ĐẶT LẠI MẬT KHẨU!</b>\n\n` +
+    `👤 <b>Thành viên:</b> ${escapeHtml(fullName)}\n` +
+    `📞 <b>Số điện thoại:</b> <code>${escapeHtml(phone)}</code>\n` +
+    (tempPassword ? `🔑 <b>Mật khẩu tạm đã cấp:</b> <code>${escapeHtml(tempPassword)}</code>\n\n` : '\n') +
+    `<i>💡 Host vui lòng thông báo hoặc kiểm tra để cấp lại mật khẩu cho thành viên này!</i>`
+
+  return sendDirectTelegramNotification(msg)
+}
+
 function escapeHtml(text: string): string {
   if (!text) return ''
   return text
