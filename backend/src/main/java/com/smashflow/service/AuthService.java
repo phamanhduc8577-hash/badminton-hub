@@ -28,6 +28,10 @@ public class AuthService {
         User user = userRepository.findByPhone(cleanPhone)
                 .orElseThrow(() -> new RuntimeException("Số điện thoại này chưa được đăng ký trong hệ thống SmashFlow!"));
 
+        if (user.getRole() == Role.HOST) {
+            throw new RuntimeException("Tài khoản Quản trị viên (Host) được bảo vệ an toàn! Mật khẩu Host không thể reset qua luồng công khai này.");
+        }
+
         // Generate temporary default password
         String defaultTempPassword = "smash" + (1000 + (int)(Math.random() * 9000));
         user.setPassword(passwordEncoder.encode(defaultTempPassword));

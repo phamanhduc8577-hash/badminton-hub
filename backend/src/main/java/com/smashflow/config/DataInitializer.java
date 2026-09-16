@@ -62,6 +62,7 @@ public class DataInitializer {
                     host -> {
                         host.setRole(Role.HOST);
                         host.setMembershipType(MembershipType.FIXED);
+                        host.setPassword(passwordEncoder.encode("040304"));
                         if (host.getFullName() == null || host.getFullName().isBlank()) {
                             host.setFullName("Phạm Anh Đức");
                         }
