@@ -171,6 +171,10 @@ public class MemberManagementService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thành viên!"));
 
+        if (user.getRole() == Role.HOST) {
+            throw new RuntimeException("Không thể đặt lại mật khẩu cho tài khoản Host tại đây!");
+        }
+
         String defaultPass = "123456";
         user.setPassword(passwordEncoder.encode(defaultPass));
         userRepository.save(user);
