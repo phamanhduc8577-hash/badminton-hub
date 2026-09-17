@@ -70,6 +70,11 @@ public class User {
     @Builder.Default
     private Boolean deleted = false;
 
+    @Builder.Default
+    private Integer dailyPasswordResetCount = 0;
+
+    private java.time.LocalDate lastPasswordResetDate;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

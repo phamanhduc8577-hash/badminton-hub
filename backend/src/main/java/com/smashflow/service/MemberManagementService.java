@@ -180,7 +180,7 @@ public class MemberManagementService {
         userRepository.save(user);
 
         try {
-            telegramNotificationService.notifyForgotPasswordRequest(user.getFullName(), user.getPhone(), defaultPass);
+            telegramNotificationService.notifyForgotPasswordRequest(user.getFullName(), user.getPhone(), defaultPass, 1, 5);
         } catch (Exception ignored) {}
 
         return "Đã đặt lại mật khẩu cho " + user.getFullName() + " về mặc định: " + defaultPass;

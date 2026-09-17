@@ -28,9 +28,21 @@ public class AuthService {
         User user = userRepository.findByPhone(cleanPhone)
                 .orElseThrow(() -> new RuntimeException("Số điện thoại này chưa được đăng ký trong hệ thống SmashFlow!"));
 
-        if (user.getRole() == Role.HOST) {
-            throw new RuntimeException("Tài khoản Quản trị viên (Host) được bảo vệ an toàn! Mật khẩu Host không thể reset qua luồng công khai này.");
+        java.time.LocalDate today = java.time.LocalDate.now();
+        int currentDailyCount = 0;
+        if (user.getLastPasswordResetDate() != null && user.getLastPasswordResetDate().equals(today)) {
+            currentDailyCount = user.getDailyPasswordResetCount() != null ? user.getDailyPasswordResetCount() : 0;
         }
+
+        int maxResetLimit = 5;
+        if (currentDailyCount >= maxResetLimit) {
+            throw new RuntimeException("Số điện thoại này đã yêu cầu cấp lại mật khẩu quá 5 lần hôm nay. Để bảo vệ tài khoản khỏi bị spam, vui lòng thử lại vào ngày mai hoặc liên hệ trực tiếp Host!");
+        }
+
+        // Increment count and update reset date
+        int newDailyCount = currentDailyCount + 1;
+        user.setDailyPasswordResetCount(newDailyCount);
+        user.setLastPasswordResetDate(today);
 
         // Generate temporary default password
         String defaultTempPassword = "smash" + (1000 + (int)(Math.random() * 9000));
@@ -39,13 +51,15 @@ public class AuthService {
 
         // Notify Host via Telegram
         try {
-            telegramNotificationService.notifyForgotPasswordRequest(user.getFullName(), user.getPhone(), defaultTempPassword);
+            telegramNotificationService.notifyForgotPasswordRequest(user.getFullName(), user.getPhone(), defaultTempPassword, newDailyCount, maxResetLimit);
         } catch (Exception ignored) {}
 
         return com.smashflow.dto.ForgotPasswordResponse.builder()
-                .message("Yêu cầu khôi phục mật khẩu đã được gửi đến Host qua Telegram! Vui lòng liên hệ Host hoặc kiểm tra tin nhắn với Host để nhận mật khẩu tạm thời.")
+                .message("Yêu cầu khôi phục mật khẩu (Lần " + newDailyCount + "/" + maxResetLimit + " hôm nay) đã được gửi đến Host qua Telegram! Vui lòng liên hệ Host hoặc kiểm tra tin nhắn với Host để nhận mật khẩu tạm thời.")
                 .fullName(user.getFullName())
                 .tempPassword(defaultTempPassword)
+                .resetCountToday(newDailyCount)
+                .maxResetPerDay(maxResetLimit)
                 .build();
     }
 

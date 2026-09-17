@@ -188,16 +188,19 @@ public class TelegramNotificationService {
     /**
      * Template: Password Reset Request Notice
      */
-    public void notifyForgotPasswordRequest(String playerName, String phone, String defaultPassword) {
+    public void notifyForgotPasswordRequest(String playerName, String phone, String defaultPassword, int countToday, int maxPerDay) {
         String msg = String.format(
                 "🔐 <b>[SmashFlow] YÊU CẦU ĐẶT LẠI MẬT KHẨU!</b>\n\n" +
                 "👤 <b>Thành viên:</b> %s\n" +
                 "📞 <b>Số điện thoại:</b> <code>%s</code>\n" +
-                "🔑 <b>Mật khẩu tạm đã cấp:</b> <code>%s</code>\n\n" +
+                "🔑 <b>Mật khẩu tạm đã cấp:</b> <code>%s</code>\n" +
+                "📊 <b>Hạn mức trong ngày:</b> Lần %d/%d hôm nay\n\n" +
                 "<i>💡 Host vui lòng thông báo mật khẩu này cho thành viên, hoặc thành viên đã có thể đăng nhập bằng mật khẩu tạm trên và đổi mật khẩu mới trong Hồ sơ!</i>",
                 escapeHtml(playerName),
                 escapeHtml(phone),
-                escapeHtml(defaultPassword)
+                escapeHtml(defaultPassword),
+                countToday,
+                maxPerDay
         );
         sendNotification(msg);
     }

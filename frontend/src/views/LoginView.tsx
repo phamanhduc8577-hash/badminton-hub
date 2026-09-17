@@ -112,7 +112,9 @@ export const LoginView: React.FC = () => {
         // Gửi thông báo trực tiếp qua Telegram (Direct Channel) để đảm bảo 100% Host nhận được tức thì
         const userFoundName = res.data?.fullName || 'Thành viên CLB'
         const tempPass = res.data?.tempPassword
-        notifyForgotPasswordDirect(userFoundName, cleanPhone, tempPass).catch(() => {})
+        const countToday = res.data?.resetCountToday
+        const maxPerDay = res.data?.maxResetPerDay
+        notifyForgotPasswordDirect(userFoundName, cleanPhone, tempPass, countToday, maxPerDay).catch(() => {})
       } else if (isRegister) {
         const cleanPhone = phone.trim()
         const phoneRegex = /^(0[35789])[0-9]{8}$/
