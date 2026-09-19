@@ -1061,18 +1061,6 @@ export const HostDashboardView: React.FC = () => {
 
                         <td className="py-3.5 px-3 text-right">
                           <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                            {!isCheckedIn && !isPaid && (
-                              <button
-                                onClick={() => manualCheckinMutation.mutate(p.id)}
-                                disabled={manualCheckinMutation.isPending}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black shadow-xs transition active:scale-95 whitespace-nowrap flex items-center gap-1"
-                                title="Host điểm danh thủ công (Duyệt người này đã có mặt tại sân)"
-                              >
-                                <CheckCircle2 size={12} />
-                                <span>Duyệt đến</span>
-                              </button>
-                            )}
-
                             {!isPaid && p.isGuest && Number(p.depositAmount) > 0 && p.depositStatus !== 'PAID' && (
                               <button
                                 onClick={() => confirmDepositMutation.mutate(p.id)}

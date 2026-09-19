@@ -221,10 +221,6 @@ export const MemberListView: React.FC = () => {
       <div className="saas-card rounded-3xl p-6 sm:p-8 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-200 text-xs font-bold uppercase tracking-wider">
-              <Users size={14} className="text-slate-900" />
-              <span>SmashFlow Directory</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               Danh Sách Thành Viên Làng Địa Ngục
             </h1>
