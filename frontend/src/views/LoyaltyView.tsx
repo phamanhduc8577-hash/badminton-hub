@@ -361,17 +361,10 @@ export const LoyaltyView: React.FC = () => {
 
         {/* Calendar Header Bar */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-200/90 pb-7 relative z-10">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-black uppercase tracking-wider">
-              <Sparkles size={13} className="text-emerald-600" />
-              <span>Smart Check-in Tracker</span>
-            </div>
+          <div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight flex items-center gap-3">
               <span>Lịch Điểm Danh & Nhật Ký Ra Sân</span>
             </h2>
-            <p className="text-xs sm:text-sm text-slate-500 font-semibold">
-              Tự động đánh dấu khi check-in QR GPS tại sân. Xây dựng thói quen thể thao kỷ luật!
-            </p>
           </div>
 
           {/* Month Navigator & KPI Widgets */}
