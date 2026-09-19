@@ -1013,20 +1013,20 @@ export const HostDashboardView: React.FC = () => {
                         </td>
 
                         <td className="py-3.5 px-3">
-                          <span className="font-mono font-bold text-slate-900 block text-xs whitespace-nowrap">
+                          <span className="text-sm font-black text-slate-950 block tracking-tight whitespace-nowrap">
                             {p.finalFee?.toLocaleString()}đ
                           </span>
                           {p.slotWindow ? (
-                            <span className="text-[10px] text-slate-900 font-extrabold block whitespace-nowrap bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded mt-0.5" title={`Khung giờ đăng ký: ${p.slotWindow}`}>
+                            <span className="text-[10px] text-slate-800 font-bold block whitespace-nowrap bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded-md mt-1" title={`Khung giờ đăng ký: ${p.slotWindow}`}>
                               ⏱️ {p.slotWindow}
                             </span>
                           ) : p.durationHours ? (
-                            <span className="text-[10px] text-slate-900 font-extrabold block whitespace-nowrap bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded mt-0.5">
+                            <span className="text-[10px] text-slate-800 font-bold block whitespace-nowrap bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded-md mt-1">
                               ⏱️ Đánh {p.durationHours}h
                             </span>
                           ) : null}
                           {p.adjustmentAmount !== 0 && (
-                            <span className="text-[10px] text-amber-700 font-bold block whitespace-nowrap">
+                            <span className="text-[10px] text-amber-700 font-bold block whitespace-nowrap mt-0.5">
                               Điều chỉnh: {p.adjustmentAmount > 0 ? '+' : ''}
                               {p.adjustmentAmount?.toLocaleString()}đ
                             </span>
