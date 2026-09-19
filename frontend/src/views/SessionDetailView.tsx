@@ -884,18 +884,18 @@ export const SessionDetailView: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <DuckMascot size={36} rounded="xl" className="border border-slate-200 shadow-2xs" />
+              <div className="flex items-center gap-3">
+                <DuckMascot size={40} rounded="xl" className="border border-slate-200 shadow-2xs shrink-0" />
                 <div>
-                  <h3 className="font-black text-sm text-slate-900">Chọn Khung Giờ Đánh ({totalSessionHours}h)</h3>
-                  <p className="text-[11px] text-slate-500 font-semibold">Tùy chọn đánh trọn ca hoặc chỉ đánh 2 tiếng</p>
+                  <h3 className="font-black text-base text-slate-950">Chọn Khung Giờ Đánh ({totalSessionHours}h)</h3>
+                  <p className="text-xs text-slate-500 font-semibold">Tùy chọn đánh trọn ca hoặc chỉ đánh 2 tiếng</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowJoinOptionModal(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
@@ -904,7 +904,7 @@ export const SessionDetailView: React.FC = () => {
                 Bạn muốn tham gia vào khung giờ nào?
               </label>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {subSlotWindows.map((win) => {
                   const isSelected = selectedSlotWindow === win.key
                   const is2h = win.duration === 2.0
@@ -924,33 +924,34 @@ export const SessionDetailView: React.FC = () => {
                         setSelectedSlotWindow(win.key)
                         setSelectedDurationHours(win.duration === totalSessionHours ? undefined : win.duration)
                       }}
-                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition flex items-center justify-between ${
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all duration-150 flex items-center justify-between ${
                         isSelected
-                          ? 'border-slate-950 bg-slate-900 text-white shadow-md'
-                          : 'border-slate-200 hover:border-slate-300 bg-white text-slate-900'
+                          ? 'border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/20'
+                          : 'border-slate-200 hover:border-slate-400 bg-white text-slate-900 shadow-2xs hover:shadow-sm'
                       }`}
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <span className={`text-xs font-black ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                          <span className={`text-sm font-black tracking-tight ${isSelected ? 'text-white' : 'text-slate-950'}`}>
                             {win.label}
                           </span>
                           {win.key === 'FULL' && (
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${isSelected ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${isSelected ? 'bg-rose-500 text-white shadow-xs' : 'bg-slate-100 text-slate-700'}`}>
                               Full ca
                             </span>
                           )}
                         </div>
-                        <p className={`text-xs font-mono font-bold ${isSelected ? 'text-slate-300' : 'text-slate-600'}`}>
-                          ⏰ {win.timeRange}
+                        <p className={`text-xs font-semibold flex items-center gap-1.5 ${isSelected ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <span>⏰</span>
+                          <span className="font-bold">{win.timeRange}</span>
                         </p>
                       </div>
 
-                      <div className="text-right">
-                        <span className={`text-sm font-black block font-mono ${isSelected ? 'text-rose-300' : 'text-rose-600'}`}>
+                      <div className="text-right pl-3">
+                        <span className={`text-base font-black block tracking-tight ${isSelected ? 'text-rose-400' : 'text-rose-600'}`}>
                           {Number(price).toLocaleString()}đ
                         </span>
-                        <span className={`text-[10px] font-semibold ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                        <span className={`text-[11px] font-bold ${isSelected ? 'text-slate-400' : 'text-slate-500'}`}>
                           {isMember ? 'Giá Thành viên' : 'Giá Vãng lai'}
                         </span>
                       </div>
