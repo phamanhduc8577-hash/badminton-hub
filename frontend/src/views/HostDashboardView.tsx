@@ -1291,9 +1291,6 @@ export const HostDashboardView: React.FC = () => {
                       <Swords size={18} className="text-slate-950" />
                       <span>Sàn đấu: {currentCourtName}</span>
                     </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Bắt cặp đối đầu cân bằng • Tự động tính Elo & Lưu vết sân đã đánh
-                    </p>
                   </div>
 
                   <button
