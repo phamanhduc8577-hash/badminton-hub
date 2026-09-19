@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { SessionItem } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
+import { CurrencyInput } from '../components/CurrencyInput'
 import { useToast } from '../components/ToastProvider'
 import { formatSessionDateTime } from '../lib/dateUtils'
 import {
@@ -738,38 +739,42 @@ export const SessionListView: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Cố định Nam</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.memberMalePrice}
-                      onChange={(e) => setEditForm({ ...editForm, memberMalePrice: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, memberMalePrice: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Cố định Nữ</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.memberFemalePrice}
-                      onChange={(e) => setEditForm({ ...editForm, memberFemalePrice: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, memberFemalePrice: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Vãng lai Nam</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.guestMalePrice}
-                      onChange={(e) => setEditForm({ ...editForm, guestMalePrice: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, guestMalePrice: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Vãng lai Nữ</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.guestFemalePrice}
-                      onChange={(e) => setEditForm({ ...editForm, guestFemalePrice: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, guestFemalePrice: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                 </div>
@@ -783,38 +788,42 @@ export const SessionListView: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Cố định Nam</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.memberMalePrice2h || 0}
-                      onChange={(e) => setEditForm({ ...editForm, memberMalePrice2h: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, memberMalePrice2h: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Cố định Nữ</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.memberFemalePrice2h || 0}
-                      onChange={(e) => setEditForm({ ...editForm, memberFemalePrice2h: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, memberFemalePrice2h: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Vãng lai Nam</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.guestMalePrice2h || 0}
-                      onChange={(e) => setEditForm({ ...editForm, guestMalePrice2h: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, guestMalePrice2h: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Vãng lai Nữ</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.guestFemalePrice2h || 0}
-                      onChange={(e) => setEditForm({ ...editForm, guestFemalePrice2h: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, guestFemalePrice2h: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                 </div>
@@ -829,38 +838,42 @@ export const SessionListView: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   <div>
                     <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Tiền thuê sân</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.costCourt || 0}
-                      onChange={(e) => setEditForm({ ...editForm, costCourt: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, costCourt: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Tiền cầu lông</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.costShuttlecock || 0}
-                      onChange={(e) => setEditForm({ ...editForm, costShuttlecock: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, costShuttlecock: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Nước uống / Khác</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.costDrinks || 0}
-                      onChange={(e) => setEditForm({ ...editForm, costDrinks: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, costDrinks: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Mức cọc (Vãng lai)</label>
-                    <input
-                      type="number"
+                    <CurrencyInput
                       value={editForm.depositAmount || 0}
-                      onChange={(e) => setEditForm({ ...editForm, depositAmount: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold text-slate-900"
+                      onChange={(val) => setEditForm({ ...editForm, depositAmount: val })}
+                      placeholder="0"
+                      suffix=""
+                      className="text-xs !p-2 rounded-lg"
                     />
                   </div>
                 </div>
