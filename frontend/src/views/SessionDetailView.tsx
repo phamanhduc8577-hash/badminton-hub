@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { SessionItem, Participant } from '../types'
+import { SessionItem, Participant, Match } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { QrCameraScanner } from '../components/QrCameraScanner'
 import { DuckMascot } from '../components/DuckMascot'
@@ -62,6 +62,95 @@ export const SessionDetailView: React.FC = () => {
     },
     refetchInterval: 3000,
   })
+
+  const { data: matches } = useQuery<Match[]>({
+    queryKey: ['matches', id],
+    queryFn: async () => {
+      const res = await api.get(`/matches/session/${id}`)
+      return res.data
+    },
+    enabled: !!id,
+    refetchInterval: 3000,
+  })
+
+  // Calculate sets, wins, losses per player for the session
+  const playerStatsMap = useMemo(() => {
+    const stats: Record<string, { totalSets: number; wins: number; losses: number }> = {}
+
+    if (!session?.participants) return stats
+
+    session.participants.forEach((p) => {
+      const uid = String(p.userId || p.id)
+      stats[uid] = { totalSets: 0, wins: 0, losses: 0 }
+    })
+
+    if (!matches) return stats
+
+    matches.forEach((m) => {
+      const pA1 = String(m.teamAPlayer1Id)
+      const pA2 = m.teamAPlayer2Id ? String(m.teamAPlayer2Id) : null
+      const pB1 = String(m.teamBPlayer1Id)
+      const pB2 = m.teamBPlayer2Id ? String(m.teamBPlayer2Id) : null
+
+      const teamAWon = m.winningTeam === 'A'
+
+      const recordPlayer = (id: string, isWinner: boolean) => {
+        if (!stats[id]) {
+          stats[id] = { totalSets: 0, wins: 0, losses: 0 }
+        }
+        stats[id].totalSets += 1
+        if (isWinner) {
+          stats[id].wins += 1
+        } else {
+          stats[id].losses += 1
+        }
+      }
+
+      recordPlayer(pA1, teamAWon)
+      if (pA2) recordPlayer(pA2, teamAWon)
+      recordPlayer(pB1, !teamAWon)
+      if (pB2) recordPlayer(pB2, !teamAWon)
+    })
+
+    return stats
+  }, [session?.participants, matches])
+
+  // Compute MVP player with highest win count in the session (min 1 win)
+  const sessionMvp = useMemo<{
+    name: string
+    avatarUrl?: string
+    wins: number
+    losses: number
+    totalSets: number
+  } | null>(() => {
+    if (!matches || matches.length === 0 || !session?.participants) return null
+
+    let bestPlayer: {
+      name: string
+      avatarUrl?: string
+      wins: number
+      losses: number
+      totalSets: number
+    } | null = null
+
+    session.participants.forEach((p) => {
+      const uid = String(p.userId || p.id)
+      const st = playerStatsMap[uid]
+      if (!st || st.wins <= 0) return
+
+      if (!bestPlayer || st.wins > bestPlayer.wins || (st.wins === bestPlayer.wins && st.losses < bestPlayer.losses)) {
+        bestPlayer = {
+          name: p.name || 'Tay vợt',
+          avatarUrl: p.avatarUrl,
+          wins: st.wins,
+          losses: st.losses,
+          totalSets: st.totalSets,
+        }
+      }
+    })
+
+    return bestPlayer
+  }, [matches, session?.participants, playerStatsMap])
 
   // Calculate total session hours
   const totalSessionHours = useMemo(() => {
@@ -310,6 +399,48 @@ export const SessionDetailView: React.FC = () => {
           </button>
         )}
       </div>
+
+      {/* Session MVP Highlight Box for all members and host */}
+      {sessionMvp && (
+        <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 rounded-3xl p-5 sm:p-7 text-slate-950 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 relative overflow-hidden">
+          <div className="flex items-center gap-3.5 sm:gap-4 relative z-10 min-w-0 flex-1">
+            <div className="relative shrink-0">
+              <DuckMascot
+                src={sessionMvp.avatarUrl || '/duck-mascot.png'}
+                size={60}
+                rounded="2xl"
+                className="border-2 border-slate-950/80 shadow-xl"
+              />
+              <div className="absolute -top-2 -right-2 w-6 h-6 rounded-xl bg-slate-950 text-amber-300 flex items-center justify-center text-xs shadow-md border border-amber-400">
+                👑
+              </div>
+            </div>
+            <div className="min-w-0 flex-1 pr-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-950 text-amber-300 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1">
+                <span>Vinh danh MVP Ca Đấu</span>
+              </div>
+              <h3 className="text-lg sm:text-2xl font-black truncate" title={sessionMvp.name}>
+                {sessionMvp.name}
+              </h3>
+              <p className="text-xs font-bold text-slate-900 mt-0.5">
+                Thắng nhiều nhất: <b>{sessionMvp.wins} Thắng</b> (-{sessionMvp.losses} Thua) • {sessionMvp.totalSets} set
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white/95 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-yellow-300/80 text-left md:text-right shrink-0 shadow-md relative z-10 md:max-w-xs">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase text-amber-900 block">
+              Phần thưởng MVP Ca Đấu
+            </span>
+            <span className="font-black text-xs sm:text-sm text-slate-950 block mt-0.5 whitespace-nowrap">
+              🥤 Tặng 01 Nước giải khát Revive / Pocari
+            </span>
+            <span className="text-[9px] sm:text-[10px] text-slate-600 block mt-0.5 font-semibold">
+              (Host trao tặng trực tiếp tại sân)
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 2-Column Responsive Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -660,78 +791,92 @@ export const SessionDetailView: React.FC = () => {
               {session.participants?.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">Chưa có ai đăng ký ca này</div>
               ) : (
-                session.participants?.map((p, idx) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl text-xs hover:border-slate-300 transition shadow-sm"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                      <span className="w-6 h-6 rounded-lg bg-slate-100 text-center font-bold text-slate-600 flex items-center justify-center text-[11px] shrink-0">
-                        {idx + 1}
-                      </span>
-                      <DuckMascot
-                        src={p.avatarUrl || '/duck-mascot.png'}
-                        size={34}
-                        rounded="xl"
-                        className="border border-slate-200 shadow-2xs shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-slate-900 truncate">{p.name}</span>
-                          <span
-                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold shrink-0 ${
-                              p.gender === 'FEMALE'
-                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                : 'bg-blue-50 text-blue-700 border border-blue-200'
-                            }`}
-                          >
-                            {p.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
-                          </span>
-                          {p.isGuest ? (
-                            <span className="text-[9px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-200 rounded font-bold shrink-0">
-                              Vãng lai
+                session.participants?.map((p, idx) => {
+                  const uid = String(p.userId || p.id)
+                  const stats = playerStatsMap[uid] || { totalSets: 0, wins: 0, losses: 0 }
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl text-xs hover:border-slate-300 transition shadow-sm"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+                        <span className="w-6 h-6 rounded-lg bg-slate-100 text-center font-bold text-slate-600 flex items-center justify-center text-[11px] shrink-0">
+                          {idx + 1}
+                        </span>
+                        <DuckMascot
+                          src={p.avatarUrl || '/duck-mascot.png'}
+                          size={34}
+                          rounded="xl"
+                          className="border border-slate-200 shadow-2xs shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-slate-900 truncate">{p.name}</span>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.2 rounded font-bold shrink-0 ${
+                                p.gender === 'FEMALE'
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                              }`}
+                            >
+                              {p.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
                             </span>
-                          ) : (
-                            <span className="text-[9px] px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-bold shrink-0">
-                              Cố định
+                            {p.isGuest ? (
+                              <span className="text-[9px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-200 rounded font-bold shrink-0">
+                                Vãng lai
+                              </span>
+                            ) : (
+                              <span className="text-[9px] px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-bold shrink-0">
+                                Cố định
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                                stats.totalSets === 0
+                                  ? 'bg-slate-50 text-slate-500 border-slate-200'
+                                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              }`}
+                            >
+                              🏸 {stats.totalSets} set ({stats.wins}W - {stats.losses}L)
                             </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                          <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
-                            {user?.role === 'HOST' ? p.phone : p.phone ? (p.phone.slice(0, 4) + '***' + p.phone.slice(-3)) : 'Chưa có SĐT'}
-                          </span>
-                          {p.slotWindow && (
-                            <span className="text-[9px] font-extrabold text-slate-900 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded shrink-0">
-                              ⏱️ {p.slotWindow}
+                            <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                              {user?.role === 'HOST' ? p.phone : p.phone ? (p.phone.slice(0, 4) + '***' + p.phone.slice(-3)) : 'Chưa có SĐT'}
                             </span>
-                          )}
+                            {p.slotWindow && (
+                              <span className="text-[9px] font-extrabold text-slate-900 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded shrink-0">
+                                ⏱️ {p.slotWindow}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="text-right shrink-0 flex flex-col items-end justify-center min-w-[72px]">
-                      {p.checkinStatus === 'CHECKED_IN' ? (
-                        <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
-                          ✓ Đã đến
+                      <div className="text-right shrink-0 flex flex-col items-end justify-center min-w-[72px]">
+                        {p.checkinStatus === 'CHECKED_IN' ? (
+                          <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+                            ✓ Đã đến
+                          </span>
+                        ) : Number(p.depositAmount) > 0 && p.depositStatus !== 'PAID' ? (
+                          <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 animate-pulse whitespace-nowrap">
+                            Chờ cọc
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 whitespace-nowrap">
+                            Chưa đến
+                          </span>
+                        )}
+                        <span className="block text-[10px] text-slate-600 font-medium mt-1 whitespace-nowrap">
+                          {p.paymentStatus === 'PAID'
+                            ? 'Đã xong'
+                            : `Thu: ${Number(p.remainingAmount).toLocaleString()}đ`}
                         </span>
-                      ) : Number(p.depositAmount) > 0 && p.depositStatus !== 'PAID' ? (
-                        <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 animate-pulse whitespace-nowrap">
-                          Chờ cọc
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 whitespace-nowrap">
-                          Chưa đến
-                        </span>
-                      )}
-                      <span className="block text-[10px] text-slate-600 font-medium mt-1 whitespace-nowrap">
-                        {p.paymentStatus === 'PAID'
-                          ? 'Đã xong'
-                          : `Thu: ${Number(p.remainingAmount).toLocaleString()}đ`}
-                      </span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
