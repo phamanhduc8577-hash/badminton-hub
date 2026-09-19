@@ -665,21 +665,21 @@ export const SessionDetailView: React.FC = () => {
                     key={p.id}
                     className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl text-xs hover:border-slate-300 transition shadow-sm"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-lg bg-slate-100 text-center font-bold text-slate-600 flex items-center justify-center text-[11px]">
+                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+                      <span className="w-6 h-6 rounded-lg bg-slate-100 text-center font-bold text-slate-600 flex items-center justify-center text-[11px] shrink-0">
                         {idx + 1}
                       </span>
                       <DuckMascot
                         src={p.avatarUrl || '/duck-mascot.png'}
-                        size={32}
+                        size={34}
                         rounded="xl"
-                        className="border border-slate-200 shadow-2xs"
+                        className="border border-slate-200 shadow-2xs shrink-0"
                       />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-900">{p.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 truncate">{p.name}</span>
                           <span
-                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold shrink-0 ${
                               p.gender === 'FEMALE'
                                 ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                 : 'bg-blue-50 text-blue-700 border border-blue-200'
@@ -688,19 +688,21 @@ export const SessionDetailView: React.FC = () => {
                             {p.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
                           </span>
                           {p.isGuest ? (
-                            <span className="text-[9px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-200 rounded font-bold">
+                            <span className="text-[9px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-200 rounded font-bold shrink-0">
                               Vãng lai
                             </span>
                           ) : (
-                            <span className="text-[9px] px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-bold">
+                            <span className="text-[9px] px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-bold shrink-0">
                               Cố định
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-slate-500 font-medium">{user?.role === 'HOST' ? p.phone : p.phone.slice(0, 4) + '***' + p.phone.slice(-3)}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                            {user?.role === 'HOST' ? p.phone : p.phone ? (p.phone.slice(0, 4) + '***' + p.phone.slice(-3)) : 'Chưa có SĐT'}
+                          </span>
                           {p.slotWindow && (
-                            <span className="text-[9px] font-extrabold text-slate-900 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded">
+                            <span className="text-[9px] font-extrabold text-slate-900 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded shrink-0">
                               ⏱️ {p.slotWindow}
                             </span>
                           )}
@@ -708,21 +710,21 @@ export const SessionDetailView: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-right">
+                    <div className="text-right shrink-0 flex flex-col items-end justify-center min-w-[72px]">
                       {p.checkinStatus === 'CHECKED_IN' ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
                           ✓ Đã đến
                         </span>
                       ) : Number(p.depositAmount) > 0 && p.depositStatus !== 'PAID' ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 animate-pulse">
-                          Chờ duyệt cọc
+                        <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 animate-pulse whitespace-nowrap">
+                          Chờ cọc
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500">
+                        <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 whitespace-nowrap">
                           Chưa đến
                         </span>
                       )}
-                      <span className="block text-[10px] text-slate-600 font-medium mt-1">
+                      <span className="block text-[10px] text-slate-600 font-medium mt-1 whitespace-nowrap">
                         {p.paymentStatus === 'PAID'
                           ? 'Đã xong'
                           : `Thu: ${Number(p.remainingAmount).toLocaleString()}đ`}
