@@ -399,9 +399,6 @@ export const SessionListView: React.FC = () => {
               <Sparkles size={22} className="text-rose-600" />
               <span>Danh sách các ca cầu lông</span>
             </h2>
-            <p className="text-xs text-slate-500 mt-1 font-semibold">
-              Đăng ký slot, điểm danh QR GPS và bắt kèo trực tiếp trên hệ thống
-            </p>
           </div>
 
           {/* Status Filter Tabs - Mobile Responsive Pill Group */}
