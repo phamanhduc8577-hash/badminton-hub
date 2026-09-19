@@ -433,7 +433,7 @@ export const SessionDetailView: React.FC = () => {
               Phần thưởng MVP Ca Đấu
             </span>
             <span className="font-black text-xs sm:text-sm text-slate-950 block mt-0.5 whitespace-nowrap">
-              🥤 Tặng 01 Nước giải khát Revive / Pocari
+              🥤 Tặng 01 Nước giải khát Revive
             </span>
             <span className="text-[9px] sm:text-[10px] text-slate-600 block mt-0.5 font-semibold">
               (Host trao tặng trực tiếp tại sân)
