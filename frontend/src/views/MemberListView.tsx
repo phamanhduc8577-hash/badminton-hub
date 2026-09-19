@@ -220,13 +220,10 @@ export const MemberListView: React.FC = () => {
       {/* Header Banner */}
       <div className="saas-card rounded-3xl p-6 sm:p-8 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-2">
+          <div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               Danh Sách Thành Viên Làng Địa Ngục
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600 font-medium">
-              Quản lý danh sách thành viên Cố Định & Vãng Lai • Đảm bảo quyền lợi và thông tin minh bạch.
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
