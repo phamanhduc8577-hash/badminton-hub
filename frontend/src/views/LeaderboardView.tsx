@@ -173,13 +173,10 @@ export const LeaderboardView: React.FC = () => {
               <TrendingUp size={22} className="text-rose-600" />
               <span>
                 {tab === 'attendance'
-                  ? 'Bảng xếp hạng Chuyên Cần (Số buổi đã tham gia)'
-                  : 'Bảng xếp hạng Chiến Thần (Số trận thắng & Win/Loss)'}
+                  ? 'Bảng xếp hạng Chuyên Cần'
+                  : 'Bảng xếp hạng Chiến Thần'}
               </span>
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5 font-semibold">
-              Hệ thống tự động xếp hạng rank và thăng cấp sau mỗi ca đánh
-            </p>
           </div>
           <span className="text-xs text-slate-700 font-bold bg-slate-100 px-3.5 py-1.5 rounded-xl border border-slate-200 w-fit flex items-center gap-1.5 shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
