@@ -281,10 +281,6 @@ export const SessionListView: React.FC = () => {
               </span>
             </h1>
 
-            <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-medium">
-              Hệ sinh thái cầu lông thông minh: Tích điểm chuyên cần đổi nước & voucher, bảng vàng leo rank Thách Đấu, ghép sân cân bằng trình độ và minh bạch chi phí từng ca.
-            </p>
-
             {/* CTA Buttons & User Welcome */}
             <div className="flex flex-wrap items-center gap-3.5 pt-2">
               {user?.role === 'HOST' ? (
