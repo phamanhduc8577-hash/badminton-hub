@@ -149,9 +149,9 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
 
       {/* Dropdown Menu with Fast Search Input */}
       {isOpen && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden animate-in fade-in duration-150">
+        <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in duration-150">
           {/* Search Header */}
-          <div className="p-2 border-b border-slate-100 bg-slate-50/80 sticky top-0">
+          <div className="p-2 border-b border-slate-100 bg-slate-50/90 sticky top-0 z-10">
             <div className="relative flex items-center">
               <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
               <input
@@ -159,7 +159,7 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Gõ tên hoặc số ĐT để tìm nhanh..."
+                placeholder="Gõ tên hoặc số ĐT để tìm..."
                 className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-7 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
               />
               {searchTerm && (
@@ -175,7 +175,7 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
           </div>
 
           {/* List Options */}
-          <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 p-1">
+          <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 p-1">
             {allowClear && (
               <div
                 onClick={() => {
@@ -186,7 +186,7 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
                   !value ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-500 hover:bg-slate-50'
                 }`}
               >
-                <span>{placeholder.includes('Đánh đơn') ? '(Không có - Đánh đơn)' : '(Bỏ chọn)'}</span>
+                <span>{placeholder.includes('Đánh đơn') ? '(Không có - Đánh đơn)' : '(Bỏ chọn - Để trống)'}</span>
                 {!value && <Check size={14} className="text-slate-900" />}
               </div>
             )}

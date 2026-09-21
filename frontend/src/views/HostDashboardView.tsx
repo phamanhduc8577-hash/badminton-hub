@@ -1335,7 +1335,7 @@ export const HostDashboardView: React.FC = () => {
                 {/* Light & Clean Sports Arena Layout */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {/* TEAM BLUE CARD */}
-                  <div className="bg-blue-50/40 rounded-2xl p-5 border border-blue-200/80 space-y-4 shadow-xs relative overflow-hidden">
+                  <div className="bg-blue-50/40 rounded-2xl p-5 border border-blue-200/80 space-y-4 shadow-xs relative">
                     <div className="flex items-center justify-between pb-2.5 border-b border-blue-200/60">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shadow-xs" />
@@ -1372,7 +1372,7 @@ export const HostDashboardView: React.FC = () => {
                   </div>
 
                   {/* TEAM RED CARD */}
-                  <div className="bg-rose-50/40 rounded-2xl p-5 border border-rose-200/80 space-y-4 shadow-xs relative overflow-hidden">
+                  <div className="bg-rose-50/40 rounded-2xl p-5 border border-rose-200/80 space-y-4 shadow-xs relative">
                     <div className="flex items-center justify-between pb-2.5 border-b border-rose-200/60">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-600 shadow-xs" />
