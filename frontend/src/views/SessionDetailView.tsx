@@ -677,12 +677,18 @@ export const SessionDetailView: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* Chi tiết khấu trừ cọc nếu có */}
+                      {/* Chi tiết khấu trừ cọc và voucher nếu có */}
                       <div className="text-[11px] text-amber-900 space-y-1 bg-amber-100/60 p-2.5 rounded-xl">
                         <div className="flex justify-between">
-                          <span>• Giá slot ca đánh:</span>
-                          <span className="font-semibold">{Number(isUserParticipant.finalFee).toLocaleString('vi-VN')}đ</span>
+                          <span>• Giá gốc ca đánh:</span>
+                          <span className="font-semibold">{Number(isUserParticipant.baseFee || isUserParticipant.finalFee).toLocaleString('vi-VN')}đ</span>
                         </div>
+                        {Number(isUserParticipant.adjustmentAmount) !== 0 && (
+                          <div className="flex justify-between text-rose-700 font-bold">
+                            <span>• {isUserParticipant.adjustmentReason || 'Ưu đãi / Giảm giá'}:</span>
+                            <span>{Number(isUserParticipant.adjustmentAmount) > 0 ? '+' : ''}{Number(isUserParticipant.adjustmentAmount).toLocaleString('vi-VN')}đ</span>
+                          </div>
+                        )}
                         {Number(isUserParticipant.depositAmount) > 0 && (
                           <div className="flex justify-between text-emerald-700 font-medium">
                             <span>• Đã cọc giữ chỗ (Khấu trừ):</span>

@@ -91,6 +91,20 @@ public class LoyaltyRewardService {
         };
     }
 
+    public static Integer getVoucherDiscountPercent(int milestone) {
+        return switch (milestone) {
+            case 10 -> 15;
+            case 30 -> 20;
+            case 35 -> 25;
+            case 40 -> 30;
+            case 60 -> 30;
+            case 65 -> 35;
+            case 80 -> 38;
+            case 90 -> 40;
+            default -> null;
+        };
+    }
+
     @Transactional
     public LoyaltyRewardResponse claimReward(Long rewardId, User user) {
         LoyaltyReward reward = loyaltyRewardRepository.findById(rewardId)

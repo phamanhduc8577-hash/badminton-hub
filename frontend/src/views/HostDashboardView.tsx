@@ -1056,8 +1056,14 @@ export const HostDashboardView: React.FC = () => {
                             </span>
                           ) : null}
                           {p.adjustmentAmount !== 0 && (
-                            <span className="text-[10px] text-amber-700 font-bold block whitespace-nowrap mt-0.5">
-                              Điều chỉnh: {p.adjustmentAmount > 0 ? '+' : ''}
+                            <span
+                              className={`text-[10px] font-bold block whitespace-nowrap mt-0.5 ${
+                                p.adjustmentAmount < 0 ? 'text-rose-600' : 'text-amber-700'
+                              }`}
+                              title={p.adjustmentReason || ''}
+                            >
+                              {p.adjustmentReason ? `🎁 ${p.adjustmentReason}: ` : 'Điều chỉnh: '}
+                              {p.adjustmentAmount > 0 ? '+' : ''}
                               {p.adjustmentAmount?.toLocaleString()}đ
                             </span>
                           )}

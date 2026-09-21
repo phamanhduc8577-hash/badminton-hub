@@ -11,4 +11,6 @@ import java.util.Optional;
 public interface LoyaltyRewardRepository extends JpaRepository<LoyaltyReward, Long> {
     List<LoyaltyReward> findByUserIdOrderByMilestoneSessionsAsc(Long userId);
     Optional<LoyaltyReward> findByUserIdAndMilestoneSessions(Long userId, Integer milestoneSessions);
+    List<LoyaltyReward> findByUserIdAndIsClaimedFalseOrderByMilestoneSessionsAsc(Long userId);
 }
+

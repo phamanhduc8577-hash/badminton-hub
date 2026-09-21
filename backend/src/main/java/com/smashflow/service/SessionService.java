@@ -29,6 +29,7 @@ public class SessionService {
     private final MatchRepository matchRepository;
     private final VietQrService vietQrService;
     private final TelegramNotificationService telegramNotificationService;
+    private final LoyaltyRewardRepository loyaltyRewardRepository;
 
     public List<SessionResponse> getAllSessions() {
         return sessionRepository.findAllByOrderByStartTimeDesc().stream()
@@ -292,6 +293,26 @@ public class SessionService {
                 : BigDecimal.ZERO;
         DepositStatus initialDepositStatus = needDeposit ? DepositStatus.PENDING : DepositStatus.NONE;
 
+        // Auto apply voucher if user has unclaimed voucher reward
+        BigDecimal adjustmentAmount = BigDecimal.ZERO;
+        String adjustmentReason = null;
+        List<LoyaltyReward> pendingRewards = loyaltyRewardRepository.findByUserIdAndIsClaimedFalseOrderByMilestoneSessionsAsc(user.getId());
+        for (LoyaltyReward r : pendingRewards) {
+            Integer discountPercent = LoyaltyRewardService.getVoucherDiscountPercent(r.getMilestoneSessions());
+            if (discountPercent != null && discountPercent > 0) {
+                BigDecimal discount = baseFee.multiply(BigDecimal.valueOf(discountPercent))
+                        .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.HALF_UP);
+                adjustmentAmount = discount.negate();
+                adjustmentReason = "Áp dụng Voucher " + discountPercent + "% (Mốc " + r.getMilestoneSessions() + " buổi)";
+                r.setIsClaimed(true);
+                r.setClaimedAt(LocalDateTime.now());
+                loyaltyRewardRepository.save(r);
+                break; // Chỉ dùng 1 voucher cho 1 lượt đăng ký ca đánh
+            }
+        }
+
+        BigDecimal finalFee = baseFee.add(adjustmentAmount).max(BigDecimal.ZERO);
+
         SessionParticipant participant = SessionParticipant.builder()
                 .session(session)
                 .user(user)
@@ -303,8 +324,9 @@ public class SessionService {
                 .depositStatus(initialDepositStatus)
                 .depositAmount(effectiveDeposit)
                 .baseFee(baseFee)
-                .adjustmentAmount(BigDecimal.ZERO)
-                .finalFee(baseFee)
+                .adjustmentAmount(adjustmentAmount)
+                .adjustmentReason(adjustmentReason)
+                .finalFee(finalFee)
                 .paymentStatus(PaymentStatus.UNPAID)
                 .build();
 
@@ -489,6 +511,24 @@ public class SessionService {
         // If user already checked in at venue, prevent deleting to preserve match logs & accounting
         if (participant.getCheckinStatus() == CheckinStatus.CHECKED_IN) {
             throw new RuntimeException("Người này đã tới sân và điểm danh, không thể xóa!");
+        }
+
+        // Nếu hủy slot và trước đó đã tự động áp voucher, hoàn lại voucher cho member
+        if (participant.getUser() != null && participant.getAdjustmentAmount() != null && participant.getAdjustmentAmount().compareTo(BigDecimal.ZERO) < 0) {
+            if (participant.getAdjustmentReason() != null && participant.getAdjustmentReason().contains("Voucher")) {
+                List<LoyaltyReward> claimedRewards = loyaltyRewardRepository.findByUserIdOrderByMilestoneSessionsAsc(participant.getUser().getId());
+                for (LoyaltyReward r : claimedRewards) {
+                    if (Boolean.TRUE.equals(r.getIsClaimed())) {
+                        Integer percent = LoyaltyRewardService.getVoucherDiscountPercent(r.getMilestoneSessions());
+                        if (percent != null && participant.getAdjustmentReason().contains(percent + "%")) {
+                            r.setIsClaimed(false);
+                            r.setClaimedAt(null);
+                            loyaltyRewardRepository.save(r);
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         if (forfeitDeposit && participant.getDepositStatus() == DepositStatus.PAID) {
