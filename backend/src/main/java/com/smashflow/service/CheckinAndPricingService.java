@@ -98,11 +98,18 @@ public class CheckinAndPricingService {
         SessionParticipant participant = participantRepository.findById(request.getParticipantId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
 
+        if (request.getOverrideBaseFee() != null) {
+            participant.setBaseFee(request.getOverrideBaseFee());
+        }
+
         if (request.getOverrideFinalFee() != null) {
             participant.setFinalFee(request.getOverrideFinalFee());
         } else if (request.getAdjustmentAmount() != null) {
             participant.setAdjustmentAmount(request.getAdjustmentAmount());
-            participant.setFinalFee(participant.getBaseFee().add(request.getAdjustmentAmount()));
+            participant.setFinalFee(participant.getBaseFee().add(request.getAdjustmentAmount()).max(BigDecimal.ZERO));
+        } else if (request.getOverrideBaseFee() != null) {
+            BigDecimal adj = participant.getAdjustmentAmount() != null ? participant.getAdjustmentAmount() : BigDecimal.ZERO;
+            participant.setFinalFee(participant.getBaseFee().add(adj).max(BigDecimal.ZERO));
         }
 
         if (request.getAdjustmentReason() != null) {

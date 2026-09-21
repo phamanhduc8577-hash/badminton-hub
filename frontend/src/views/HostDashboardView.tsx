@@ -55,6 +55,7 @@ export const HostDashboardView: React.FC = () => {
 
   // Override Bill Modal State
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null)
+  const [overrideBaseFee, setOverrideBaseFee] = useState<number>(0)
   const [adjustmentAmount, setAdjustmentAmount] = useState<number>(0)
   const [adjustmentReason, setAdjustmentReason] = useState<string>('')
 
@@ -310,6 +311,7 @@ export const HostDashboardView: React.FC = () => {
       if (!selectedParticipant) return
       const res = await api.post('/sessions/participants/override-bill', {
         participantId: selectedParticipant.id,
+        overrideBaseFee,
         adjustmentAmount,
         adjustmentReason,
       })
@@ -1110,6 +1112,7 @@ export const HostDashboardView: React.FC = () => {
                             <button
                               onClick={() => {
                                 setSelectedParticipant(p)
+                                setOverrideBaseFee(p.baseFee || p.finalFee || 0)
                                 setAdjustmentAmount(p.adjustmentAmount || 0)
                                 setAdjustmentReason(p.adjustmentReason || '')
                               }}
@@ -1703,7 +1706,49 @@ export const HostDashboardView: React.FC = () => {
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block text-slate-700 font-bold mb-1">
-                  Số tiền điều chỉnh (VND) (Nhập số âm nếu giảm, dương nếu tăng):
+                  Giá gốc ca đánh (VND) (VD: 95.000đ giảm còn 75.000đ khi về sớm):
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <CurrencyInput
+                      value={overrideBaseFee}
+                      onChange={(val) => {
+                        setOverrideBaseFee(val)
+                        // Tự động tính lại số tiền giảm nếu có voucher %
+                        const voucherMatch = adjustmentReason.match(/Voucher\s+(\d+)%/i)
+                        if (voucherMatch) {
+                          const percent = parseInt(voucherMatch[1], 10)
+                          const newDiscount = Math.round((val * percent) / 100)
+                          setAdjustmentAmount(-newDiscount)
+                        }
+                      }}
+                      placeholder="95000"
+                    />
+                  </div>
+                  {selectedParticipant.baseFee !== overrideBaseFee && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const original = selectedParticipant.baseFee || 0
+                        setOverrideBaseFee(original)
+                        const voucherMatch = adjustmentReason.match(/Voucher\s+(\d+)%/i)
+                        if (voucherMatch) {
+                          const percent = parseInt(voucherMatch[1], 10)
+                          const newDiscount = Math.round((original * percent) / 100)
+                          setAdjustmentAmount(-newDiscount)
+                        }
+                      }}
+                      className="px-2.5 py-2 rounded-xl text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    >
+                      Đặt lại
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Số tiền điều chỉnh / Giảm giá voucher (VND) (Nhập số âm nếu giảm, dương nếu tăng):
                 </label>
                 <div className="flex items-center gap-2">
                   <button
@@ -1739,22 +1784,39 @@ export const HostDashboardView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Lý do điều chỉnh:</label>
+                <label className="block text-slate-700 font-bold mb-1">Lý do điều chỉnh / Ghi chú:</label>
                 <input
                   type="text"
                   value={adjustmentReason}
                   onChange={(e) => setAdjustmentReason(e.target.value)}
-                  placeholder="Về sớm 1 tiếng / Sự cố sân..."
-                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-slate-900"
+                  placeholder="Về sớm 1 tiếng / Áp dụng Voucher 15%..."
+                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-slate-900 font-medium"
                 />
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-[11px] text-slate-600">
-                <p>Tiền gốc: {selectedParticipant.baseFee?.toLocaleString()}đ</p>
-                <p className="font-bold text-slate-900">
-                  Thành tiền mới:{' '}
-                  {Math.max(0, selectedParticipant.baseFee + adjustmentAmount).toLocaleString()}đ
-                </p>
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5 text-[11px] text-slate-600">
+                <div className="flex justify-between">
+                  <span>Giá gốc áp dụng:</span>
+                  <span className="font-bold text-slate-900">{overrideBaseFee.toLocaleString('vi-VN')}đ</span>
+                </div>
+                {adjustmentAmount !== 0 && (
+                  <div className={`flex justify-between font-bold ${adjustmentAmount < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    <span>{adjustmentReason || (adjustmentAmount < 0 ? 'Giảm trừ' : 'Phụ thu')}:</span>
+                    <span>{adjustmentAmount > 0 ? '+' : ''}{adjustmentAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+                {selectedParticipant.depositAmount > 0 && (
+                  <div className="flex justify-between text-emerald-700 font-semibold">
+                    <span>Đã đặt cọc giữ chỗ:</span>
+                    <span>- {selectedParticipant.depositAmount.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-slate-200 flex justify-between text-xs font-black text-slate-950">
+                  <span>Thành tiền mới:</span>
+                  <span className="text-sm font-mono text-emerald-700">
+                    {Math.max(0, overrideBaseFee + adjustmentAmount).toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
               </div>
             </div>
 

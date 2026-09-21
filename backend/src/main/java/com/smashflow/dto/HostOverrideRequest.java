@@ -11,7 +11,9 @@ public class HostOverrideRequest {
     @NotNull(message = "ID người tham gia không được để trống")
     private Long participantId;
 
+    private BigDecimal overrideBaseFee;  // Host điều chỉnh lại giá gốc (vd: 95k -> 75k khi về sớm)
     private BigDecimal adjustmentAmount; // e.g., +20000 for drinks or -15000 for early leave
     private String adjustmentReason;
     private BigDecimal overrideFinalFee; // if host sets absolute amount directly
 }
+
