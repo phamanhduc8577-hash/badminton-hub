@@ -476,6 +476,16 @@ public class SessionService {
             }
             p.setBaseFee(newBaseFee);
             BigDecimal adj = p.getAdjustmentAmount() != null ? p.getAdjustmentAmount() : BigDecimal.ZERO;
+            if (p.getAdjustmentReason() != null && p.getAdjustmentReason().contains("Voucher")) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("Voucher\\s+(\\d+)%").matcher(p.getAdjustmentReason());
+                if (matcher.find()) {
+                    int percent = Integer.parseInt(matcher.group(1));
+                    BigDecimal discount = newBaseFee.multiply(BigDecimal.valueOf(percent))
+                            .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.HALF_UP);
+                    adj = discount.negate();
+                    p.setAdjustmentAmount(adj);
+                }
+            }
             p.setFinalFee(newBaseFee.add(adj).max(BigDecimal.ZERO));
             participantRepository.save(p);
         }
