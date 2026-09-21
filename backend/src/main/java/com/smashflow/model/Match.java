@@ -48,7 +48,7 @@ public class Match {
     @Column(length = 50)
     private String courtName; // e.g. "Sân 1", "Sân 2", "Sân 3"
 
-    @CreationTimestamp
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

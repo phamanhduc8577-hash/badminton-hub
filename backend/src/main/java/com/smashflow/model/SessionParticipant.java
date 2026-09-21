@@ -89,12 +89,13 @@ public class SessionParticipant {
     @Column(length = 20)
     private PaymentMethod paymentMethod;
 
-    @CreationTimestamp
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
     public BigDecimal getRemainingPaymentAmount() {
         if (paymentStatus == PaymentStatus.PAID) {
