@@ -45,15 +45,12 @@ public class DataInitializer {
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_password_reset_count INT DEFAULT 0;");
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_password_reset_date DATE;");
                 jdbcTemplate.execute("UPDATE users SET membership_type = 'FIXED' WHERE role = 'HOST';");
-                // Đồng bộ số buổi tham gia thực tế từ các ca đã tham gia hoặc có trận đấu (ít nhất 1 buổi cho các bạn đã có lịch sử)
+                // Đồng bộ chính xác số buổi tham gia theo đúng số ca người đó đã điểm danh (CHECKED_IN)
                 jdbcTemplate.execute("""
-                    UPDATE users u SET sessions_attended = GREATEST(
-                        COALESCE((
-                            SELECT COUNT(DISTINCT sp.session_id)
-                            FROM session_participants sp
-                            WHERE sp.user_id = u.id AND sp.checkin_status = 'CHECKED_IN'
-                        ), 0),
-                        CASE WHEN u.win_count > 0 OR u.loss_count > 0 THEN 1 ELSE 0 END
+                    UPDATE users u SET sessions_attended = (
+                        SELECT COUNT(DISTINCT sp.session_id)
+                        FROM session_participants sp
+                        WHERE sp.user_id = u.id AND sp.checkin_status = 'CHECKED_IN'
                     ) WHERE u.id IS NOT NULL;
                 """);
             } catch (Exception ignored) {

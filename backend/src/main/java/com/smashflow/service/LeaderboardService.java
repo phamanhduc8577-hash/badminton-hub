@@ -16,16 +16,8 @@ public class LeaderboardService {
     private final UserRepository userRepository;
 
     public List<LeaderboardEntry> getAttendanceLeaderboard() {
-        // Đồng bộ số buổi tham gia thực tế: nếu có win/loss > 0 thì tối thiểu là 1 buổi
         List<User> users = userRepository.findAll().stream()
                 .filter(u -> !Boolean.TRUE.equals(u.getDeleted()))
-                .peek(u -> {
-                    int attended = u.getSessionsAttended() != null ? u.getSessionsAttended() : 0;
-                    if (attended == 0 && ((u.getWinCount() != null && u.getWinCount() > 0) || (u.getLossCount() != null && u.getLossCount() > 0))) {
-                        u.setSessionsAttended(1);
-                        userRepository.save(u);
-                    }
-                })
                 .sorted((a, b) -> Integer.compare(
                         b.getSessionsAttended() != null ? b.getSessionsAttended() : 0,
                         a.getSessionsAttended() != null ? a.getSessionsAttended() : 0
@@ -37,9 +29,6 @@ public class LeaderboardService {
 
         for (User u : users) {
             int attended = u.getSessionsAttended() != null ? u.getSessionsAttended() : 0;
-            if (attended == 0 && ((u.getWinCount() != null && u.getWinCount() > 0) || (u.getLossCount() != null && u.getLossCount() > 0))) {
-                attended = 1;
-            }
             result.add(LeaderboardEntry.builder()
                     .id(u.getId())
                     .fullName(u.getFullName())
