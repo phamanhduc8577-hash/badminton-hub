@@ -8,6 +8,7 @@ import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
 import { getPlayerRankDisplay, getLolRank } from '../lib/ranks'
 import { CurrencyInput } from '../components/CurrencyInput'
+import { PlayerSelect } from '../components/PlayerSelect'
 import { formatMatchTime } from '../lib/dateUtils'
 import {
   Users,
@@ -604,7 +605,7 @@ export const HostDashboardView: React.FC = () => {
       })
   }
 
-  // Auto Fair-Play Match Suggestion for the current court
+  // Auto Fair-Play Match Suggestion for the current court (Gender-Balanced Double/Single)
   const handleAutoSuggestFairMatch = (courtName: string) => {
     const assignedInOtherCourters = new Set<string>()
     Object.entries(courtDrafts).forEach(([cName, d]) => {
@@ -630,51 +631,80 @@ export const HostDashboardView: React.FC = () => {
       return
     }
 
-    if (pool.length >= 4) {
-      const p1 = String(pool[0].userId || pool[0].id)
-      const p2 = String(pool[3].userId || pool[3].id)
-      const p3 = String(pool[1].userId || pool[1].id)
-      const p4 = String(pool[2].userId || pool[2].id)
-      const chosen = new Set([p1, p2, p3, p4])
+    // Separate by gender
+    const males = pool.filter((u) => u.gender !== 'FEMALE')
+    const females = pool.filter((u) => u.gender === 'FEMALE')
 
-      setCourtDrafts((prev) => {
-        const updated = { ...prev }
-        Object.keys(updated).forEach((cName) => {
-          if (cName !== courtName && updated[cName]) {
-            const d = { ...updated[cName] }
-            let changed = false
-            if (chosen.has(d.teamAP1)) { d.teamAP1 = ''; changed = true }
-            if (chosen.has(d.teamAP2)) { d.teamAP2 = ''; changed = true }
-            if (chosen.has(d.teamBP1)) { d.teamBP1 = ''; changed = true }
-            if (chosen.has(d.teamBP2)) { d.teamBP2 = ''; changed = true }
-            if (changed) updated[cName] = d
-          }
-        })
-        updated[courtName] = { teamAP1: p1, teamAP2: p2, teamBP1: p3, teamBP2: p4 }
-        return updated
-      })
-    } else {
-      const p1 = String(pool[0].userId || pool[0].id)
-      const p2 = String(pool[1].userId || pool[1].id)
-      const chosen = new Set([p1, p2])
+    let p1 = ''
+    let p2 = ''
+    let p3 = ''
+    let p4 = ''
 
-      setCourtDrafts((prev) => {
-        const updated = { ...prev }
-        Object.keys(updated).forEach((cName) => {
-          if (cName !== courtName && updated[cName]) {
-            const d = { ...updated[cName] }
-            let changed = false
-            if (chosen.has(d.teamAP1)) { d.teamAP1 = ''; changed = true }
-            if (chosen.has(d.teamAP2)) { d.teamAP2 = ''; changed = true }
-            if (chosen.has(d.teamBP1)) { d.teamBP1 = ''; changed = true }
-            if (chosen.has(d.teamBP2)) { d.teamBP2 = ''; changed = true }
-            if (changed) updated[cName] = d
-          }
-        })
-        updated[courtName] = { teamAP1: p1, teamAP2: '', teamBP1: p2, teamBP2: '' }
-        return updated
-      })
+    // Priority 1: Men's Doubles (Nam-Nam vs Nam-Nam) if at least 4 males
+    if (males.length >= 4 && (females.length < 2 || males[0] === pool[0])) {
+      p1 = String(males[0].userId || males[0].id)
+      p2 = String(males[3].userId || males[3].id)
+      p3 = String(males[1].userId || males[1].id)
+      p4 = String(males[2].userId || males[2].id)
     }
+    // Priority 2: Mixed Doubles (Nam-Nữ vs Nam-Nữ) if at least 2 males & 2 females
+    else if (males.length >= 2 && females.length >= 2) {
+      p1 = String(males[0].userId || males[0].id)
+      p2 = String(females[0].userId || females[0].id)
+      p3 = String(males[1].userId || males[1].id)
+      p4 = String(females[1].userId || females[1].id)
+    }
+    // Priority 3: Women's Doubles (Nữ-Nữ vs Nữ-Nữ) if at least 4 females
+    else if (females.length >= 4) {
+      p1 = String(females[0].userId || females[0].id)
+      p2 = String(females[3].userId || females[3].id)
+      p3 = String(females[1].userId || females[1].id)
+      p4 = String(females[2].userId || females[2].id)
+    }
+    // Priority 4: Men's Doubles fallback if 4 males available
+    else if (males.length >= 4) {
+      p1 = String(males[0].userId || males[0].id)
+      p2 = String(males[3].userId || males[3].id)
+      p3 = String(males[1].userId || males[1].id)
+      p4 = String(males[2].userId || males[2].id)
+    }
+    // Priority 5: Single Match with same gender if possible (Nam vs Nam or Nữ vs Nữ)
+    else if (males.length >= 2) {
+      p1 = String(males[0].userId || males[0].id)
+      p3 = String(males[1].userId || males[1].id)
+    } else if (females.length >= 2) {
+      p1 = String(females[0].userId || females[0].id)
+      p3 = String(females[1].userId || females[1].id)
+    }
+    // Fallback: 4 players general double (or 2 players single) if unbalanced pool
+    else if (pool.length >= 4) {
+      p1 = String(pool[0].userId || pool[0].id)
+      p2 = String(pool[3].userId || pool[3].id)
+      p3 = String(pool[1].userId || pool[1].id)
+      p4 = String(pool[2].userId || pool[2].id)
+    } else {
+      p1 = String(pool[0].userId || pool[0].id)
+      p3 = String(pool[1].userId || pool[1].id)
+    }
+
+    const chosen = new Set([p1, p2, p3, p4].filter(Boolean))
+
+    setCourtDrafts((prev) => {
+      const updated = { ...prev }
+      Object.keys(updated).forEach((cName) => {
+        if (cName !== courtName && updated[cName]) {
+          const d = { ...updated[cName] }
+          let changed = false
+          if (chosen.has(d.teamAP1)) { d.teamAP1 = ''; changed = true }
+          if (chosen.has(d.teamAP2)) { d.teamAP2 = ''; changed = true }
+          if (chosen.has(d.teamBP1)) { d.teamBP1 = ''; changed = true }
+          if (chosen.has(d.teamBP2)) { d.teamBP2 = ''; changed = true }
+          if (changed) updated[cName] = d
+        }
+      })
+      updated[courtName] = { teamAP1: p1, teamAP2: p2, teamBP1: p3, teamBP2: p4 }
+      return updated
+    })
   }
 
   if (isLoading || !session) {
@@ -1316,44 +1346,28 @@ export const HostDashboardView: React.FC = () => {
 
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-slate-700">Player 1</label>
-                      <select
+                      <PlayerSelect
                         value={currentDraft.teamAP1}
-                        onChange={(e) => updateCurrentDraft('teamAP1', e.target.value)}
-                        className="w-full bg-white border border-slate-200 hover:border-blue-400 rounded-xl p-2.5 text-slate-900 font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-none text-xs shadow-xs transition"
-                      >
-                        <option value="">Chọn tay vợt...</option>
-                        {getAvailableUsersForCourt(currentCourtName, currentDraft.teamAP1).map((u) => {
-                          const rank = getPlayerRankDisplay(u.eloScore || 0, u.placementMatches ?? 5)
-                          const stats = playerStatsMap[String(u.userId || u.id)]
-                          return (
-                            <option key={u.id} value={String(u.userId || u.id)}>
-                              {u.name} • {rank.name} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
-                              {u.isGuest ? '[Vãng lai]' : ''}
-                            </option>
-                          )
-                        })}
-                      </select>
+                        onChange={(val) => updateCurrentDraft('teamAP1', val)}
+                        options={getAvailableUsersForCourt(currentCourtName, currentDraft.teamAP1)}
+                        playerStatsMap={playerStatsMap}
+                        placeholder="Chọn tay vợt..."
+                        colorTheme="blue"
+                        allowClear={true}
+                      />
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-slate-700">Player 2 (Đánh đôi)</label>
-                      <select
+                      <PlayerSelect
                         value={currentDraft.teamAP2}
-                        onChange={(e) => updateCurrentDraft('teamAP2', e.target.value)}
-                        className="w-full bg-white border border-slate-200 hover:border-blue-400 rounded-xl p-2.5 text-slate-900 font-bold focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-none text-xs shadow-xs transition"
-                      >
-                        <option value="">(Không có - Đánh đơn)</option>
-                        {getAvailableUsersForCourt(currentCourtName, currentDraft.teamAP2).map((u) => {
-                          const rank = getPlayerRankDisplay(u.eloScore || 0, u.placementMatches ?? 5)
-                          const stats = playerStatsMap[String(u.userId || u.id)]
-                          return (
-                            <option key={u.id} value={String(u.userId || u.id)}>
-                              {u.name} • {rank.name} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
-                              {u.isGuest ? '[Vãng lai]' : ''}
-                            </option>
-                          )
-                        })}
-                      </select>
+                        onChange={(val) => updateCurrentDraft('teamAP2', val)}
+                        options={getAvailableUsersForCourt(currentCourtName, currentDraft.teamAP2)}
+                        playerStatsMap={playerStatsMap}
+                        placeholder="(Không có - Đánh đơn)"
+                        colorTheme="blue"
+                        allowClear={true}
+                      />
                     </div>
                   </div>
 
@@ -1369,44 +1383,28 @@ export const HostDashboardView: React.FC = () => {
 
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-slate-700">Player 1</label>
-                      <select
+                      <PlayerSelect
                         value={currentDraft.teamBP1}
-                        onChange={(e) => updateCurrentDraft('teamBP1', e.target.value)}
-                        className="w-full bg-white border border-slate-200 hover:border-rose-400 rounded-xl p-2.5 text-slate-900 font-bold focus:border-rose-600 focus:ring-2 focus:ring-rose-100 focus:outline-none text-xs shadow-xs transition"
-                      >
-                        <option value="">Chọn tay vợt...</option>
-                        {getAvailableUsersForCourt(currentCourtName, currentDraft.teamBP1).map((u) => {
-                          const rank = getPlayerRankDisplay(u.eloScore || 0, u.placementMatches ?? 5)
-                          const stats = playerStatsMap[String(u.userId || u.id)]
-                          return (
-                            <option key={u.id} value={String(u.userId || u.id)}>
-                              {u.name} • {rank.name} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
-                              {u.isGuest ? '[Vãng lai]' : ''}
-                            </option>
-                          )
-                        })}
-                      </select>
+                        onChange={(val) => updateCurrentDraft('teamBP1', val)}
+                        options={getAvailableUsersForCourt(currentCourtName, currentDraft.teamBP1)}
+                        playerStatsMap={playerStatsMap}
+                        placeholder="Chọn tay vợt..."
+                        colorTheme="rose"
+                        allowClear={true}
+                      />
                     </div>
 
                     <div className="space-y-1">
                       <label className="block text-[11px] font-bold text-slate-700">Player 2 (Đánh đôi)</label>
-                      <select
+                      <PlayerSelect
                         value={currentDraft.teamBP2}
-                        onChange={(e) => updateCurrentDraft('teamBP2', e.target.value)}
-                        className="w-full bg-white border border-slate-200 hover:border-rose-400 rounded-xl p-2.5 text-slate-900 font-bold focus:border-rose-600 focus:ring-2 focus:ring-rose-100 focus:outline-none text-xs shadow-xs transition"
-                      >
-                        <option value="">(Không có - Đánh đơn)</option>
-                        {getAvailableUsersForCourt(currentCourtName, currentDraft.teamBP2).map((u) => {
-                          const rank = getPlayerRankDisplay(u.eloScore || 0, u.placementMatches ?? 5)
-                          const stats = playerStatsMap[String(u.userId || u.id)]
-                          return (
-                            <option key={u.id} value={String(u.userId || u.id)}>
-                              {u.name} • {rank.name} ({u.eloScore || 0} LP) | 🏸 {stats?.totalSets || 0} set{' '}
-                              {u.isGuest ? '[Vãng lai]' : ''}
-                            </option>
-                          )
-                        })}
-                      </select>
+                        onChange={(val) => updateCurrentDraft('teamBP2', val)}
+                        options={getAvailableUsersForCourt(currentCourtName, currentDraft.teamBP2)}
+                        playerStatsMap={playerStatsMap}
+                        placeholder="(Không có - Đánh đơn)"
+                        colorTheme="rose"
+                        allowClear={true}
+                      />
                     </div>
                   </div>
                 </div>
@@ -2249,39 +2247,27 @@ export const HostDashboardView: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Vị trí 1 (Bắt buộc):</label>
-                    <select
+                    <PlayerSelect
                       value={editMatchTeamAP1}
-                      onChange={(e) => setEditMatchTeamAP1(e.target.value)}
-                      className="w-full bg-white border border-blue-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-blue-600"
-                    >
-                      <option value="">-- Chọn Người 1 --</option>
-                      {rosterUsers.map((p) => {
-                        const uid = String(p.userId || p.id)
-                        return (
-                          <option key={uid} value={uid}>
-                            {p.name} ({p.eloScore || 0} LP)
-                          </option>
-                        )
-                      })}
-                    </select>
+                      onChange={setEditMatchTeamAP1}
+                      options={rosterUsers}
+                      playerStatsMap={playerStatsMap}
+                      placeholder="-- Chọn Người 1 --"
+                      colorTheme="blue"
+                      allowClear={false}
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Vị trí 2 (Đánh đôi):</label>
-                    <select
+                    <PlayerSelect
                       value={editMatchTeamAP2}
-                      onChange={(e) => setEditMatchTeamAP2(e.target.value)}
-                      className="w-full bg-white border border-blue-300 rounded-xl p-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:border-blue-600"
-                    >
-                      <option value="">-- Trống (Đánh đơn) --</option>
-                      {rosterUsers.map((p) => {
-                        const uid = String(p.userId || p.id)
-                        return (
-                          <option key={uid} value={uid}>
-                            {p.name} ({p.eloScore || 0} LP)
-                          </option>
-                        )
-                      })}
-                    </select>
+                      onChange={setEditMatchTeamAP2}
+                      options={rosterUsers}
+                      playerStatsMap={playerStatsMap}
+                      placeholder="-- Trống (Đánh đơn) --"
+                      colorTheme="blue"
+                      allowClear={true}
+                    />
                   </div>
                 </div>
               </div>
@@ -2302,39 +2288,27 @@ export const HostDashboardView: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Vị trí 1 (Bắt buộc):</label>
-                    <select
+                    <PlayerSelect
                       value={editMatchTeamBP1}
-                      onChange={(e) => setEditMatchTeamBP1(e.target.value)}
-                      className="w-full bg-white border border-rose-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-rose-600"
-                    >
-                      <option value="">-- Chọn Người 1 --</option>
-                      {rosterUsers.map((p) => {
-                        const uid = String(p.userId || p.id)
-                        return (
-                          <option key={uid} value={uid}>
-                            {p.name} ({p.eloScore || 0} LP)
-                          </option>
-                        )
-                      })}
-                    </select>
+                      onChange={setEditMatchTeamBP1}
+                      options={rosterUsers}
+                      playerStatsMap={playerStatsMap}
+                      placeholder="-- Chọn Người 1 --"
+                      colorTheme="rose"
+                      allowClear={false}
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Vị trí 2 (Đánh đôi):</label>
-                    <select
+                    <PlayerSelect
                       value={editMatchTeamBP2}
-                      onChange={(e) => setEditMatchTeamBP2(e.target.value)}
-                      className="w-full bg-white border border-rose-300 rounded-xl p-2.5 text-xs font-medium text-slate-900 focus:outline-none focus:border-rose-600"
-                    >
-                      <option value="">-- Trống (Đánh đơn) --</option>
-                      {rosterUsers.map((p) => {
-                        const uid = String(p.userId || p.id)
-                        return (
-                          <option key={uid} value={uid}>
-                            {p.name} ({p.eloScore || 0} LP)
-                          </option>
-                        )
-                      })}
-                    </select>
+                      onChange={setEditMatchTeamBP2}
+                      options={rosterUsers}
+                      playerStatsMap={playerStatsMap}
+                      placeholder="-- Trống (Đánh đơn) --"
+                      colorTheme="rose"
+                      allowClear={true}
+                    />
                   </div>
                 </div>
               </div>
