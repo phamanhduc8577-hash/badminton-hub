@@ -50,7 +50,7 @@ export const MemberListView: React.FC = () => {
       const res = await api.get('/members')
       return res.data
     },
-    refetchInterval: 8000,
+    refetchInterval: 30000,
   })
 
   const { data: deletedMembers = [], isLoading: isLoadingDeleted, refetch: refetchDeleted } = useQuery<MemberProfile[]>({
