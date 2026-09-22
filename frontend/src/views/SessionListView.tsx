@@ -405,10 +405,10 @@ export const SessionListView: React.FC = () => {
           </div>
 
           {/* Status Filter Tabs - Mobile Responsive Pill Group */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-200/80 rounded-2xl w-full sm:w-auto overflow-x-auto shadow-inner">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-200/80 rounded-2xl w-full sm:w-auto overflow-x-auto no-scrollbar shadow-inner touch-pan-x">
             <button
               onClick={() => setStatusFilter('ALL')}
-              className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 statusFilter === 'ALL'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-600 hover:text-slate-950'
@@ -421,7 +421,7 @@ export const SessionListView: React.FC = () => {
             {user && (
               <button
                 onClick={() => setStatusFilter('MY_SESSIONS')}
-                className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                   statusFilter === 'MY_SESSIONS'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-950'
@@ -434,7 +434,7 @@ export const SessionListView: React.FC = () => {
 
             <button
               onClick={() => setStatusFilter('ACTIVE_UPCOMING')}
-              className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 statusFilter === 'ACTIVE_UPCOMING'
                   ? 'bg-slate-950 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-950'
@@ -446,7 +446,7 @@ export const SessionListView: React.FC = () => {
 
             <button
               onClick={() => setStatusFilter('COMPLETED')}
-              className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 statusFilter === 'COMPLETED'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-600 hover:text-slate-950'
