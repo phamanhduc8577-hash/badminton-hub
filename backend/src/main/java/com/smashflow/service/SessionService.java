@@ -33,7 +33,7 @@ public class SessionService {
 
     public List<SessionResponse> getAllSessions(User currentUser) {
         List<Long> bookedSessionIds = (currentUser != null)
-                ? participantRepository.findBookedSessionIdsByUserId(currentUser.getId())
+                ? participantRepository.findBookedSessionIdsByUserIdOrPhone(currentUser.getId(), currentUser.getPhone())
                 : List.of();
 
         return sessionRepository.findAllByOrderByStartTimeDesc().stream()
@@ -49,7 +49,7 @@ public class SessionService {
 
     public List<SessionResponse> getUpcomingSessions(User currentUser) {
         List<Long> bookedSessionIds = (currentUser != null)
-                ? participantRepository.findBookedSessionIdsByUserId(currentUser.getId())
+                ? participantRepository.findBookedSessionIdsByUserIdOrPhone(currentUser.getId(), currentUser.getPhone())
                 : List.of();
 
         return sessionRepository.findByStatusOrderByStartTimeDesc(SessionStatus.UPCOMING).stream()
@@ -79,7 +79,7 @@ public class SessionService {
         response.setParticipants(participants);
         if (currentUser != null) {
             boolean isBooked = participants.stream()
-                    .anyMatch(p -> p.getUserId() != null && p.getUserId().equals(currentUser.getId()) && p.getCheckinStatus() != CheckinStatus.ABSENT);
+                    .anyMatch(p -> ((p.getUserId() != null && p.getUserId().equals(currentUser.getId())) || (p.getPhone() != null && p.getPhone().equals(currentUser.getPhone()))) && p.getCheckinStatus() != CheckinStatus.ABSENT);
             response.setIsBookedByCurrentUser(isBooked);
         }
         return response;

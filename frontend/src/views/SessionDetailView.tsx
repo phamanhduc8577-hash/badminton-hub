@@ -308,7 +308,7 @@ export const SessionDetailView: React.FC = () => {
       setShowCheckinModal(true)
 
       // If user is already registered in this session and hasn't checked in yet, auto-trigger checkin
-      const currentUserParticipant = session.participants?.find((p) => user?.id && p.userId === user.id)
+      const currentUserParticipant = session.participants?.find((p) => (user?.id && p.userId === user.id) || (user?.phone && p.phone === user.phone))
       if (currentUserParticipant && currentUserParticipant.checkinStatus !== 'CHECKED_IN') {
         autoCheckinTriggered.current = true
         handleCheckinSubmit(cleanToken)
@@ -371,8 +371,8 @@ export const SessionDetailView: React.FC = () => {
     )
   }
 
-  // Find user participant info (Strictly match logged-in user)
-  const isUserParticipant = session.participants?.find((p) => user?.id && p.userId === user.id)
+  // Find user participant info (Strictly match logged-in user by ID or Phone)
+  const isUserParticipant = session.participants?.find((p) => (user?.id && p.userId === user.id) || (user?.phone && p.phone === user.phone))
   const isPendingDeposit = isUserParticipant && Number(isUserParticipant.depositAmount) > 0 && isUserParticipant.depositStatus !== 'PAID'
   const isCheckedIn = isUserParticipant?.checkinStatus === 'CHECKED_IN'
   const isFull = session.bookedSlots >= session.maxSlots
