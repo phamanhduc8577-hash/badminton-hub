@@ -11,18 +11,15 @@ import {
   Phone,
   Lock,
   User as UserIcon,
-  ShieldCheck,
-  Trophy,
-  QrCode,
   CheckCircle2,
   Upload,
   Camera,
-  KeyRound,
   Send,
   ArrowLeft,
   Gift,
   Coins,
   Swords,
+  Trophy,
 } from 'lucide-react'
 
 export const LoginView: React.FC = () => {
@@ -170,71 +167,11 @@ export const LoginView: React.FC = () => {
   }
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center py-6">
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-        {/* Left Side: Brand Showcase & Value Props (6 cols) */}
-        <div className="lg:col-span-6 space-y-6">
-          <div className="flex items-center gap-4">
-            <DuckMascot size={64} rounded="2xl" />
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold uppercase tracking-wider">
-                <span>SmashFlow Portal</span>
-              </div>
-              <h2 className="text-xl font-black text-slate-900 mt-1">CLB Làng Địa Ngục</h2>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-              Quản trị CLB cầu lông & <br />
-              <span className="underline decoration-rose-500/40 decoration-4 underline-offset-8">
-                điểm danh thông minh
-              </span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-              Hệ sinh thái cầu lông thông minh: Tích điểm chuyên cần đổi quà, vinh danh leo rank Thách Đấu, ghép sân cân bằng trình độ và minh bạch chi phí từng ca.
-            </p>
-          </div>
-
-          {/* Value Props Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold">
-                <Gift size={16} />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm">Tích điểm chuyên cần</h4>
-              <p className="text-slate-600 text-[11px]">Đổi nước tăng lực & voucher giảm giá slot ca đánh.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
-                <Trophy size={16} />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm">Leo Rank & Vinh danh</h4>
-              <p className="text-slate-600 text-[11px]">Bảng xếp hạng chiến thần và danh hiệu Thách Đấu.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
-                <Swords size={16} />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm">Ghép sân thông minh</h4>
-              <p className="text-slate-600 text-[11px]">Cân bằng trình độ 100%, bắt kèo đấu sòng phẳng.</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
-                <Coins size={16} />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm">Chia tiền tự động</h4>
-              <p className="text-slate-600 text-[11px]">Hạch toán chi phí sân, cầu, nước rõ ràng từng buổi.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Auth Card Form (6 cols) */}
-        <div className="lg:col-span-6">
-          <div className="saas-card rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden">
+    <div className="min-h-[80vh] flex items-center justify-center py-4 sm:py-6">
+      <div className="w-full max-w-5xl flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+        {/* Auth Card Form: On Mobile displayed first (order-1), on Desktop right column (lg:order-2 lg:col-span-6) */}
+        <div id="auth-form-card" className="w-full order-1 lg:order-2 lg:col-span-6 scroll-mt-24">
+          <div className="saas-card rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-lg border border-slate-200/90 bg-white">
             <div className="space-y-1">
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">
                 {isForgotPassword
@@ -274,7 +211,7 @@ export const LoginView: React.FC = () => {
                     setForgotSuccess('')
                     setError('')
                   }}
-                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white text-xs rounded-xl shadow flex items-center justify-center gap-2 transition"
+                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white text-xs rounded-xl shadow flex items-center justify-center gap-2 transition cursor-pointer"
                 >
                   <ArrowLeft size={16} />
                   <span>Quay lại trang Đăng nhập</span>
@@ -332,7 +269,7 @@ export const LoginView: React.FC = () => {
                             setError('')
                             setForgotSuccess('')
                           }}
-                          className="text-[11px] font-bold text-slate-500 hover:text-slate-900 transition"
+                          className="text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
                         >
                           Quên mật khẩu?
                         </button>
@@ -360,7 +297,7 @@ export const LoginView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setGender('MALE')}
-                          className={`py-2.5 text-xs font-bold rounded-xl border transition ${
+                          className={`py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                             gender === 'MALE'
                               ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -371,7 +308,7 @@ export const LoginView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setGender('FEMALE')}
-                          className={`py-2.5 text-xs font-bold rounded-xl border transition ${
+                          className={`py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                             gender === 'FEMALE'
                               ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -389,7 +326,7 @@ export const LoginView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setMembershipChoice('CASUAL')}
-                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
                             membershipChoice === 'CASUAL'
                               ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-200 text-amber-950'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -409,7 +346,7 @@ export const LoginView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setMembershipChoice('FIXED')}
-                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between ${
+                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
                             membershipChoice === 'FIXED'
                               ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-200 text-emerald-950'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -442,7 +379,7 @@ export const LoginView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute -bottom-1 -right-1 p-1.5 bg-slate-950 text-white rounded-xl shadow border border-white"
+                            className="absolute -bottom-1 -right-1 p-1.5 bg-slate-950 text-white rounded-xl shadow border border-white cursor-pointer"
                             title="Tải ảnh từ máy"
                           >
                             <Camera size={12} />
@@ -461,7 +398,7 @@ export const LoginView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full py-2 px-3 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 flex items-center justify-center gap-1.5 shadow-2xs transition"
+                            className="w-full py-2 px-3 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
                           >
                             <Upload size={14} className="text-slate-600" />
                             <span>Tải ảnh từ máy / điện thoại</span>
@@ -470,7 +407,7 @@ export const LoginView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setAvatarUrl('/duck-mascot.png')}
-                            className="w-full py-1 text-[11px] font-bold text-slate-500 hover:text-slate-900 transition"
+                            className="w-full py-1 text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
                           >
                             Dùng Mascot mặc định
                           </button>
@@ -483,7 +420,7 @@ export const LoginView: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white text-xs rounded-xl shadow flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50 mt-4"
+                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white text-xs rounded-xl shadow flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50 mt-4 cursor-pointer"
                 >
                   {isForgotPassword ? (
                     <>
@@ -514,7 +451,7 @@ export const LoginView: React.FC = () => {
                       setIsForgotPassword(false)
                       setError('')
                     }}
-                    className="text-xs text-slate-900 hover:underline font-bold flex items-center justify-center gap-1 mx-auto"
+                    className="text-xs text-slate-900 hover:underline font-bold flex items-center justify-center gap-1 mx-auto cursor-pointer"
                   >
                     <ArrowLeft size={14} />
                     <span>Quay lại Đăng nhập</span>
@@ -526,13 +463,73 @@ export const LoginView: React.FC = () => {
                       setIsRegister(!isRegister)
                       setError('')
                     }}
-                    className="text-xs text-slate-900 hover:underline font-bold"
+                    className="text-xs text-slate-900 hover:underline font-bold cursor-pointer"
                   >
                     {isRegister ? 'Đã có tài khoản? Đăng nhập ngay' : 'Chưa có tài khoản? Đăng ký thành viên'}
                   </button>
                 )}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Brand Showcase & Value Props: on Mobile order second (order-2), on Desktop left column (lg:order-1 lg:col-span-6) */}
+        <div className="w-full order-2 lg:order-1 lg:col-span-6 space-y-6">
+          <div className="flex items-center gap-4">
+            <DuckMascot size={64} rounded="2xl" />
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold uppercase tracking-wider">
+                <span>SmashFlow Portal</span>
+              </div>
+              <h2 className="text-xl font-black text-slate-900 mt-1">CLB Làng Địa Ngục</h2>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+              Quản trị CLB cầu lông & <br />
+              <span className="underline decoration-rose-500/40 decoration-4 underline-offset-8">
+                điểm danh thông minh
+              </span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+              Hệ sinh thái cầu lông thông minh: Tích điểm chuyên cần đổi quà, vinh danh leo rank Thách Đấu, ghép sân cân bằng trình độ và minh bạch chi phí từng ca.
+            </p>
+          </div>
+
+          {/* Value Props Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
+              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold">
+                <Gift size={16} />
+              </div>
+              <h4 className="font-bold text-slate-900 text-sm">Tích điểm chuyên cần</h4>
+              <p className="text-slate-600 text-[11px]">Đổi nước tăng lực & voucher giảm giá slot ca đánh.</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
+                <Trophy size={16} />
+              </div>
+              <h4 className="font-bold text-slate-900 text-sm">Leo Rank & Vinh danh</h4>
+              <p className="text-slate-600 text-[11px]">Bảng xếp hạng chiến thần và danh hiệu Thách Đấu.</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
+              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
+                <Swords size={16} />
+              </div>
+              <h4 className="font-bold text-slate-900 text-sm">Ghép sân thông minh</h4>
+              <p className="text-slate-600 text-[11px]">Cân bằng trình độ 100%, bắt kèo đấu sòng phẳng.</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
+                <Coins size={16} />
+              </div>
+              <h4 className="font-bold text-slate-900 text-sm">Chia tiền tự động</h4>
+              <p className="text-slate-600 text-[11px]">Hạch toán chi phí sân, cầu, nước rõ ràng từng buổi.</p>
+            </div>
           </div>
         </div>
       </div>

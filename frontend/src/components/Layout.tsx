@@ -205,8 +205,17 @@ export const Layout: React.FC = () => {
               </div>
             ) : (
               <button
-                onClick={() => navigate('/login')}
-                className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95"
+                onClick={() => {
+                  if (location.pathname === '/login') {
+                    const loginForm = document.getElementById('auth-form-card')
+                    if (loginForm) {
+                      loginForm.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    }
+                  } else {
+                    navigate('/login')
+                  }
+                }}
+                className="px-5 py-2.5 bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition active:scale-95 cursor-pointer"
               >
                 Đăng nhập
               </button>
