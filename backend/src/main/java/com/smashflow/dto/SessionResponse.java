@@ -51,5 +51,7 @@ public class SessionResponse {
     private String checkinToken;
     private LocalDateTime tokenExpiresAt;
 
+    private Boolean isBookedByCurrentUser;
+
     private List<ParticipantResponse> participants;
 }

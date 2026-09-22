@@ -63,7 +63,7 @@ export const SessionListView: React.FC = () => {
     depositAmount: 0,
   })
 
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE_UPCOMING' | 'COMPLETED'>('ALL')
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'MY_SESSIONS' | 'ACTIVE_UPCOMING' | 'COMPLETED'>('ALL')
   const [showAllCompleted, setShowAllCompleted] = useState(false)
 
   const { data: sessions, isLoading, error } = useQuery<SessionItem[]>({
@@ -230,6 +230,9 @@ export const SessionListView: React.FC = () => {
       return timeA - timeB // Ca sắp tới gần nhất xếp trên
     })
 
+    if (statusFilter === 'MY_SESSIONS') {
+      return sorted.filter((s) => Boolean(s.isBookedByCurrentUser))
+    }
     if (statusFilter === 'ACTIVE_UPCOMING') {
       return sorted.filter((s) => s.effectiveStatus === 'ACTIVE' || s.effectiveStatus === 'UPCOMING')
     }
@@ -242,16 +245,19 @@ export const SessionListView: React.FC = () => {
 
   // Thống kê nhanh số lượng theo trạng thái
   const counts = React.useMemo(() => {
-    if (!sessions) return { total: 0, activeUpcoming: 0, completed: 0 }
+    if (!sessions) return { total: 0, mySessions: 0, activeUpcoming: 0, completed: 0 }
+    let mySessions = 0
     let activeUpcoming = 0
     let completed = 0
     sessions.forEach((s) => {
+      if (s.isBookedByCurrentUser) mySessions++
       const st = getEffectiveStatus(s)
       if (st === 'ACTIVE' || st === 'UPCOMING') activeUpcoming++
       else completed++
     })
     return {
       total: sessions.length,
+      mySessions,
       activeUpcoming,
       completed,
     }
@@ -412,6 +418,20 @@ export const SessionListView: React.FC = () => {
               <span>Tất cả ({counts.total})</span>
             </button>
 
+            {user && (
+              <button
+                onClick={() => setStatusFilter('MY_SESSIONS')}
+                className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  statusFilter === 'MY_SESSIONS'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                <CheckCircle size={13} className={statusFilter === 'MY_SESSIONS' ? 'text-white' : 'text-emerald-600'} />
+                <span>Ca của tôi ({counts.mySessions})</span>
+              </button>
+            )}
+
             <button
               onClick={() => setStatusFilter('ACTIVE_UPCOMING')}
               className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
@@ -451,7 +471,9 @@ export const SessionListView: React.FC = () => {
           <div className="text-center py-16 saas-card rounded-3xl space-y-3 border border-slate-200">
             <DuckMascot size={64} rounded="2xl" className="mx-auto opacity-70" />
             <p className="text-slate-950 font-black text-lg">
-              {statusFilter === 'ACTIVE_UPCOMING'
+              {statusFilter === 'MY_SESSIONS'
+                ? 'Bạn chưa đăng ký tham gia ca đánh nào'
+                : statusFilter === 'ACTIVE_UPCOMING'
                 ? 'Không có ca đánh nào đang mở hoặc sắp diễn ra'
                 : statusFilter === 'COMPLETED'
                 ? 'Chưa có ca đánh nào kết thúc'
@@ -459,7 +481,7 @@ export const SessionListView: React.FC = () => {
             </p>
             <p className="text-slate-500 text-xs font-semibold">
               {statusFilter !== 'ALL'
-                ? 'Bạn có thể chọn tab "Tất cả" để xem toàn bộ lịch hoạt động.'
+                ? 'Bạn có thể chọn tab "Tất cả" hoặc "Sắp tới" để khám phá và đăng ký ca.'
                 : 'Vui lòng quay lại sau hoặc liên hệ Host.'}
             </p>
             {statusFilter !== 'ALL' && (
@@ -494,7 +516,14 @@ export const SessionListView: React.FC = () => {
                   <div className="space-y-3.5 sm:space-y-4">
                     {/* Header Badges */}
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5 sm:gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        {session.isBookedByCurrentUser && (
+                          <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black uppercase px-2.5 py-1 rounded-full bg-emerald-600 text-white shadow-md shadow-emerald-600/20 border border-emerald-500 animate-in fade-in">
+                            <CheckCircle size={12} className="text-white" />
+                            <span>Đã đăng ký</span>
+                          </span>
+                        )}
+
                         <span
                           className={`text-[10px] font-black uppercase px-2.5 sm:px-3 py-1 rounded-full border ${
                             effectiveStatus === 'ACTIVE'

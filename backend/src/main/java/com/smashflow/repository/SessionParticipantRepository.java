@@ -31,5 +31,8 @@ public interface SessionParticipantRepository extends JpaRepository<SessionParti
 
     @Query("SELECT COUNT(sp) FROM SessionParticipant sp WHERE (sp.guestPhone = :phone OR (sp.user IS NOT NULL AND sp.user.phone = :phone)) AND sp.checkinStatus != com.smashflow.model.CheckinStatus.ABSENT")
     long countPastBookingsByPhone(String phone);
+
+    @Query("SELECT DISTINCT sp.session.id FROM SessionParticipant sp WHERE sp.user.id = :userId AND sp.checkinStatus != com.smashflow.model.CheckinStatus.ABSENT")
+    List<Long> findBookedSessionIdsByUserId(Long userId);
 }
 

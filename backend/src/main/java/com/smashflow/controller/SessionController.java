@@ -24,18 +24,18 @@ public class SessionController {
     private final CheckinAndPricingService checkinAndPricingService;
 
     @GetMapping
-    public ResponseEntity<List<SessionResponse>> getAllSessions() {
-        return ResponseEntity.ok(sessionService.getAllSessions());
+    public ResponseEntity<List<SessionResponse>> getAllSessions(@AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(sessionService.getAllSessions(currentUser));
     }
 
     @GetMapping("/public/upcoming")
-    public ResponseEntity<List<SessionResponse>> getUpcomingSessions() {
-        return ResponseEntity.ok(sessionService.getUpcomingSessions());
+    public ResponseEntity<List<SessionResponse>> getUpcomingSessions(@AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(sessionService.getUpcomingSessions(currentUser));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SessionResponse> getSessionDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(sessionService.getSessionDetail(id));
+    public ResponseEntity<SessionResponse> getSessionDetail(@PathVariable Long id, @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(sessionService.getSessionDetail(id, currentUser));
     }
 
     @PostMapping

@@ -72,6 +72,7 @@ export interface SessionItem {
   costDrinks?: number
   checkinToken?: string
   tokenExpiresAt?: string
+  isBookedByCurrentUser?: boolean
   participants?: Participant[]
 }
 

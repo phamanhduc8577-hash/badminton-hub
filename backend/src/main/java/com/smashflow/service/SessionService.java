@@ -31,19 +31,43 @@ public class SessionService {
     private final TelegramNotificationService telegramNotificationService;
     private final LoyaltyRewardRepository loyaltyRewardRepository;
 
-    public List<SessionResponse> getAllSessions() {
+    public List<SessionResponse> getAllSessions(User currentUser) {
+        List<Long> bookedSessionIds = (currentUser != null)
+                ? participantRepository.findBookedSessionIdsByUserId(currentUser.getId())
+                : List.of();
+
         return sessionRepository.findAllByOrderByStartTimeDesc().stream()
-                .map(this::toSessionResponseSummary)
+                .map(s -> {
+                    SessionResponse res = toSessionResponseSummary(s);
+                    if (currentUser != null) {
+                        res.setIsBookedByCurrentUser(bookedSessionIds.contains(s.getId()));
+                    }
+                    return res;
+                })
                 .collect(Collectors.toList());
     }
 
-    public List<SessionResponse> getUpcomingSessions() {
+    public List<SessionResponse> getUpcomingSessions(User currentUser) {
+        List<Long> bookedSessionIds = (currentUser != null)
+                ? participantRepository.findBookedSessionIdsByUserId(currentUser.getId())
+                : List.of();
+
         return sessionRepository.findByStatusOrderByStartTimeDesc(SessionStatus.UPCOMING).stream()
-                .map(this::toSessionResponseSummary)
+                .map(s -> {
+                    SessionResponse res = toSessionResponseSummary(s);
+                    if (currentUser != null) {
+                        res.setIsBookedByCurrentUser(bookedSessionIds.contains(s.getId()));
+                    }
+                    return res;
+                })
                 .collect(Collectors.toList());
     }
 
     public SessionResponse getSessionDetail(Long id) {
+        return getSessionDetail(id, null);
+    }
+
+    public SessionResponse getSessionDetail(Long id, User currentUser) {
         Session session = sessionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
 
@@ -53,6 +77,11 @@ public class SessionService {
 
         SessionResponse response = toSessionResponseSummary(session);
         response.setParticipants(participants);
+        if (currentUser != null) {
+            boolean isBooked = participants.stream()
+                    .anyMatch(p -> p.getUserId() != null && p.getUserId().equals(currentUser.getId()) && p.getCheckinStatus() != CheckinStatus.ABSENT);
+            response.setIsBookedByCurrentUser(isBooked);
+        }
         return response;
     }
 
