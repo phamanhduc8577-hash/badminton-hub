@@ -36,7 +36,7 @@ public class Venue {
     @Builder.Default
     private Integer radiusMeters = 150;
 
-    @CreationTimestamp
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

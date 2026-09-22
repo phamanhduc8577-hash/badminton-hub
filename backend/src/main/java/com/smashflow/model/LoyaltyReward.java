@@ -35,7 +35,7 @@ public class LoyaltyReward {
 
     private LocalDateTime claimedAt;
 
-    @CreationTimestamp
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 }
