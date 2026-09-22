@@ -75,10 +75,6 @@ export const LeaderboardView: React.FC = () => {
               Bảng xếp hạng
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-              Vinh danh các tay vợt theo hệ thống 10 Bậc Rank & Đoàn (III, II, I): 100 Điểm mỗi đoàn, chuỗi thắng thưởng thêm điểm, và 5 trận phân hạng khởi đầu.
-            </p>
-
             {/* Quick Rank Crest Strip Preview */}
             <div className="flex items-center gap-2.5 pt-2 overflow-x-auto pb-1">
               {LOL_RANKS.map((r) => (
