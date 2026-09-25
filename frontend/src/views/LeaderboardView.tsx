@@ -89,38 +89,38 @@ export const LeaderboardView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             <button
               onClick={() => setShowTierSystem(!showTierSystem)}
-              className="px-4 py-3 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs rounded-2xl border border-slate-300 shadow-sm transition flex items-center gap-2 active:scale-95"
+              className="px-4 py-2.5 sm:py-3 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs rounded-2xl border border-slate-300 shadow-sm transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
             >
               <Info size={16} className="text-rose-600" />
               <span>{showTierSystem ? 'Ẩn khung 10 Bậc Rank' : 'Khung 10 Bậc Rank'}</span>
             </button>
 
             {/* Tab Switcher */}
-            <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-300 text-xs font-bold min-w-[290px] shadow-sm">
+            <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-300 text-xs font-bold w-full sm:w-auto sm:min-w-[290px] shadow-sm">
               <button
                 onClick={() => setTab('attendance')}
-                className={`py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition ${
+                className={`py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   tab === 'attendance'
                     ? 'bg-slate-950 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
-                <Award size={16} />
+                <Award size={15} />
                 <span>Rank Chuyên cần</span>
               </button>
 
               <button
                 onClick={() => setTab('wins')}
-                className={`py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition ${
+                className={`py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   tab === 'wins'
                     ? 'bg-slate-950 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
-                <Flame size={16} className="text-rose-500" />
+                <Flame size={15} className="text-rose-500" />
                 <span>Rank Chiến thần</span>
               </button>
             </div>

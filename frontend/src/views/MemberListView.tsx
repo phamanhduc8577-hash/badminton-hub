@@ -234,7 +234,7 @@ export const MemberListView: React.FC = () => {
         {/* Quick Stats Grid */}
         <div
           className={`grid gap-3 pt-6 mt-6 border-t border-slate-200/80 text-xs ${
-            user?.role === 'HOST' ? 'grid-cols-3' : 'grid-cols-2'
+            user?.role === 'HOST' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'
           }`}
         >
           <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl">
@@ -259,10 +259,10 @@ export const MemberListView: React.FC = () => {
       {/* Navigation Tabs & Search Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Tabs */}
-        <div className="flex items-center gap-1.5 p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
+        <div className="flex items-center gap-1.5 p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto no-scrollbar touch-pan-x">
           <button
             onClick={() => setActiveTab('FIXED')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
               activeTab === 'FIXED'
                 ? 'bg-slate-900 text-white shadow-md'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -277,7 +277,7 @@ export const MemberListView: React.FC = () => {
           {user?.role === 'HOST' && (
             <button
               onClick={() => setActiveTab('PENDING')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
                 activeTab === 'PENDING'
                   ? 'bg-amber-600 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -294,7 +294,7 @@ export const MemberListView: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('CASUAL')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
               activeTab === 'CASUAL'
                 ? 'bg-slate-900 text-white shadow-md'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -308,7 +308,7 @@ export const MemberListView: React.FC = () => {
         </div>
 
         {/* Search Box */}
-        <div className="relative min-w-[240px]">
+        <div className="relative w-full sm:w-auto sm:min-w-[240px]">
           <Search className="absolute left-3.5 top-2.5 text-slate-400" size={15} />
           <input
             type="text"
