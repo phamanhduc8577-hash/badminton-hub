@@ -379,11 +379,11 @@ export const SessionDetailView: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Top Breadcrumb Bar */}
-      <div className="flex items-center justify-between">
+      {/* Top Breadcrumb & Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition bg-white px-3.5 py-1.5 rounded-lg border border-slate-200 shadow-sm"
+          className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-slate-950 transition bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs self-start sm:self-auto cursor-pointer"
         >
           <ArrowLeft size={15} />
           <span>Quay lại danh sách ca</span>
@@ -392,10 +392,10 @@ export const SessionDetailView: React.FC = () => {
         {user?.role === 'HOST' && (
           <button
             onClick={() => navigate(`/host/session/${session.id}`)}
-            className="flex items-center gap-2 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition shadow-md shadow-rose-600/20 active:scale-95 cursor-pointer w-full sm:w-auto"
           >
             <Shield size={15} />
-            <span>Mở Host Panel</span>
+            <span>Mở Host Panel: Bắt Kèo & Quản Lý Ca</span>
           </button>
         )}
       </div>
@@ -446,10 +446,10 @@ export const SessionDetailView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Session Info & Pricing Card (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="saas-card rounded-3xl p-8 space-y-6 relative">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="saas-card rounded-3xl p-5 sm:p-8 space-y-6 relative">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold uppercase px-3 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-200">
+                <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-200">
                   {session.status === 'ACTIVE'
                     ? '• Đang diễn ra'
                     : session.status === 'UPCOMING'
@@ -469,13 +469,13 @@ export const SessionDetailView: React.FC = () => {
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-950 leading-tight">
               {session.title}
             </h1>
 
             {/* Venue & Time Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-700">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs text-slate-700">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
                 <div className="flex items-center gap-2 text-slate-900 font-bold">
                   <MapPin size={15} />
                   <span>Địa điểm thi đấu</span>
@@ -484,7 +484,7 @@ export const SessionDetailView: React.FC = () => {
                 <p className="text-slate-600 text-[11px] leading-relaxed font-medium">{session.venueAddress}</p>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
                 <div className="flex items-center gap-2 text-slate-900 font-bold">
                   <Clock size={15} className="text-rose-600" />
                   <span>Khung giờ ca đánh</span>
