@@ -749,44 +749,52 @@ export const HostDashboardView: React.FC = () => {
       </div>
 
       {/* Host Command Center Banner */}
-      <div className="saas-card rounded-3xl p-6 sm:p-8 md:p-10 space-y-6 relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
-          <div className="space-y-3 max-w-2xl">
-            <div className="flex items-center gap-2.5">
-              <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 bg-slate-100 text-slate-800 border border-slate-200 rounded-full flex items-center gap-1.5">
-                <Shield size={14} className="text-slate-950" />
+      <div className="saas-card rounded-3xl p-5 sm:p-8 space-y-6 relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div className="space-y-4 max-w-2xl">
+            {/* Top Pill Tags & Court Config Button */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-black uppercase tracking-wider px-3 py-1 bg-slate-900 text-white rounded-full flex items-center gap-1.5 shadow-xs">
+                <Shield size={13} className="text-rose-400" />
                 <span>Host Control Center</span>
               </span>
-              <span className="text-xs text-slate-600 font-semibold">Sân: {session.venueName}</span>
+
               <button
                 onClick={() => {
                   setCourtEditNamesInput(session.courtNames || 'Sân 1, Sân 2')
                   setCourtEditSlotsInput(session.maxSlots || 8)
                   setShowCourtEditModal(true)
                 }}
-                className="text-xs font-bold px-3 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-white shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+                className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-2xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
                 title="Nhấn để sửa tên sân hoặc nâng/giảm slot nhanh"
               >
                 <span>🏸 {session.courtNames || 'Sân 1, Sân 2'} ({courtList.length} Sân)</span>
-                <Edit2 size={11} className="text-slate-300" />
+                <Edit2 size={11} className="text-slate-500" />
               </button>
             </div>
 
-            <div className="flex items-center gap-4">
-              <DuckMascot src="/duck-mascot.png" size={56} rounded="2xl" className="shadow-md border border-slate-200" />
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{session.title}</h1>
-                <p className="text-xs sm:text-sm text-slate-600 font-normal">
-                  {new Date(session.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} -{' '}
-                  {new Date(session.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}{' '}
-                  • Mục tiêu: <b>Tối thiểu {minTargetSets} set/người</b>
-                </p>
+            {/* Session Title & Metadata Chips */}
+            <div className="space-y-2">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight leading-snug">
+                {session.title}
+              </h1>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 pt-1">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+                  📍 <b>{session.venueName}</b>
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+                  ⏰ {new Date(session.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(session.endTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 font-bold">
+                  🎯 Tối thiểu {minTargetSets} set/người
+                </span>
               </div>
             </div>
           </div>
 
           {/* Dynamic Token Quick Box */}
-          <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0">
             <div
               onClick={() => setShowQrModal(true)}
               className="w-16 h-16 bg-white p-1.5 rounded-xl flex items-center justify-center cursor-pointer shadow border border-slate-200 hover:scale-105 transition"
@@ -817,71 +825,71 @@ export const HostDashboardView: React.FC = () => {
         </div>
 
         {/* Quick Executive Metrics Dashboard */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-slate-200 text-xs relative z-10">
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-5 border-t border-slate-200 text-xs relative z-10">
+          <div className="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200">
             <span className="text-slate-500 font-bold block text-[11px]">Quân số hiện tại</span>
-            <span className="text-xl font-black text-slate-900 mt-1 block">
+            <span className="text-lg sm:text-xl font-black text-slate-900 mt-1 block">
               {session.bookedSlots} / {session.maxSlots} Người
             </span>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          <div className="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200">
             <span className="text-slate-500 font-bold block text-[11px]">Đã điểm danh tại sân</span>
-            <span className="text-xl font-black text-emerald-700 mt-1 block">{session.checkedInSlots} Đã Đến</span>
+            <span className="text-lg sm:text-xl font-black text-emerald-700 mt-1 block">{session.checkedInSlots} Đã Đến</span>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          <div className="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200">
             <span className="text-slate-500 font-bold block text-[11px]">Doanh thu đã thu</span>
-            <span className="text-xl font-black text-slate-900 mt-1 block">
+            <span className="text-lg sm:text-xl font-black text-slate-900 mt-1 block">
               {Number(report?.totalRevenue || 0).toLocaleString()}đ
             </span>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          <div className="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200">
             <span className="text-slate-500 font-bold block text-[11px]">Tổng số trận đã đánh</span>
-            <span className="text-xl font-black text-slate-900 mt-1 block">
+            <span className="text-lg sm:text-xl font-black text-slate-900 mt-1 block">
               {matches?.length || 0} Trận ({courtList.length} Sân)
             </span>
           </div>
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+      {/* Tabs Navigation - Horizontal Mobile Friendly */}
+      <div className="flex items-center gap-1.5 p-1 bg-slate-200/80 rounded-2xl overflow-x-auto no-scrollbar shadow-inner text-xs font-bold touch-pan-x">
         <button
           onClick={() => setActiveTab('roster')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+          className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
             activeTab === 'roster'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-slate-950 text-white shadow-md'
+              : 'text-slate-700 hover:text-slate-950'
           }`}
         >
-          <Users size={15} />
-          <span>1. Danh sách & Điểm danh ({session.participants?.length || 0})</span>
+          <Users size={14} />
+          <span>1. Điểm danh ({session.participants?.length || 0})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('matchmaker')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+          className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
             activeTab === 'matchmaker'
-              ? 'bg-slate-950 text-white shadow-md shadow-slate-900/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-slate-950 text-white shadow-md'
+              : 'text-slate-700 hover:text-slate-950'
           }`}
         >
-          <Swords size={15} />
-          <span>2. Bắt kèo Đa Sân & Điều Tiết Set Cầu ({courtList.length} Sân)</span>
+          <Swords size={14} />
+          <span>2. Bắt kèo ({courtList.length} Sân)</span>
         </button>
 
         <button
           onClick={() => setActiveTab('settle')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+          className={`flex-1 sm:flex-initial px-3.5 py-2 rounded-xl transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
             activeTab === 'settle'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-slate-950 text-white shadow-md'
+              : 'text-slate-700 hover:text-slate-950'
           }`}
         >
-          <DollarSign size={15} />
-          <span>3. Quyết toán tài chính & MVP</span>
+          <DollarSign size={14} />
+          <span>3. Quyết toán & MVP</span>
         </button>
       </div>
 
@@ -1589,17 +1597,17 @@ export const HostDashboardView: React.FC = () => {
             })()
           )}
 
-          <div className="saas-card rounded-3xl p-6 sm:p-8 md:p-10 space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+          <div className="saas-card rounded-3xl p-5 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-4 border-b border-slate-200">
               <div>
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Receipt size={18} className="text-slate-900" />
+                <h2 className="text-base font-black text-slate-950 flex items-center gap-2">
+                  <Receipt size={18} className="text-slate-950" />
                   <span>Báo cáo Quyết toán Doanh thu & Chi phí Ca</span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">Báo cáo tài chính minh bạch cho Host</p>
               </div>
 
-              <span className="text-xs font-bold px-3 py-1 bg-slate-100 text-slate-800 rounded-full">
+              <span className="text-[11px] font-bold px-3 py-1 bg-slate-100 text-slate-800 rounded-xl border border-slate-200 self-start sm:self-auto truncate max-w-xs">
                 {session.title}
               </span>
             </div>
