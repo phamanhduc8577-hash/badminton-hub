@@ -122,7 +122,7 @@ export const HostDashboardView: React.FC = () => {
       const res = await api.get(`/sessions/${id}`)
       return res.data
     },
-    refetchInterval: 12000,
+    refetchInterval: false,
   })
 
   const { data: matches } = useQuery<Match[]>({

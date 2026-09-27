@@ -20,6 +20,7 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 60 * 1000, // Cache dữ liệu 1 phút, giảm tải gọi API liên tục
     },
   },
 })

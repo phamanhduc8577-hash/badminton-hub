@@ -60,7 +60,7 @@ export const SessionDetailView: React.FC = () => {
       const res = await api.get(`/sessions/${id}`)
       return res.data
     },
-    refetchInterval: 15000,
+    refetchInterval: false,
   })
 
   const { data: matches } = useQuery<Match[]>({
@@ -70,7 +70,7 @@ export const SessionDetailView: React.FC = () => {
       return res.data
     },
     enabled: !!id,
-    refetchInterval: 15000,
+    refetchInterval: false,
   })
 
   // Calculate sets, wins, losses per player for the session
