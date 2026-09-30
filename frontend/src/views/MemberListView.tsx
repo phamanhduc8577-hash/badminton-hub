@@ -6,7 +6,6 @@ import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
 import { getPlayerRankDisplay, LOL_RANKS } from '../lib/ranks'
-import { notifyForgotPasswordDirect } from '../lib/telegram'
 import {
   Users,
   ShieldCheck,
@@ -862,9 +861,6 @@ export const MemberListView: React.FC = () => {
                 onClick={() => {
                   const targetMember = confirmResetPassMember
                   resetPasswordMutation.mutate(targetMember.id, {
-                    onSuccess: () => {
-                      notifyForgotPasswordDirect(targetMember.fullName, targetMember.phone || 'Chưa có SĐT', '123456').catch(() => {})
-                    },
                     onSettled: () => setConfirmResetPassMember(null),
                   })
                 }}

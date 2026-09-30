@@ -4,7 +4,6 @@ import { api } from '../lib/api'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
-import { notifyNewUserRegisteredDirect, notifyForgotPasswordDirect } from '../lib/telegram'
 import {
   LogIn,
   UserPlus,
@@ -105,13 +104,6 @@ export const LoginView: React.FC = () => {
         }
         const res = await api.post('/auth/forgot-password', { phone: cleanPhone })
         setForgotSuccess(res.data?.message || 'Đã gửi yêu cầu cấp lại mật khẩu đến Host qua Telegram!')
-
-        // Gửi thông báo trực tiếp qua Telegram (Direct Channel) để đảm bảo 100% Host nhận được tức thì
-        const userFoundName = res.data?.fullName || 'Thành viên CLB'
-        const tempPass = res.data?.tempPassword
-        const countToday = res.data?.resetCountToday
-        const maxPerDay = res.data?.maxResetPerDay
-        notifyForgotPasswordDirect(userFoundName, cleanPhone, tempPass, countToday, maxPerDay).catch(() => {})
       } else if (isRegister) {
         const cleanPhone = phone.trim()
         const phoneRegex = /^(0[35789])[0-9]{8}$/
@@ -136,14 +128,6 @@ export const LoginView: React.FC = () => {
           avatarUrl: payloadAvatar,
         })
         setAuth(res.data, res.data.token)
-
-        // Instant direct Telegram notification pipeline
-        notifyNewUserRegisteredDirect(
-          fullName.trim(),
-          cleanPhone,
-          gender,
-          membershipChoice
-        ).catch(() => {})
 
         if (membershipChoice === 'FIXED') {
           showToast('Đăng ký thành công! Yêu cầu "Cố định" đang chờ Host duyệt.', 'info')
