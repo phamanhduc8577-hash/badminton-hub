@@ -70,7 +70,7 @@ export const MemberListView: React.FC = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
       queryClient.invalidateQueries({ queryKey: ['deleted-members'] })
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
       showToast(`Đã khôi phục thành công tài khoản của ${data.fullName}!`, 'success')
     },
@@ -78,6 +78,41 @@ export const MemberListView: React.FC = () => {
       showToast(err.response?.data?.message || 'Không thể khôi phục thành viên!', 'error')
     },
   })
+
+  // Mutations for Host
+  const optimizeAvatarsMutation = useMutation({
+    mutationFn: async (apply: boolean) => {
+      const res = await api.post('/members/optimize-avatars', null, { params: { apply } })
+      return res.data as {
+        changed: number
+        failed: number
+        beforeKb: number
+        afterKb: number
+        savedKb: number
+      }
+    },
+  })
+
+  const handleOptimizeAvatars = async () => {
+    try {
+      const preview = await optimizeAvatarsMutation.mutateAsync(false)
+      if (!preview.changed) {
+        showToast('Không có ảnh đại diện nào cần thu nhỏ thêm.', 'info')
+        return
+      }
+      const ok = window.confirm(
+        `Sẽ thu nhỏ ${preview.changed} ảnh đại diện (${preview.beforeKb} KB → ${preview.afterKb} KB, tiết kiệm khoảng ${preview.savedKb} KB mỗi lần tải danh sách).\n\n` +
+          'Thao tác này ghi đè ảnh cũ và không thể hoàn tác. Tiếp tục?'
+      )
+      if (!ok) return
+      await optimizeAvatarsMutation.mutateAsync(true)
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
+      showToast(`Đã thu nhỏ ${preview.changed} ảnh đại diện!`, 'success')
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Không thể tối ưu ảnh đại diện!', 'error')
+    }
+  }
 
   // Mutations for Host
   const approveMutation = useMutation({
@@ -143,7 +178,7 @@ export const MemberListView: React.FC = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
       showToast(data?.message || 'Đã xóa tài khoản thành viên thành công!')
     },
@@ -170,7 +205,7 @@ export const MemberListView: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
       setEditingRankMember(null)
       showToast('Đã cập nhật Bậc Rank & LP cho thành viên thành công!')
     },
@@ -187,7 +222,7 @@ export const MemberListView: React.FC = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-wins'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
       showToast(data?.message || 'Đã dọn sạch ca sân, bảo lưu toàn bộ thành viên thật!')
     },
@@ -253,6 +288,19 @@ export const MemberListView: React.FC = () => {
             <span className="text-xl font-black text-blue-950 mt-0.5 block">{casualMembers.length} người</span>
           </div>
         </div>
+
+        {user?.role === 'HOST' && (
+          <div className="pt-4 flex justify-end">
+            <button
+              onClick={handleOptimizeAvatars}
+              disabled={optimizeAvatarsMutation.isPending}
+              title="Thu nhỏ ảnh đại diện cũ để giảm băng thông"
+              className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-[11px] font-bold transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {optimizeAvatarsMutation.isPending ? 'Đang xử lý...' : '🖼️ Tối ưu ảnh đại diện'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Navigation Tabs & Search Toolbar */}

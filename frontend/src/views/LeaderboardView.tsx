@@ -1,34 +1,49 @@
 import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { LeaderboardEntry } from '../types'
+import { LeaderboardEntry, LeaderboardPage } from '../types'
+import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { RankEmblem } from '../components/RankEmblem'
 import { getLolRank, getPlayerRankDisplay, LOL_RANKS } from '../lib/ranks'
 import { Trophy, Flame, Award, TrendingUp, Shield, Sparkles, ChevronRight, Info, Zap } from 'lucide-react'
 
+const PAGE_SIZE = 30
+
 export const LeaderboardView: React.FC = () => {
+  const { user } = useAuthStore()
   const [tab, setTab] = useState<'attendance' | 'wins'>('attendance')
   const [showTierSystem, setShowTierSystem] = useState<boolean>(false)
 
-  const { data: attendanceRank, isLoading: loadingAttendance } = useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard-attendance'],
-    queryFn: async () => {
-      const res = await api.get('/leaderboards/attendance')
+  // Chỉ tải bảng của tab đang mở, mỗi lần 30 người; "Xem thêm" mới tải trang kế tiếp
+  const {
+    data,
+    isLoading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<LeaderboardPage>({
+    queryKey: ['leaderboards', tab, user?.id ?? 'anon'],
+    queryFn: async ({ pageParam }) => {
+      const res = await api.get(`/leaderboards/${tab}`, {
+        params: { page: pageParam, size: PAGE_SIZE },
+      })
       return res.data
     },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
   })
 
-  const { data: winsRank, isLoading: loadingWins } = useQuery<LeaderboardEntry[]>({
-    queryKey: ['leaderboard-wins'],
-    queryFn: async () => {
-      const res = await api.get('/leaderboards/wins')
-      return res.data
-    },
-  })
+  const entries: LeaderboardEntry[] = data?.pages.flatMap((p) => p.entries) ?? []
+  const me: LeaderboardEntry | null = data?.pages[0]?.me ?? null
+  const total = data?.pages[0]?.total ?? 0
+  const meIsListed = !!me && entries.some((e) => e.id === me.id)
 
-  const currentList = tab === 'attendance' ? attendanceRank : winsRank
-  const isLoading = tab === 'attendance' ? loadingAttendance : loadingWins
+  // Nếu người xem nằm ngoài phần đã tải, ghim hạng của họ ngay dưới danh sách để khỏi phải cuộn tìm
+  const renderList: { entry: LeaderboardEntry; pinned: boolean }[] = [
+    ...entries.map((entry) => ({ entry, pinned: false })),
+    ...(me && !meIsListed ? [{ entry: me, pinned: true }] : []),
+  ]
 
   const getRankBadge = (rank: number) => {
     if (rank === 1) {
@@ -187,15 +202,25 @@ export const LeaderboardView: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {currentList?.map((entry) => {
+            {renderList.map(({ entry, pinned }) => {
+              const isMe = me?.id === entry.id
               const score = tab === 'attendance' ? entry.sessionsAttended : (entry.eloScore ?? 0)
               const rankDisplay = getPlayerRankDisplay(entry.eloScore ?? 0, entry.placementMatches ?? 5, entry.shieldMatches ?? 0)
               const baseTier = getLolRank(entry.eloScore ?? 0)
 
               return (
+                <React.Fragment key={`${pinned ? 'me-' : ''}${entry.id}`}>
+                {pinned && (
+                  <div className="flex items-center gap-3 pt-2 text-[11px] font-black text-rose-600 uppercase tracking-wider">
+                    <span className="flex-1 border-t border-dashed border-rose-300" />
+                    <span>Hạng của bạn</span>
+                    <span className="flex-1 border-t border-dashed border-rose-300" />
+                  </div>
+                )}
                 <div
-                  key={entry.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-400 hover:shadow-lg transition duration-200 gap-4"
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 rounded-2xl border hover:border-slate-400 hover:shadow-lg transition duration-200 gap-4 ${
+                    isMe ? 'border-rose-400 ring-2 ring-rose-200 bg-rose-50/40' : 'border-slate-200/90 bg-white'
+                  }`}
                 >
                   {/* Left Player Info & 3D Helmet Crest */}
                   <div className="flex items-center gap-3.5 sm:gap-4">
@@ -220,6 +245,9 @@ export const LeaderboardView: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2.5 flex-wrap">
                         <span className="font-black text-base text-slate-950">{entry.fullName}</span>
+                        {isMe && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600 text-white font-black">Bạn</span>
+                        )}
 
                         {/* LOL Tier Pill for Wins */}
                         {tab === 'wins' ? (
@@ -288,8 +316,23 @@ export const LeaderboardView: React.FC = () => {
                     )}
                   </div>
                 </div>
+                </React.Fragment>
               )
             })}
+
+            {entries.length === 0 && (
+              <p className="text-center py-10 text-sm font-bold text-slate-500">Chưa có dữ liệu xếp hạng.</p>
+            )}
+
+            {hasNextPage && (
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="w-full py-3 rounded-2xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 font-bold text-sm transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isFetchingNextPage ? 'Đang tải...' : `Xem thêm (${entries.length}/${total})`}
+              </button>
+            )}
           </div>
         )}
       </div>

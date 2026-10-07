@@ -122,6 +122,15 @@ export interface Match {
   createdAt: string
 }
 
+export interface LeaderboardPage {
+  entries: LeaderboardEntry[]
+  me: LeaderboardEntry | null
+  page: number
+  size: number
+  total: number
+  hasMore: boolean
+}
+
 export interface LeaderboardEntry {
   id: number
   fullName: string

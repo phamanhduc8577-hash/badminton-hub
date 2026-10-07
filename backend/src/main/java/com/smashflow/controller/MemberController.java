@@ -18,6 +18,7 @@ import java.util.List;
 public class MemberController {
 
     private final MemberManagementService memberManagementService;
+    private final com.smashflow.service.AvatarOptimizationService avatarOptimizationService;
 
     @GetMapping
     public ResponseEntity<List<MemberProfileResponse>> getAllMembers(
@@ -82,6 +83,13 @@ public class MemberController {
     public ResponseEntity<java.util.Map<String, String>> deleteMember(@PathVariable Long userId) {
         String msg = memberManagementService.deleteMember(userId);
         return ResponseEntity.ok(java.util.Map.of("message", msg));
+    }
+
+    @PostMapping("/optimize-avatars")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<java.util.Map<String, Object>> optimizeAvatars(
+            @RequestParam(defaultValue = "false") boolean apply) {
+        return ResponseEntity.ok(avatarOptimizationService.optimizeAvatars(apply));
     }
 
     @PostMapping("/reset-database-clean")

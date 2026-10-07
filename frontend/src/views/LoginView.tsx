@@ -69,7 +69,7 @@ export const LoginView: React.FC = () => {
       const img = new window.Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
-        const size = 200 // Chuẩn 200x200 siêu sắc nét trên mọi màn hình Retina/OLED
+        const size = 128 // 128x128 đủ nét trên màn hình Retina/OLED mà dung lượng chỉ vài KB
         canvas.width = size
         canvas.height = size
         const ctx = canvas.getContext('2d')
@@ -78,7 +78,7 @@ export const LoginView: React.FC = () => {
           const sx = (img.width - minDim) / 2
           const sy = (img.height - minDim) / 2
           ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size)
-          const base64 = canvas.toDataURL('image/jpeg', 0.75) // Giữ độ nét cao 75% mà dung lượng chỉ ~12KB
+          const base64 = canvas.toDataURL('image/jpeg', 0.7) // Chất lượng 70%, dung lượng chỉ vài KB
           setAvatarUrl(base64)
         }
       }
