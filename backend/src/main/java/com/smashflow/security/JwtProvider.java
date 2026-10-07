@@ -13,11 +13,19 @@ import java.util.Date;
 @Component
 public class JwtProvider {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtProvider.class);
+    private static final String INSECURE_DEFAULT_SECRET = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+
     private final SecretKey key;
     private final long expiration;
 
     public JwtProvider(@Value("${jwt.secret}") String secret,
                        @Value("${jwt.expiration}") long expiration) {
+        if (INSECURE_DEFAULT_SECRET.equals(secret)) {
+            log.error("!!! BẢO MẬT: JWT_SECRET chưa được đặt, đang dùng secret mặc định công khai trong mã nguồn. Hãy đặt biến môi trường JWT_SECRET trên Render ngay !!!");
+        } else {
+            log.info("JWT_SECRET đã được cấu hình từ biến môi trường.");
+        }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expiration = expiration;
     }

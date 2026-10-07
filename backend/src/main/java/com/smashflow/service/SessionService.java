@@ -42,6 +42,7 @@ public class SessionService {
                     if (currentUser != null) {
                         res.setIsBookedByCurrentUser(bookedSessionIds.contains(s.getId()));
                     }
+                    hideCheckinTokenIfNotHost(res, currentUser);
                     return res;
                 })
                 .collect(Collectors.toList());
@@ -58,6 +59,7 @@ public class SessionService {
                     if (currentUser != null) {
                         res.setIsBookedByCurrentUser(bookedSessionIds.contains(s.getId()));
                     }
+                    hideCheckinTokenIfNotHost(res, currentUser);
                     return res;
                 })
                 .collect(Collectors.toList());
@@ -82,7 +84,37 @@ public class SessionService {
                     .anyMatch(p -> ((p.getUserId() != null && p.getUserId().equals(currentUser.getId())) || (p.getPhone() != null && p.getPhone().equals(currentUser.getPhone()))) && p.getCheckinStatus() != CheckinStatus.ABSENT);
             response.setIsBookedByCurrentUser(isBooked);
         }
+
+        hideCheckinTokenIfNotHost(response, currentUser);
+        maskOtherParticipantsPhones(participants, currentUser);
         return response;
+    }
+
+    private static boolean isHost(User user) {
+        return user != null && user.getRole() == Role.HOST;
+    }
+
+    /** Mã check-in chỉ dành cho Host (hiển thị QR/token). Người khác phải quét QR hoặc nhập mã do Host cung cấp. */
+    private void hideCheckinTokenIfNotHost(SessionResponse response, User currentUser) {
+        if (!isHost(currentUser)) {
+            response.setCheckinToken(null);
+        }
+    }
+
+    /** Che SĐT của người khác với người xem không phải Host; SĐT của chính mình vẫn giữ nguyên. */
+    private void maskOtherParticipantsPhones(List<ParticipantResponse> participants, User currentUser) {
+        if (isHost(currentUser)) {
+            return;
+        }
+        for (ParticipantResponse p : participants) {
+            boolean isMe = currentUser != null
+                    && ((p.getUserId() != null && p.getUserId().equals(currentUser.getId()))
+                    || (p.getPhone() != null && p.getPhone().equals(currentUser.getPhone())));
+            String phone = p.getPhone();
+            if (!isMe && phone != null && phone.length() >= 7) {
+                p.setPhone(phone.substring(0, 4) + "***" + phone.substring(phone.length() - 3));
+            }
+        }
     }
 
     @Transactional

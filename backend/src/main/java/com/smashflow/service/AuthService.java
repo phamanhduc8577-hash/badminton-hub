@@ -57,7 +57,6 @@ public class AuthService {
         return com.smashflow.dto.ForgotPasswordResponse.builder()
                 .message("Yêu cầu khôi phục mật khẩu (Lần " + newDailyCount + "/" + maxResetLimit + " hôm nay) đã được gửi đến Host qua Telegram! Vui lòng liên hệ Host hoặc kiểm tra tin nhắn với Host để nhận mật khẩu tạm thời.")
                 .fullName(user.getFullName())
-                .tempPassword(defaultTempPassword)
                 .resetCountToday(newDailyCount)
                 .maxResetPerDay(maxResetLimit)
                 .build();

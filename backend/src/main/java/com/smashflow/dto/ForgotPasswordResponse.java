@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 public class ForgotPasswordResponse {
     private String message;
     private String fullName;
-    private String tempPassword;
     private Integer resetCountToday;
     private Integer maxResetPerDay;
 }

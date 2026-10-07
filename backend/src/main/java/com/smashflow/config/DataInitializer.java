@@ -18,7 +18,11 @@ import java.math.BigDecimal;
 
 @Configuration
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class DataInitializer {
+
+    @org.springframework.beans.factory.annotation.Value("${host.initial-password:}")
+    private String hostInitialPassword;
 
     private final UserRepository userRepository;
     private final VenueRepository venueRepository;
@@ -61,7 +65,7 @@ public class DataInitializer {
                     host -> {
                         host.setRole(Role.HOST);
                         host.setMembershipType(MembershipType.FIXED);
-                        host.setPassword(passwordEncoder.encode("040304"));
+                        // Không ghi đè mật khẩu Host: mật khẩu do Host tự đổi phải được giữ nguyên sau mỗi lần khởi động
                         if (host.getFullName() == null || host.getFullName().isBlank()) {
                             host.setFullName("Phạm Anh Đức");
                         }
@@ -71,10 +75,17 @@ public class DataInitializer {
                         userRepository.save(host);
                     },
                     () -> {
+                        // Chỉ chạy khi DB chưa có Host (database mới). Mật khẩu lấy từ biến môi trường HOST_INITIAL_PASSWORD.
+                        String initialPassword = (hostInitialPassword != null && !hostInitialPassword.isBlank())
+                                ? hostInitialPassword
+                                : java.util.UUID.randomUUID().toString().substring(0, 12);
+                        if (hostInitialPassword == null || hostInitialPassword.isBlank()) {
+                            log.warn("HOST_INITIAL_PASSWORD chưa được đặt. Đã tạo Host với mật khẩu tạm: {} - hãy đăng nhập và đổi ngay!", initialPassword);
+                        }
                         User host = User.builder()
                                 .phone("0325872682")
                                 .fullName("Phạm Anh Đức")
-                                .password(passwordEncoder.encode("040304"))
+                                .password(passwordEncoder.encode(initialPassword))
                                 .gender(Gender.MALE)
                                 .role(Role.HOST)
                                 .membershipType(MembershipType.FIXED)

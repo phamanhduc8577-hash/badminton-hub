@@ -41,7 +41,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
 
         // Rate limit critical authentication & public booking endpoints
-        if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register") || path.contains("/book")) {
+        if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register") || path.startsWith("/api/auth/forgot-password") || path.contains("/book")) {
             String clientIp = getClientIp(request);
             String key = clientIp + ":" + path;
             long now = System.currentTimeMillis();

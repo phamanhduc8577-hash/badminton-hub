@@ -17,10 +17,10 @@ import java.util.Map;
 @Slf4j
 public class TelegramNotificationService {
 
-    @Value("${telegram.bot-token:8664493359:AAEIrvA-XuX3aoclYOOh5bAyvMdDOLDu7UE}")
+    @Value("${telegram.bot-token:}")
     private String botToken;
 
-    @Value("${telegram.chat-id:8723745423}")
+    @Value("${telegram.chat-id:}")
     private String chatId;
 
     @Value("${telegram.enabled:true}")
@@ -40,13 +40,12 @@ public class TelegramNotificationService {
      * Send notification to Host's Telegram via direct UTF-8 java.net.http.HttpClient.
      */
     public void sendNotification(String message) {
-        String token = (botToken != null && !botToken.isBlank()) ? botToken.trim() : "8664493359:AAEIrvA-XuX3aoclYOOh5bAyvMdDOLDu7UE";
-        String cid = (chatId != null && !chatId.isBlank()) ? chatId.trim() : "8723745423";
-
-        if (!enabled) {
-            log.warn("Telegram notification skipped: disabled");
+        if (!enabled || botToken == null || botToken.isBlank() || chatId == null || chatId.isBlank()) {
+            log.warn("Telegram notification skipped: disabled or TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not configured");
             return;
         }
+        String token = botToken.trim();
+        String cid = chatId.trim();
 
         // Run in detached daemon thread to prevent any API latency
         new Thread(() -> {
