@@ -1,11 +1,11 @@
 package com.smashflow.service;
 
+import com.smashflow.dto.CancelCheckinResponse;
 import com.smashflow.dto.CheckinRequest;
 import com.smashflow.dto.HostOverrideRequest;
 import com.smashflow.dto.ParticipantResponse;
 import com.smashflow.dto.SettlePaymentRequest;
 import com.smashflow.model.*;
-import com.smashflow.repository.LoyaltyRewardRepository;
 import com.smashflow.repository.SessionParticipantRepository;
 import com.smashflow.repository.SessionRepository;
 import com.smashflow.repository.UserRepository;
@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -25,7 +25,7 @@ public class CheckinAndPricingService {
     private final SessionRepository sessionRepository;
     private final SessionParticipantRepository participantRepository;
     private final UserRepository userRepository;
-    private final LoyaltyRewardRepository loyaltyRewardRepository;
+    private final LoyaltyRewardService loyaltyRewardService;
     private final GeoLocationService geoLocationService;
     private final TelegramNotificationService telegramNotificationService;
 
@@ -72,25 +72,69 @@ public class CheckinAndPricingService {
 
     @Transactional
     public ParticipantResponse hostCheckinManual(Long participantId) {
-        SessionParticipant participant = participantRepository.findById(participantId)
+        // Khóa dòng người tham gia ngay từ đầu: bấm đúp / request song song sẽ phải chờ nhau
+        SessionParticipant participant = participantRepository.findByIdForUpdate(participantId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
 
         if (participant.getCheckinStatus() == CheckinStatus.CHECKED_IN) {
             throw new RuntimeException("Người này đã điểm danh rồi!");
         }
 
+        User user = participant.getUser();
+        if (user != null) {
+            // Khóa dòng thành viên để các lần điểm danh khác của cùng người này chạy tuần tự
+            userRepository.lockRowById(user.getId());
+        }
+
         participant.setCheckinStatus(CheckinStatus.CHECKED_IN);
         participant.setCheckinAt(LocalDateTime.now());
-        participantRepository.save(participant);
+        participantRepository.saveAndFlush(participant);
 
-        if (participant.getUser() != null) {
-            User user = participant.getUser();
-            user.setSessionsAttended((user.getSessionsAttended() != null ? user.getSessionsAttended() : 0) + 1);
-            userRepository.save(user);
-            checkAndGrantLoyaltyRewards(user);
+        if (user != null) {
+            int attended = recalculateAttendance(user);
+            loyaltyRewardService.grantEligibleRewards(user, attended);
         }
 
         return toParticipantResponse(participant);
+    }
+
+    /** Host hủy điểm danh (ví dụ bấm nhầm): trả về chưa điểm danh, tính lại số buổi và thu hồi quà chưa trao. */
+    @Transactional
+    public CancelCheckinResponse hostCancelCheckin(Long participantId) {
+        SessionParticipant participant = participantRepository.findByIdForUpdate(participantId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
+
+        if (participant.getCheckinStatus() != CheckinStatus.CHECKED_IN) {
+            throw new RuntimeException("Người này chưa được điểm danh nên không cần hủy!");
+        }
+
+        User user = participant.getUser();
+        if (user != null) {
+            userRepository.lockRowById(user.getId());
+        }
+
+        participant.setCheckinStatus(CheckinStatus.PENDING);
+        participant.setCheckinAt(null);
+        participantRepository.saveAndFlush(participant);
+
+        List<String> notes = new ArrayList<>();
+        if (user != null) {
+            int attended = recalculateAttendance(user);
+            notes.addAll(loyaltyRewardService.revokeIneligibleRewards(user, attended));
+        }
+
+        return CancelCheckinResponse.builder()
+                .participant(toParticipantResponse(participant))
+                .notes(notes)
+                .build();
+    }
+
+    /** Số buổi = số ca khác nhau đã điểm danh. Phải gọi sau khi đã khóa dòng user và flush trạng thái điểm danh. */
+    private int recalculateAttendance(User user) {
+        int attended = (int) participantRepository.countDistinctCheckedInSessions(user.getId());
+        user.setSessionsAttended(attended);
+        userRepository.save(user);
+        return attended;
     }
 
     @Transactional
@@ -169,23 +213,7 @@ public class CheckinAndPricingService {
     }
 
     private void checkAndGrantLoyaltyRewards(User user) {
-        List<Integer> milestones = Arrays.asList(5, 10, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100);
-        int attended = user.getSessionsAttended();
-
-        for (Integer m : milestones) {
-            if (attended >= m && loyaltyRewardRepository.findByUserIdAndMilestoneSessions(user.getId(), m).isEmpty()) {
-                String rewardName = LoyaltyRewardService.getRewardNameForMilestone(m);
-
-                LoyaltyReward reward = LoyaltyReward.builder()
-                        .user(user)
-                        .milestoneSessions(m)
-                        .rewardName(rewardName)
-                        .isClaimed(false)
-                        .build();
-
-                loyaltyRewardRepository.save(reward);
-            }
-        }
+        loyaltyRewardService.grantEligibleRewards(user, user.getSessionsAttended());
     }
 
     private ParticipantResponse toParticipantResponse(SessionParticipant p) {

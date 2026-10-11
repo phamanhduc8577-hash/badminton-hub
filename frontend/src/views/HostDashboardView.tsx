@@ -32,6 +32,7 @@ import {
   Trash2,
   Square,
   CheckSquare,
+  Undo2,
 } from 'lucide-react'
 
 interface CourtDraft {
@@ -291,6 +292,33 @@ export const HostDashboardView: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['pending-handovers'] })
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Không thể duyệt điểm danh!', 'error')
+    },
+  })
+
+  // Cancel Checkin Mutation (Host bấm nhầm duyệt điểm danh)
+  const cancelCheckinMutation = useMutation({
+    mutationFn: async (participantId: number) => {
+      const res = await api.post(`/sessions/participants/${participantId}/cancel-checkin`)
+      return res.data as { notes?: string[] }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['pending-handovers'] })
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
+      const notes = data?.notes ?? []
+      showToast(
+        notes.length > 0 ? `Đã hủy điểm danh. ${notes.join(' ')}` : 'Đã hủy điểm danh thành công!',
+        notes.some((n) => n.includes('giữ nguyên')) ? 'info' : 'success'
+      )
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Không thể hủy điểm danh!', 'error')
     },
   })
 
@@ -1000,10 +1028,28 @@ export const HostDashboardView: React.FC = () => {
 
                         <td className="py-3.5 px-3">
                           {isCheckedIn ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              <CheckCircle2 size={11} className="text-emerald-600" />
-                              <span>Đã điểm danh</span>
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 size={11} className="text-emerald-600" />
+                                <span>Đã điểm danh</span>
+                              </span>
+                              <button
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Hủy điểm danh của ${p.name}? Số buổi sẽ được tính lại và quà chưa trao của mốc không còn đủ điều kiện sẽ bị thu hồi.`
+                                    )
+                                  ) {
+                                    cancelCheckinMutation.mutate(p.id)
+                                  }
+                                }}
+                                disabled={cancelCheckinMutation.isPending}
+                                className="p-1 rounded-lg text-slate-500 hover:text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                                title="Hủy điểm danh (dùng khi lỡ bấm duyệt nhầm)"
+                              >
+                                <Undo2 size={13} />
+                              </button>
+                            </div>
                           ) : (
                             <button
                               onClick={() => manualCheckinMutation.mutate(p.id)}

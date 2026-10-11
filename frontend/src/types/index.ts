@@ -156,6 +156,18 @@ export interface LoyaltyReward {
   claimedAt?: string
 }
 
+export interface PendingHandover {
+  rewardId: number
+  userId: number
+  fullName: string
+  phone?: string
+  avatarUrl?: string
+  milestoneSessions: number
+  rewardName: string
+  sessionsAttended: number
+  createdAt: string
+}
+
 export interface AttendanceRecord {
   sessionId: number
   sessionTitle: string

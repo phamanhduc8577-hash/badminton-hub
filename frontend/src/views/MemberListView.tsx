@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { MemberProfile } from '../types'
+import { MemberProfile, PendingHandover } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Trash2,
   X,
+  Gift,
 } from 'lucide-react'
 
 export const MemberListView: React.FC = () => {
@@ -59,6 +60,32 @@ export const MemberListView: React.FC = () => {
       return res.data
     },
     enabled: user?.role === 'HOST',
+  })
+
+  // Danh sách quà vật lý đã đủ điều kiện nhưng Host chưa trao tận tay
+  const { data: pendingHandovers = [] } = useQuery<PendingHandover[]>({
+    queryKey: ['pending-handovers'],
+    queryFn: async () => {
+      const res = await api.get('/loyalty/pending-handovers')
+      return res.data
+    },
+    enabled: user?.role === 'HOST',
+    refetchOnMount: 'always',
+  })
+
+  const confirmHandoverMutation = useMutation({
+    mutationFn: async (rewardId: number) => {
+      const res = await api.post(`/loyalty/${rewardId}/handover`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-handovers'] })
+      showToast('Đã ghi nhận trao quà thành công!', 'success')
+    },
+    onError: (err: any) => {
+      queryClient.invalidateQueries({ queryKey: ['pending-handovers'] })
+      showToast(err.response?.data?.message || 'Không thể xác nhận trao quà!', 'error')
+    },
   })
 
   // Restore member mutation
@@ -302,6 +329,60 @@ export const MemberListView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Quà cần trao: chỉ Host thấy */}
+      {user?.role === 'HOST' && pendingHandovers.length > 0 && (
+        <div className="saas-card rounded-3xl p-6 space-y-4 border border-amber-200 bg-amber-50/40">
+          <div className="flex items-center justify-between pb-3 border-b border-amber-200/80">
+            <div className="flex items-center gap-2">
+              <Gift size={16} className="text-amber-600" />
+              <h2 className="text-sm font-bold text-slate-900">Quà cần trao tận tay</h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black">
+                {pendingHandovers.length}
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium">
+              Bấm "Đã trao" sau khi đưa quà cho thành viên
+            </span>
+          </div>
+
+          <div className="divide-y divide-amber-100">
+            {pendingHandovers.map((h) => (
+              <div key={h.rewardId} className="py-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <DuckMascot
+                    src={h.avatarUrl || '/duck-mascot.png'}
+                    size={36}
+                    rounded="xl"
+                    className="border border-slate-200 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-900 text-sm block truncate">{h.fullName}</span>
+                    <span className="text-[11px] text-slate-500">
+                      {h.phone ? `${h.phone} • ` : ''}đã đi {h.sessionsAttended} buổi
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <span className="text-xs font-black text-slate-900 block">{h.rewardName}</span>
+                    <span className="text-[10px] text-amber-700 font-bold">Mốc {h.milestoneSessions} buổi</span>
+                  </div>
+                  <button
+                    onClick={() => confirmHandoverMutation.mutate(h.rewardId)}
+                    disabled={confirmHandoverMutation.isPending}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition disabled:opacity-60 cursor-pointer"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>Đã trao</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Navigation Tabs & Search Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

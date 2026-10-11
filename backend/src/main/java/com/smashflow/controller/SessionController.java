@@ -89,6 +89,12 @@ public class SessionController {
         return ResponseEntity.ok(checkinAndPricingService.hostCheckinManual(participantId));
     }
 
+    @PostMapping("/participants/{participantId}/cancel-checkin")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<CancelCheckinResponse> hostCancelCheckin(@PathVariable Long participantId) {
+        return ResponseEntity.ok(checkinAndPricingService.hostCancelCheckin(participantId));
+    }
+
     @PostMapping("/participants/override-bill")
     @PreAuthorize("hasRole('HOST')")
     public ResponseEntity<ParticipantResponse> hostOverrideBill(@Valid @RequestBody HostOverrideRequest request) {

@@ -1,11 +1,10 @@
 import React, { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { LoyaltyReward, AttendanceRecord } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { GiftGraphic } from '../components/GiftGraphic'
-import { useToast } from '../components/ToastProvider'
 import {
   Gift,
   CheckCircle2,
@@ -25,8 +24,6 @@ import {
 
 export const LoyaltyView: React.FC = () => {
   const { user, setAuth, token } = useAuthStore()
-  const queryClient = useQueryClient()
-  const { showToast } = useToast()
 
   // Always fetch latest User profile (sessionsAttended, winCount, lossCount)
   const { data: profile } = useQuery({
@@ -55,7 +52,6 @@ export const LoyaltyView: React.FC = () => {
   } | null>(null)
 
   const [isRevealed, setIsRevealed] = useState(false)
-  const [claimSuccess, setClaimSuccess] = useState(false)
 
   // 1. Fetch user claimed / available rewards
   const { data: rewards } = useQuery<LoyaltyReward[]>({
@@ -79,21 +75,8 @@ export const LoyaltyView: React.FC = () => {
     refetchOnMount: 'always',
   })
 
-  const claimMilestoneMutation = useMutation({
-    mutationFn: async (milestone: number) => {
-      const res = await api.post(`/loyalty/milestone/${milestone}/claim`)
-      return res.data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['loyalty-rewards'] })
-      queryClient.invalidateQueries({ queryKey: ['my-profile'] })
-      setClaimSuccess(true)
-      showToast('Chúc mừng bạn đã nhận phần thưởng chuyên cần!', 'success')
-    },
-    onError: (err: any) => {
-      showToast(err.response?.data?.message || 'Không thể nhận quà!', 'error')
-    },
-  })
+  // Member chỉ xem quà. Việc nhận quà vật lý do Host xác nhận "Đã trao"; voucher tự trừ khi đăng ký ca.
+  const isVoucherType = (type: string) => type.startsWith('DISCOUNT')
 
   const attended = profile?.sessionsAttended ?? user?.sessionsAttended ?? 0
 
@@ -275,7 +258,6 @@ export const LoyaltyView: React.FC = () => {
       isClaimed,
     })
     setIsRevealed(isClaimed) // If already claimed, reveal immediately
-    setClaimSuccess(isClaimed)
   }
 
   return (
@@ -571,6 +553,8 @@ export const LoyaltyView: React.FC = () => {
             const isReached = attended >= m.target
             const rewardRecord = rewards?.find((r) => r.milestoneSessions === m.target)
             const isClaimed = !!rewardRecord?.isClaimed
+            const isVoucher = isVoucherType(m.type)
+            const doneLabel = isVoucher ? 'Đã dùng' : 'Đã nhận'
 
             return (
               <div
@@ -597,7 +581,7 @@ export const LoyaltyView: React.FC = () => {
                   {isClaimed ? (
                     <span className="flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-300">
                       <CheckCircle2 size={12} />
-                      Đã nhận
+                      {doneLabel}
                     </span>
                   ) : isReached ? (
                     <span className="text-[10px] font-black text-rose-600 animate-pulse bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
@@ -639,7 +623,7 @@ export const LoyaltyView: React.FC = () => {
                   {isClaimed ? (
                     <span className="text-xs font-black text-slate-500 py-1 flex items-center gap-1">
                       <Check size={14} className="text-emerald-600" />
-                      <span>Đã nhận quà thành công</span>
+                      <span>{isVoucher ? 'Voucher đã được sử dụng' : 'Host đã trao quà cho bạn'}</span>
                     </span>
                   ) : isReached ? (
                     <button
@@ -647,7 +631,7 @@ export const LoyaltyView: React.FC = () => {
                       className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-black text-xs rounded-xl shadow-md shadow-rose-500/20 transition active:scale-95 flex items-center justify-center gap-2"
                     >
                       <PackageOpen size={15} />
-                      <span>Mở hộp & Nhận quà</span>
+                      <span>Mở hộp xem quà</span>
                     </button>
                   ) : (
                     <span className="text-xs font-bold text-slate-400">
@@ -731,15 +715,16 @@ export const LoyaltyView: React.FC = () => {
                   </p>
                 </div>
 
-                {claimSuccess || unboxingMilestone.isClaimed ? (
+                {unboxingMilestone.isClaimed ? (
                   <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-emerald-950 space-y-2">
                     <div className="flex items-center justify-center gap-2 font-black text-sm text-emerald-800">
                       <CheckCircle2 size={18} className="text-emerald-600" />
-                      <span>Đã nhận phần thưởng thành công!</span>
+                      <span>
+                        {isVoucherType(unboxingMilestone.type)
+                          ? 'Voucher này đã được sử dụng!'
+                          : 'Host đã trao quà này cho bạn!'}
+                      </span>
                     </div>
-                    <p className="text-xs text-emerald-700 font-semibold leading-relaxed">
-                      Thông tin nhận quà đã được ghi nhận. Vui lòng gặp Host tại sân để nhận hiện vật hoặc áp dụng giảm giá ca tiếp theo!
-                    </p>
                     <button
                       onClick={() => setUnboxingMilestone(null)}
                       className="w-full mt-2 py-3 bg-slate-950 text-white font-black text-xs rounded-xl hover:bg-slate-800 transition"
@@ -748,26 +733,21 @@ export const LoyaltyView: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2.5">
-                    <button
-                      disabled={claimMilestoneMutation.isPending}
-                      onClick={() => claimMilestoneMutation.mutate(unboxingMilestone.target)}
-                      className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm rounded-2xl shadow-xl shadow-emerald-600/30 transition active:scale-95 flex items-center justify-center gap-2"
-                    >
-                      {claimMilestoneMutation.isPending ? (
-                        <span>Đang xử lý nhận quà...</span>
-                      ) : (
-                        <>
-                          <Sparkles size={18} className="text-amber-300" />
-                          <span>Nhận món quà này ngay</span>
-                        </>
-                      )}
-                    </button>
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-amber-950 space-y-2">
+                    <div className="flex items-center justify-center gap-2 font-black text-sm text-amber-800">
+                      <Gift size={18} className="text-amber-600" />
+                      <span>Bạn đã đủ điều kiện nhận quà này!</span>
+                    </div>
+                    <p className="text-xs text-amber-800 font-semibold leading-relaxed">
+                      {isVoucherType(unboxingMilestone.type)
+                        ? 'Voucher sẽ được tự động trừ vào giá khi bạn đăng ký ca đánh tiếp theo, không cần bấm nhận.'
+                        : 'Vui lòng gặp Host tại sân để nhận quà. Host sẽ xác nhận sau khi trao quà cho bạn.'}
+                    </p>
                     <button
                       onClick={() => setUnboxingMilestone(null)}
-                      className="w-full py-2.5 text-xs text-slate-500 font-bold hover:text-slate-800 transition"
+                      className="w-full mt-2 py-3 bg-slate-950 text-white font-black text-xs rounded-xl hover:bg-slate-800 transition"
                     >
-                      Để sau
+                      Đã hiểu, đóng
                     </button>
                   </div>
                 )}

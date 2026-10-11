@@ -2,10 +2,12 @@ package com.smashflow.controller;
 
 import com.smashflow.dto.AttendanceHistoryResponse;
 import com.smashflow.dto.LoyaltyRewardResponse;
+import com.smashflow.dto.PendingHandoverResponse;
 import com.smashflow.model.User;
 import com.smashflow.service.LoyaltyRewardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,15 +30,17 @@ public class LoyaltyRewardController {
         return ResponseEntity.ok(loyaltyRewardService.getUserAttendanceHistory(user));
     }
 
-    @PostMapping("/{rewardId}/claim")
-    public ResponseEntity<LoyaltyRewardResponse> claimReward(@PathVariable Long rewardId,
-                                                             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(loyaltyRewardService.claimReward(rewardId, user));
+    /** Host xem danh sách quà vật lý đã đủ điều kiện nhưng chưa trao. */
+    @GetMapping("/pending-handovers")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<List<PendingHandoverResponse>> getPendingHandovers() {
+        return ResponseEntity.ok(loyaltyRewardService.getPendingHandovers());
     }
 
-    @PostMapping("/milestone/{milestone}/claim")
-    public ResponseEntity<LoyaltyRewardResponse> claimRewardByMilestone(@PathVariable Integer milestone,
-                                                                        @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(loyaltyRewardService.claimRewardByMilestone(milestone, user));
+    /** Host xác nhận đã trao quà tận tay. Member không còn tự nhận quà. */
+    @PostMapping("/{rewardId}/handover")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<LoyaltyRewardResponse> confirmHandover(@PathVariable Long rewardId) {
+        return ResponseEntity.ok(loyaltyRewardService.confirmHandover(rewardId));
     }
 }

@@ -2,8 +2,11 @@ package com.smashflow.repository;
 
 import com.smashflow.model.CheckinStatus;
 import com.smashflow.model.SessionParticipant;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -11,6 +14,15 @@ import java.util.Optional;
 
 @Repository
 public interface SessionParticipantRepository extends JpaRepository<SessionParticipant, Long> {
+    /** Khóa dòng người tham gia khi Host duyệt / hủy điểm danh, tránh bấm đúp cộng dư buổi. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT sp FROM SessionParticipant sp WHERE sp.id = :id")
+    Optional<SessionParticipant> findByIdForUpdate(@Param("id") Long id);
+
+    /** Số buổi thực tế = số ca khác nhau mà thành viên đã được điểm danh (cùng cách tính với DataInitializer). */
+    @Query("SELECT COUNT(DISTINCT sp.session.id) FROM SessionParticipant sp WHERE sp.user.id = :userId AND sp.checkinStatus = com.smashflow.model.CheckinStatus.CHECKED_IN")
+    long countDistinctCheckedInSessions(@Param("userId") Long userId);
+
     List<SessionParticipant> findBySessionId(Long sessionId);
     Optional<SessionParticipant> findBySessionIdAndUserId(Long sessionId, Long userId);
     Optional<SessionParticipant> findBySessionIdAndGuestPhone(Long sessionId, String guestPhone);
