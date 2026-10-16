@@ -43,6 +43,7 @@ export const MemberListView: React.FC = () => {
   const [confirmResetPassMember, setConfirmResetPassMember] = useState<MemberProfile | null>(null)
   const [confirmDowngradeMember, setConfirmDowngradeMember] = useState<MemberProfile | null>(null)
   const [confirmUpgradeMember, setConfirmUpgradeMember] = useState<MemberProfile | null>(null)
+  const [editingGenderMember, setEditingGenderMember] = useState<MemberProfile | null>(null)
 
   const { data: members = [], isLoading } = useQuery<MemberProfile[]>({
     queryKey: ['members'],
@@ -181,6 +182,27 @@ export const MemberListView: React.FC = () => {
     },
     onError: (err: any) => {
       showToast(err.response?.data?.message || 'Không thể đổi phân loại!', 'error')
+    },
+  })
+
+  const updateGenderMutation = useMutation({
+    mutationFn: async ({ userId, gender }: { userId: number; gender: 'MALE' | 'FEMALE' }) => {
+      const res = await api.put(`/members/${userId}/gender`, { gender })
+      return res.data as MemberProfile
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      queryClient.invalidateQueries({ queryKey: ['session'] })
+      setEditingGenderMember(null)
+      showToast(
+        `Đã đổi giới tính của ${data.fullName} thành ${data.gender === 'FEMALE' ? 'Nữ' : 'Nam'}. Giá các ca chưa thanh toán đã được tính lại.`,
+        'success'
+      )
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Không thể đổi giới tính!', 'error')
     },
   })
 
@@ -516,15 +538,28 @@ export const MemberListView: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-3">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md inline-block whitespace-nowrap text-center ${
+                      {(() => {
+                        const badgeClass = `text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 whitespace-nowrap text-center ${
                           m.gender === 'FEMALE'
                             ? 'bg-rose-50 text-rose-700 border border-rose-200'
                             : 'bg-blue-50 text-blue-700 border border-blue-200'
-                        }`}
-                      >
-                        {m.gender === 'FEMALE' ? 'Nữ (Trợ giá)' : 'Nam'}
-                      </span>
+                        }`
+                        const label = m.gender === 'FEMALE' ? 'Nữ (Trợ giá)' : 'Nam'
+                        return user?.role === 'HOST' ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditingGenderMember(m)}
+                            className={`${badgeClass} min-h-8 px-2.5 cursor-pointer hover:brightness-95 active:scale-95 transition`}
+                            title="Sửa giới tính (Host)"
+                            aria-label={`Sửa giới tính của ${m.fullName}, hiện tại: ${label}`}
+                          >
+                            <span>{label}</span>
+                            <Edit2 size={10} className="opacity-70" />
+                          </button>
+                        ) : (
+                          <span className={badgeClass}>{label}</span>
+                        )
+                      })()}
                     </td>
 
                     <td className="py-3.5 px-3">
@@ -1032,6 +1067,74 @@ export const MemberListView: React.FC = () => {
                 Xác nhận
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Host: Sửa giới tính thành viên */}
+      {editingGenderMember && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200"
+          onClick={() => !updateGenderMutation.isPending && setEditingGenderMember(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-gender-title"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-3xl sm:rounded-3xl px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 space-y-4"
+          >
+            <div className="sm:hidden mx-auto -mt-1 h-1.5 w-10 rounded-full bg-slate-200" aria-hidden="true" />
+            <div className="text-center space-y-1">
+              <h3 id="edit-gender-title" className="font-black text-slate-900 text-base">
+                Sửa giới tính
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                <b className="text-slate-900">{editingGenderMember.fullName}</b> hiện là{' '}
+                <b className={editingGenderMember.gender === 'FEMALE' ? 'text-rose-700' : 'text-blue-700'}>
+                  {editingGenderMember.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
+                </b>
+                . Chọn giới tính đúng:
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {(['MALE', 'FEMALE'] as const).map((g) => {
+                const isCurrent = (editingGenderMember.gender === 'FEMALE' ? 'FEMALE' : 'MALE') === g
+                return (
+                  <button
+                    key={g}
+                    type="button"
+                    disabled={isCurrent || updateGenderMutation.isPending}
+                    onClick={() => updateGenderMutation.mutate({ userId: editingGenderMember.id, gender: g })}
+                    className={`min-h-12 rounded-2xl border text-sm font-black transition active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
+                      isCurrent
+                        ? 'bg-slate-100 border-slate-200 text-slate-400'
+                        : g === 'FEMALE'
+                        ? 'bg-rose-600 border-rose-600 text-white hover:bg-rose-700 shadow-md'
+                        : 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700 shadow-md'
+                    }`}
+                  >
+                    {updateGenderMutation.isPending && !isCurrent
+                      ? 'Đang lưu...'
+                      : `${g === 'FEMALE' ? 'Nữ' : 'Nam'}${isCurrent ? ' (hiện tại)' : ''}`}
+                  </button>
+                )
+              })}
+            </div>
+
+            <p className="text-[11px] text-amber-800 font-medium bg-amber-50 p-2.5 rounded-xl border border-amber-200 leading-relaxed">
+              💡 Các ca đã đăng ký nhưng <b>chưa thanh toán</b> sẽ được tính lại giá theo giới tính mới. Ca đã thanh toán giữ nguyên để đối soát.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setEditingGenderMember(null)}
+              disabled={updateGenderMutation.isPending}
+              className="w-full min-h-11 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm sm:text-xs rounded-xl transition"
+            >
+              Hủy
+            </button>
           </div>
         </div>
       )}

@@ -21,6 +21,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final TelegramNotificationService telegramNotificationService;
+    private final GenderChangeService genderChangeService;
 
     @Transactional
     public com.smashflow.dto.ForgotPasswordResponse requestForgotPassword(String rawPhone) {
@@ -125,6 +126,11 @@ public class AuthService {
 
     @Transactional
     public AuthResponse updateProfile(User user, com.smashflow.dto.UpdateProfileRequest request) {
+        // Đổi giới tính: kiểm tra trước để nếu bị khóa thì không lưu dở các thay đổi khác
+        if (request.getGender() != null && request.getGender() != user.getGender()) {
+            genderChangeService.changeBySelf(user, request.getGender());
+        }
+
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName().trim());
         }
@@ -175,6 +181,7 @@ public class AuthService {
                 .placementMatches(user.getPlacementMatches() != null ? user.getPlacementMatches() : 0)
                 .currentStreak(user.getCurrentStreak() != null ? user.getCurrentStreak() : 0)
                 .shieldMatches(user.getShieldMatches() != null ? user.getShieldMatches() : 0)
+                .genderLocked(genderChangeService.isSelfEditLocked(user))
                 .build();
     }
 }

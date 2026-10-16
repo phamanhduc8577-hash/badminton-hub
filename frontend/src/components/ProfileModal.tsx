@@ -17,6 +17,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
 
   const [fullName, setFullName] = useState(user?.fullName || '')
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || '/duck-mascot.png')
+  const [gender, setGender] = useState<'MALE' | 'FEMALE'>(user?.gender === 'FEMALE' ? 'FEMALE' : 'MALE')
   const [showPasswordSection, setShowPasswordSection] = useState(false)
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -33,6 +34,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     if (user) {
       setFullName(user.fullName || '')
       setAvatarUrl(user.avatarUrl || '/duck-mascot.png')
+      setGender(user.gender === 'FEMALE' ? 'FEMALE' : 'MALE')
       setShowPasswordSection(false)
       setOldPassword('')
       setNewPassword('')
@@ -40,7 +42,30 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
   }, [isOpen, user])
 
+  // Lấy trạng thái mới nhất (genderLocked có thể đổi sau khi Host điểm danh / thu tiền)
+  useEffect(() => {
+    if (!isOpen) return
+    const authToken = token || localStorage.getItem('smashflow_token')
+    if (!authToken) return
+    let cancelled = false
+    api
+      .get('/auth/me')
+      .then((res) => {
+        const latest = useAuthStore.getState().user
+        if (!cancelled && res.data && latest) setAuth({ ...latest, ...res.data }, authToken)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
   if (!isOpen || !user) return null
+
+  const genderLocked = user.genderLocked === true
+  const currentGender: 'MALE' | 'FEMALE' = user.gender === 'FEMALE' ? 'FEMALE' : 'MALE'
+  const genderChanged = gender !== currentGender
 
   // Handle local image file upload & resize/compress to base64
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -124,6 +149,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
         payload.newPassword = newPassword.trim()
       }
 
+      if (!genderLocked && genderChanged) {
+        payload.gender = gender
+      }
+
       const res = await api.put('/auth/profile', payload, {
         headers: {
           'Content-Type': 'application/json',
@@ -134,6 +163,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
         setAuth({ ...user, ...res.data }, authToken || '')
       }
       queryClient.invalidateQueries({ queryKey: ['my-profile'] })
+      queryClient.invalidateQueries({ queryKey: ['members'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
       queryClient.invalidateQueries({ queryKey: ['sessions'] })
       queryClient.invalidateQueries({ queryKey: ['session'] })
@@ -154,17 +184,29 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white border border-slate-200 rounded-t-3xl sm:rounded-3xl px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-8 max-w-md w-full shadow-2xl relative space-y-5 max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto overscroll-contain"
+      >
+        {/* Grab handle (mobile bottom sheet) */}
+        <div className="sm:hidden mx-auto -mt-1 h-1.5 w-10 rounded-full bg-slate-200" aria-hidden="true" />
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+          aria-label="Đóng"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
         >
           <X size={18} />
         </button>
 
         <div className="text-center space-y-1">
-          <h3 className="text-xl font-black text-slate-950">Chỉnh sửa hồ sơ & Avatar</h3>
+          <h3 id="profile-modal-title" className="text-xl font-black text-slate-950">Chỉnh sửa hồ sơ & Avatar</h3>
           <p className="text-xs text-slate-500 font-medium">Thay đổi thông tin, ảnh đại diện và mật khẩu</p>
         </div>
 
@@ -243,10 +285,49 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-950 font-bold focus:outline-none focus:border-slate-950 shadow-sm"
+                className="w-full bg-white border border-slate-200 rounded-xl py-3 sm:py-2.5 pl-10 pr-4 text-base sm:text-xs text-slate-950 font-bold focus:outline-none focus:border-slate-950 shadow-sm"
               />
             </div>
           </div>
+
+          {/* Giới tính: tự sửa được khi chưa tham gia / thanh toán ca nào */}
+          <fieldset>
+            <legend className="block text-xs font-bold text-slate-700 mb-1">Giới tính</legend>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Giới tính">
+              {(['MALE', 'FEMALE'] as const).map((g) => {
+                const selected = gender === g
+                return (
+                  <button
+                    key={g}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={genderLocked}
+                    onClick={() => setGender(g)}
+                    className={`min-h-11 py-2.5 text-sm sm:text-xs font-bold rounded-xl border transition active:scale-95 disabled:active:scale-100 disabled:cursor-not-allowed ${
+                      selected
+                        ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    } ${genderLocked && !selected ? 'opacity-40' : ''}`}
+                  >
+                    {g === 'MALE' ? 'Nam' : 'Nữ'}
+                  </button>
+                )
+              })}
+            </div>
+            {genderLocked ? (
+              <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 flex items-start gap-1.5">
+                <Lock size={12} className="mt-0.5 shrink-0 text-slate-400" />
+                <span>Bạn đã tham gia ca đánh nên không thể tự đổi giới tính. Nếu chọn nhầm, hãy nhắn Host để được sửa giúp.</span>
+              </p>
+            ) : genderChanged ? (
+              <p className="mt-1.5 p-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] leading-relaxed text-amber-800 font-medium">
+                ⚠️ Giá các ca bạn đã đăng ký nhưng chưa thanh toán sẽ được tính lại theo giới tính mới. Sau khi tham gia ca đầu tiên, chỉ Host mới đổi được.
+              </p>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-slate-500">Chọn nhầm lúc đăng ký? Bạn có thể sửa lại trước khi tham gia ca đầu tiên.</p>
+            )}
+          </fieldset>
 
           {/* Toggle Change Password Section */}
           <div className="pt-1 border-t border-slate-100">
@@ -275,7 +356,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                       value={oldPassword}
                       onChange={(e) => setOldPassword(e.target.value)}
                       placeholder="Nhập mật khẩu đang dùng"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-9 text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-9 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
                     />
                     <button
                       type="button"
@@ -296,7 +377,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Tối thiểu 6 ký tự"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-9 text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-9 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
                     />
                     <button
                       type="button"
@@ -317,7 +398,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Nhập lại mật khẩu mới"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-4 text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-4 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
                     />
                   </div>
                 </div>
@@ -325,18 +406,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             )}
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-2.5">
+          <div className="sticky bottom-0 -mx-5 sm:mx-0 px-5 sm:px-0 pt-3 pb-1 bg-white/95 backdrop-blur-sm border-t border-slate-100 sm:border-0 grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+              className="min-h-11 sm:min-h-0 px-4 py-2.5 rounded-xl border border-slate-200 text-sm sm:text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-xs font-black rounded-xl shadow-md transition active:scale-95 disabled:opacity-50 flex items-center gap-2"
+              className="min-h-11 sm:min-h-0 px-6 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-sm sm:text-xs font-black rounded-xl shadow-md transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Sparkles size={14} />
               <span>{loading ? 'Đang lưu...' : 'Lưu hồ sơ'}</span>

@@ -50,6 +50,14 @@ public class MemberController {
         return ResponseEntity.ok(memberManagementService.updateMembershipType(userId, request));
     }
 
+    @PutMapping("/{userId}/gender")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<MemberProfileResponse> updateMemberGender(
+            @PathVariable Long userId,
+            @Valid @RequestBody com.smashflow.dto.UpdateGenderRequest request) {
+        return ResponseEntity.ok(memberManagementService.updateMemberGender(userId, request.getGender()));
+    }
+
     @PutMapping("/{userId}/rank")
     @PreAuthorize("hasRole('HOST')")
     public ResponseEntity<MemberProfileResponse> updateMemberRank(

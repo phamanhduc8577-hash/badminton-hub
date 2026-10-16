@@ -22,6 +22,7 @@ public class MemberManagementService {
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final TelegramNotificationService telegramNotificationService;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private final GenderChangeService genderChangeService;
 
     public List<MemberProfileResponse> getAllMembers(User currentUser) {
         boolean isHost = currentUser != null && currentUser.getRole() == Role.HOST;
@@ -142,6 +143,11 @@ public class MemberManagementService {
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    @Transactional
+    public MemberProfileResponse updateMemberGender(Long userId, com.smashflow.model.Gender gender) {
+        return toResponse(genderChangeService.changeByHost(userId, gender), true);
     }
 
     @Transactional

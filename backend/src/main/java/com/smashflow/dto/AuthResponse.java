@@ -24,4 +24,6 @@ public class AuthResponse {
     private Integer currentStreak;
     private Integer shieldMatches;
     private String avatarUrl;
+    /** true = không được tự đổi giới tính nữa, phải nhờ Host. */
+    private Boolean genderLocked;
 }

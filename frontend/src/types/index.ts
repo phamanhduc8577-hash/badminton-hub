@@ -14,6 +14,8 @@ export interface User {
   placementMatches?: number
   currentStreak?: number
   shieldMatches?: number
+  /** true = không được tự đổi giới tính, phải nhờ Host */
+  genderLocked?: boolean
 }
 
 export interface MemberProfile {
