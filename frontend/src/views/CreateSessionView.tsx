@@ -5,6 +5,28 @@ import { api } from '../lib/api'
 import { DollarSign, Plus, ArrowLeft, Receipt, MapPin } from 'lucide-react'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { useToast } from '../components/ToastProvider'
+import { validateSlotCount } from '../components/host/hostUtils'
+
+const MIN_COURTS = 1
+const MAX_COURTS = 10
+
+/** "Sân 1, Sân 2, ..." theo số sân */
+const buildCourtNames = (count: number) => Array.from({ length: count }, (_, i) => `Sân ${i + 1}`).join(', ')
+
+const parseCourtNames = (raw: string) =>
+  raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+const validateCourtCount = (raw: string): string | null => {
+  const trimmed = raw.trim()
+  if (!trimmed) return 'Vui lòng nhập số sân.'
+  if (!/^\d+$/.test(trimmed)) return 'Số sân chỉ gồm chữ số.'
+  const n = Number(trimmed)
+  if (n < MIN_COURTS || n > MAX_COURTS) return `Số sân phải từ ${MIN_COURTS} đến ${MAX_COURTS}.`
+  return null
+}
 
 export const CreateSessionView: React.FC = () => {
   const navigate = useNavigate()
@@ -40,9 +62,12 @@ export const CreateSessionView: React.FC = () => {
   const [venueAddress, setVenueAddress] = useState('')
   const [startTime, setStartTime] = useState(initialDates.startStr)
   const [endTime, setEndTime] = useState(initialDates.endStr)
-  const [maxSlots, setMaxSlots] = useState(8)
-  const [courtCount, setCourtCount] = useState(2)
-  const [courtNames, setCourtNames] = useState('Sân 1, Sân 2')
+  const [maxSlotsInput, setMaxSlotsInput] = useState('16')
+  const [maxSlotsTouched, setMaxSlotsTouched] = useState(false)
+  const [courtCountInput, setCourtCountInput] = useState('2')
+  const [courtNames, setCourtNames] = useState(buildCourtNames(2))
+  const [courtNamesEdited, setCourtNamesEdited] = useState(false)
+  const [submitAttempted, setSubmitAttempted] = useState(false)
   const [memberMalePrice, setMemberMalePrice] = useState(50000)
   const [memberFemalePrice, setMemberFemalePrice] = useState(40000)
   const [guestMalePrice, setGuestMalePrice] = useState(60000)
@@ -68,7 +93,7 @@ export const CreateSessionView: React.FC = () => {
         const diffHours = (end - start) / (1000 * 60 * 60)
         return Math.round(diffHours * 10) / 10
       }
-    } catch (_) {}
+    } catch {}
     return 2
   }, [startTime, endTime])
 
@@ -81,7 +106,7 @@ export const CreateSessionView: React.FC = () => {
         const pad = (n: number) => String(n).padStart(2, '0')
         return `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}T${pad(s.getHours())}:${pad(s.getMinutes())}`
       }
-    } catch (_) {}
+    } catch {}
     return initialDates.minStr
   }, [startTime, initialDates.minStr])
 
@@ -97,7 +122,27 @@ export const CreateSessionView: React.FC = () => {
         const pad = (n: number) => String(n).padStart(2, '0')
         setEndTime(`${autoEnd.getFullYear()}-${pad(autoEnd.getMonth() + 1)}-${pad(autoEnd.getDate())}T${pad(autoEnd.getHours())}:${pad(autoEnd.getMinutes())}`)
       }
-    } catch (_) {}
+    } catch {}
+  }
+
+  const courtCountError = validateCourtCount(courtCountInput)
+  const maxSlotsError = validateSlotCount(maxSlotsInput)
+  const courtNameList = parseCourtNames(courtNames)
+  const courtNamesError = courtNameList.length === 0 ? 'Vui lòng nhập ít nhất 1 tên sân.' : null
+  const courtCount = courtCountError ? 0 : Number(courtCountInput)
+  const courtNamesMismatch =
+    !courtCountError && !courtNamesError && courtNameList.length !== courtCount
+      ? `Đang có ${courtNameList.length} tên sân cho ${courtCount} sân.`
+      : null
+
+  const handleCourtCountChange = (raw: string) => {
+    const digits = raw.replace(/[^\d]/g, '').slice(0, 2)
+    setCourtCountInput(digits)
+    if (validateCourtCount(digits)) return
+    const n = Number(digits)
+    // Tự sinh tên sân & gợi ý số slot cho tới khi Host tự sửa tay
+    if (!courtNamesEdited) setCourtNames(buildCourtNames(n))
+    if (!maxSlotsTouched) setMaxSlotsInput(String(Math.min(60, n * 8)))
   }
 
   const createMutation = useMutation({
@@ -116,9 +161,9 @@ export const CreateSessionView: React.FC = () => {
         venueAddress: venueAddress.trim(),
         startTime: formatToFullIso(startTime),
         endTime: formatToFullIso(endTime),
-        maxSlots,
+        maxSlots: Number(maxSlotsInput),
         courtCount,
-        courtNames,
+        courtNames: courtNameList.join(', '),
         memberMalePrice,
         memberFemalePrice,
         guestMalePrice,
@@ -169,6 +214,12 @@ export const CreateSessionView: React.FC = () => {
         <form
           onSubmit={(e) => {
             e.preventDefault()
+            setSubmitAttempted(true)
+            const firstError = courtCountError || courtNamesError || courtNamesMismatch || maxSlotsError
+            if (firstError) {
+              showToast(firstError, 'error')
+              return
+            }
             createMutation.mutate()
           }}
           className="space-y-6 text-xs"
@@ -248,39 +299,99 @@ export const CreateSessionView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Số sân bao quát</label>
+                <label htmlFor="create-court-count" className="block font-bold text-slate-700 mb-1.5">
+                  Số sân
+                </label>
                 <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={courtCount}
-                  onChange={(e) => setCourtCount(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold focus:border-slate-900 focus:outline-none shadow-sm"
+                  id="create-court-count"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="off"
+                  value={courtCountInput}
+                  onChange={(e) => handleCourtCountChange(e.target.value)}
+                  aria-invalid={!!courtCountError}
+                  aria-describedby={courtCountError ? 'create-court-count-error' : undefined}
+                  className={`w-full bg-white border rounded-xl p-2.5 text-slate-900 font-bold focus:outline-none shadow-sm ${
+                    courtCountError ? 'border-rose-500 focus:border-rose-600' : 'border-slate-200 focus:border-slate-900'
+                  }`}
                 />
+                {courtCountError && (
+                  <p id="create-court-count-error" role="alert" className="mt-1 text-[11px] font-bold text-rose-600">
+                    {courtCountError}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Tên / Số sân chỉ định</label>
+                <label htmlFor="create-court-names" className="block font-bold text-slate-700 mb-1.5">
+                  Tên sân (ngăn cách bằng dấu phẩy)
+                </label>
                 <input
+                  id="create-court-names"
                   type="text"
                   placeholder="VD: Sân 1, Sân 2"
                   value={courtNames}
-                  onChange={(e) => setCourtNames(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold focus:border-slate-900 focus:outline-none shadow-sm"
+                  onChange={(e) => {
+                    setCourtNames(e.target.value)
+                    setCourtNamesEdited(true)
+                  }}
+                  aria-invalid={!!(courtNamesError || courtNamesMismatch)}
+                  className={`w-full bg-white border rounded-xl p-2.5 text-slate-900 font-bold focus:outline-none shadow-sm ${
+                    (submitAttempted && courtNamesError) || courtNamesMismatch
+                      ? 'border-amber-500 focus:border-amber-600'
+                      : 'border-slate-200 focus:border-slate-900'
+                  }`}
                 />
+                {((submitAttempted && courtNamesError) || courtNamesMismatch) && (
+                  <p role="alert" className="mt-1 text-[11px] font-bold text-amber-700">
+                    {courtNamesError || courtNamesMismatch}
+                  </p>
+                )}
+                {courtNamesEdited && !courtCountError && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCourtNames(buildCourtNames(courtCount))
+                      setCourtNamesEdited(false)
+                    }}
+                    className="mt-1 min-h-9 text-[11px] font-bold text-slate-700 underline"
+                  >
+                    Đặt lại theo số sân
+                  </button>
+                )}
               </div>
             </div>
 
             <div>
-              <label className="block font-bold text-slate-700 mb-1.5">Số lượng Slot tối đa</label>
+              <label htmlFor="create-max-slots" className="block font-bold text-slate-700 mb-1.5">
+                Số lượng Slot tối đa
+              </label>
               <input
-                type="number"
-                min={2}
-                max={40}
-                value={maxSlots}
-                onChange={(e) => setMaxSlots(Number(e.target.value))}
-                className="w-full sm:w-1/3 bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold focus:border-slate-900 focus:outline-none shadow-sm"
+                id="create-max-slots"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                value={maxSlotsInput}
+                onChange={(e) => {
+                  setMaxSlotsInput(e.target.value.replace(/[^\d]/g, '').slice(0, 3))
+                  setMaxSlotsTouched(true)
+                }}
+                aria-invalid={!!maxSlotsError}
+                aria-describedby="create-max-slots-hint"
+                className={`w-full sm:w-1/3 bg-white border rounded-xl p-2.5 text-slate-900 font-bold focus:outline-none shadow-sm ${
+                  maxSlotsError ? 'border-rose-500 focus:border-rose-600' : 'border-slate-200 focus:border-slate-900'
+                }`}
               />
+              <p
+                id="create-max-slots-hint"
+                role={maxSlotsError ? 'alert' : undefined}
+                className={`mt-1 text-[11px] font-bold ${maxSlotsError ? 'text-rose-600' : 'text-slate-500'}`}
+              >
+                {maxSlotsError ??
+                  (maxSlotsTouched ? 'Gợi ý: 8 người mỗi sân.' : `Tự gợi ý ${courtCount || 0} sân × 8 người.`)}
+              </p>
             </div>
           </div>
 
@@ -289,7 +400,7 @@ export const CreateSessionView: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/80">
               <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
                 <DollarSign size={15} className="text-rose-600" />
-                <span>Ma trận giá slot & Tiền cọc 30%</span>
+                <span>Ma trận giá slot & Tiền cọc giữ chỗ</span>
               </h3>
               <span className="text-[11px] font-black px-2.5 py-0.5 rounded-lg bg-slate-900 text-white shadow-xs w-fit">
                 ⏱️ Khung ca: {sessionHours} Giờ ({sessionHours === 2 ? 'Ca chuẩn 2 Tiếng' : sessionHours === 3 ? 'Ca kéo dài 3 Tiếng' : `Ca ${sessionHours} Tiếng`})

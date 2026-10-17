@@ -6,24 +6,43 @@ import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { useToast } from '../components/ToastProvider'
 import { getPlayerRankDisplay, LOL_RANKS } from '../lib/ranks'
+import { BottomSheet } from '../components/BottomSheet'
+import { ConfirmSheet } from '../components/host/ConfirmSheet'
+import { ActionListItem, ActionListDivider } from '../components/host/ActionListItem'
 import {
   Users,
-  ShieldCheck,
   Clock,
   CheckCircle2,
   XCircle,
-  ArrowUpDown,
   Search,
   Sparkles,
-  Flame,
   Award,
   KeyRound,
   Edit2,
   RotateCcw,
   Trash2,
-  X,
   Gift,
+  MoreHorizontal,
+  UserMinus,
+  Loader2,
 } from 'lucide-react'
+
+interface AvatarOptimizePreview {
+  changed: number
+  failed: number
+  beforeKb: number
+  afterKb: number
+  savedKb: number
+}
+
+const membershipShortLabel = (m: MemberProfile) =>
+  m.role === 'HOST'
+    ? 'Quản trị viên'
+    : m.membershipType === 'FIXED'
+    ? 'Cố định'
+    : m.membershipType === 'PENDING_FIXED'
+    ? 'Chờ duyệt'
+    : 'Vãng lai'
 
 export const MemberListView: React.FC = () => {
   const { user } = useAuthStore()
@@ -44,6 +63,33 @@ export const MemberListView: React.FC = () => {
   const [confirmDowngradeMember, setConfirmDowngradeMember] = useState<MemberProfile | null>(null)
   const [confirmUpgradeMember, setConfirmUpgradeMember] = useState<MemberProfile | null>(null)
   const [editingGenderMember, setEditingGenderMember] = useState<MemberProfile | null>(null)
+  // Menu "⋯" trên mobile + xác nhận tối ưu ảnh
+  const [actionMember, setActionMember] = useState<MemberProfile | null>(null)
+  const [optimizePreview, setOptimizePreview] = useState<AvatarOptimizePreview | null>(null)
+
+  // Trạng thái chờ duyệt / từ chối theo từng thành viên
+  const [pendingMemberIds, setPendingMemberIds] = useState<Record<number, number>>({})
+  const setMemberPending = (userId: number, on: boolean) =>
+    setPendingMemberIds((prev) => {
+      const next = { ...prev }
+      const count = (next[userId] || 0) + (on ? 1 : -1)
+      if (count <= 0) delete next[userId]
+      else next[userId] = count
+      return next
+    })
+  const isMemberPending = (userId: number) => !!pendingMemberIds[userId]
+
+  const openRankEditor = (m: MemberProfile) => {
+    setEditingRankMember(m)
+    setManualLpInput(m.eloScore || 0)
+    setManualPlacementsInput(m.placementMatches ?? 5)
+    setManualShieldInput(m.shieldMatches ?? 0)
+  }
+
+  const openRestore = () => {
+    refetchDeleted()
+    setShowRestoreModal(true)
+  }
 
   const { data: members = [], isLoading } = useQuery<MemberProfile[]>({
     queryKey: ['members'],
@@ -128,17 +174,23 @@ export const MemberListView: React.FC = () => {
         showToast('Không có ảnh đại diện nào cần thu nhỏ thêm.', 'info')
         return
       }
-      const ok = window.confirm(
-        `Sẽ thu nhỏ ${preview.changed} ảnh đại diện (${preview.beforeKb} KB → ${preview.afterKb} KB, tiết kiệm khoảng ${preview.savedKb} KB mỗi lần tải danh sách).\n\n` +
-          'Thao tác này ghi đè ảnh cũ và không thể hoàn tác. Tiếp tục?'
-      )
-      if (!ok) return
+      setOptimizePreview(preview)
+    } catch (err: any) {
+      showToast(err.response?.data?.message || 'Không thể tối ưu ảnh đại diện!', 'error')
+    }
+  }
+
+  const handleApplyOptimizeAvatars = async () => {
+    if (!optimizePreview) return
+    try {
       await optimizeAvatarsMutation.mutateAsync(true)
       queryClient.invalidateQueries({ queryKey: ['members'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
-      showToast(`Đã thu nhỏ ${preview.changed} ảnh đại diện!`, 'success')
+      showToast(`Đã thu nhỏ ${optimizePreview.changed} ảnh đại diện!`, 'success')
     } catch (err: any) {
       showToast(err.response?.data?.message || 'Không thể tối ưu ảnh đại diện!', 'error')
+    } finally {
+      setOptimizePreview(null)
     }
   }
 
@@ -148,12 +200,17 @@ export const MemberListView: React.FC = () => {
       const res = await api.post(`/members/${userId}/approve-fixed`)
       return res.data
     },
+    onMutate: (userId: number) => setMemberPending(userId, true),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
       showToast('Đã duyệt thành viên Cố Định thành công!')
     },
     onError: (err: any) => {
       showToast(err.response?.data?.message || 'Không thể duyệt thành viên!', 'error')
+    },
+    onSettled: (_d, _e, userId) => {
+      setMemberPending(userId, false)
+      setActionMember((cur) => (cur?.id === userId ? null : cur))
     },
   })
 
@@ -162,12 +219,17 @@ export const MemberListView: React.FC = () => {
       const res = await api.post(`/members/${userId}/reject-fixed`)
       return res.data
     },
+    onMutate: (userId: number) => setMemberPending(userId, true),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] })
       showToast('Đã từ chối / chuyển thành viên về trạng thái Vãng Lai!', 'info')
     },
     onError: (err: any) => {
       showToast(err.response?.data?.message || 'Có lỗi xảy ra!', 'error')
+    },
+    onSettled: (_d, _e, userId) => {
+      setMemberPending(userId, false)
+      setActionMember((cur) => (cur?.id === userId ? null : cur))
     },
   })
 
@@ -322,12 +384,25 @@ export const MemberListView: React.FC = () => {
         </div>
 
         {user?.role === 'HOST' && (
-          <div className="pt-4 flex justify-end">
+          <div className="pt-4 flex flex-wrap items-center justify-end gap-2">
+            <button
+              onClick={openRestore}
+              className="min-h-11 sm:min-h-0 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs sm:text-[11px] font-bold transition active:scale-95 flex items-center gap-1.5"
+              title="Xem danh sách và khôi phục các thành viên đã lỡ xóa"
+            >
+              <RotateCcw size={13} />
+              <span>Khôi phục thành viên</span>
+              {deletedMembers.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px]">
+                  {deletedMembers.length}
+                </span>
+              )}
+            </button>
             <button
               onClick={handleOptimizeAvatars}
               disabled={optimizeAvatarsMutation.isPending}
               title="Thu nhỏ ảnh đại diện cũ để giảm băng thông"
-              className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-[11px] font-bold transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              className="min-h-11 sm:min-h-0 px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-[11px] font-bold transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {optimizeAvatarsMutation.isPending ? 'Đang xử lý...' : '🖼️ Tối ưu ảnh đại diện'}
             </button>
@@ -479,7 +554,81 @@ export const MemberListView: React.FC = () => {
             <p className="font-semibold">Không tìm thấy thành viên nào phù hợp.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Mobile: thẻ từng thành viên + menu "⋯" */}
+          <ul className="md:hidden divide-y divide-slate-100 -mx-2" aria-label="Danh sách thành viên">
+            {filteredList.map((m) => {
+              const rankDisplay = getPlayerRankDisplay(m.eloScore || 0, m.placementMatches ?? 5, m.shieldMatches ?? 0)
+              const pending = isMemberPending(m.id)
+              return (
+                <li key={m.id} className="px-2 py-3 flex items-start gap-3" aria-busy={pending || undefined}>
+                  <DuckMascot
+                    src={m.avatarUrl || '/duck-mascot.png'}
+                    size={40}
+                    rounded="xl"
+                    className="border border-slate-200 shadow-2xs shrink-0"
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-bold text-slate-900 text-sm truncate">{m.fullName}</span>
+                      {m.role === 'HOST' && (
+                        <span className="text-[10px] px-1.5 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded font-black shrink-0">
+                          👑 Host
+                        </span>
+                      )}
+                    </div>
+                    {m.phone && <span className="block text-xs text-slate-500">{m.phone}</span>}
+                    <div className="flex flex-wrap items-center gap-1 text-[11px] font-bold">
+                      <span
+                        className={`px-1.5 py-0.5 rounded-md border ${
+                          m.gender === 'FEMALE'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}
+                      >
+                        {m.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded-md border ${
+                          m.membershipType === 'FIXED' || m.role === 'HOST'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : m.membershipType === 'PENDING_FIXED'
+                            ? 'bg-amber-50 text-amber-800 border-amber-300'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {membershipShortLabel(m)}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded-md border ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}>
+                        {rankDisplay.name} · {m.eloScore || 0} LP
+                      </span>
+                    </div>
+                    <span className="block text-xs text-slate-600 font-medium">
+                      {m.sessionsAttended} ca · {m.winCount}W - {m.lossCount}L
+                    </span>
+                    {pending && (
+                      <span className="flex items-center gap-1 text-xs font-bold text-slate-500">
+                        <Loader2 size={12} className="animate-spin" /> Đang xử lý...
+                      </span>
+                    )}
+                  </div>
+                  {user?.role === 'HOST' && (
+                    <button
+                      type="button"
+                      onClick={() => setActionMember(m)}
+                      disabled={pending}
+                      aria-label={`Thao tác cho ${m.fullName}`}
+                      className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition shrink-0 disabled:opacity-50"
+                    >
+                      <MoreHorizontal size={20} />
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider bg-slate-50/50">
@@ -611,44 +760,18 @@ export const MemberListView: React.FC = () => {
                         {m.role === 'HOST' ? (
                           <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => {
-                                setEditingRankMember(m)
-                                setManualLpInput(m.eloScore || 0)
-                                setManualPlacementsInput(m.placementMatches ?? 5)
-                                setManualShieldInput(m.shieldMatches ?? 0)
-                              }}
+                              onClick={() => openRankEditor(m)}
                               className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 rounded-xl transition border border-slate-200"
                               title="Chỉnh sửa Bậc Rank / LP trực tiếp cho Host"
                             >
                               <Award size={13} className="text-amber-600" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                refetchDeleted()
-                                setShowRestoreModal(true)
-                              }}
-                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-bold transition active:scale-95 flex items-center gap-1"
-                              title="Xem danh sách và khôi phục các thành viên đã lỡ xóa"
-                            >
-                              <RotateCcw size={11} />
-                              <span>Khôi phục thành viên</span>
-                              {deletedMembers.length > 0 && (
-                                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[9px]">
-                                  {deletedMembers.length}
-                                </span>
-                              )}
                             </button>
                           </div>
                         ) : (
                           <div className="flex items-center justify-end gap-1.5">
                             {/* Nút Host Chỉnh Sửa Rank trực tiếp */}
                             <button
-                              onClick={() => {
-                                setEditingRankMember(m)
-                                setManualLpInput(m.eloScore || 0)
-                                setManualPlacementsInput(m.placementMatches ?? 5)
-                                setManualShieldInput(m.shieldMatches ?? 0)
-                              }}
+                              onClick={() => openRankEditor(m)}
                               className="p-1.5 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 rounded-xl transition border border-slate-200"
                               title="Chỉnh sửa Bậc Rank / LP trực tiếp cho người chơi"
                             >
@@ -669,18 +792,18 @@ export const MemberListView: React.FC = () => {
                               <>
                                 <button
                                   onClick={() => approveMutation.mutate(m.id)}
-                                  disabled={approveMutation.isPending}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition"
+                                  disabled={isMemberPending(m.id)}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Duyệt người này làm Thành Viên Cố Định"
                                 >
                                   <CheckCircle2 size={13} />
-                                  <span>Duyệt Cố Định</span>
+                                  <span>{isMemberPending(m.id) ? 'Đang xử lý...' : 'Duyệt Cố Định'}</span>
                                 </button>
 
                                 <button
                                   onClick={() => rejectMutation.mutate(m.id)}
-                                  disabled={rejectMutation.isPending}
-                                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-xl flex items-center gap-1 transition"
+                                  disabled={isMemberPending(m.id)}
+                                  className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-xl flex items-center gap-1 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Từ chối và giữ ở trạng thái Vãng Lai"
                                 >
                                   <XCircle size={13} />
@@ -706,11 +829,11 @@ export const MemberListView: React.FC = () => {
                               </button>
                             )}
 
-                            {/* Nút Xóa Thành Viên */}
+                            {/* Nút Xóa Thành Viên (tách xa nút Level Up) */}
                             <button
                               onClick={() => setConfirmDeleteMember(m)}
                               disabled={deleteMemberMutation.isPending}
-                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-800 rounded-xl transition border border-rose-200 shadow-2xs"
+                              className="ml-3 p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-800 rounded-xl transition border border-rose-200 shadow-2xs"
                               title="Xóa tài khoản thành viên này (Có thể khôi phục)"
                             >
                               <Trash2 size={13} />
@@ -724,189 +847,272 @@ export const MemberListView: React.FC = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
-      {/* Host Manual Rank Editor Modal */}
-      {editingRankMember && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <Award size={18} className="text-amber-500" />
-                <h3 className="font-black text-slate-900 text-sm">
-                  Chỉnh Rank & LP: {editingRankMember.fullName}
-                </h3>
-              </div>
-              <button
-                onClick={() => setEditingRankMember(null)}
-                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700"
-              >
-                <X size={16} />
-              </button>
+
+      {/* Mobile: menu thao tác "⋯" cho 1 thành viên (Xóa luôn nằm cuối, màu đỏ) */}
+      <BottomSheet
+        open={!!actionMember}
+        onClose={() => setActionMember(null)}
+        title={actionMember ? `Thao tác: ${actionMember.fullName}` : undefined}
+        ariaLabel="Thao tác thành viên"
+      >
+        {actionMember && (
+          <ul className="space-y-1 -mx-2" aria-label="Danh sách thao tác">
+            <ActionListItem
+              icon={<Award size={18} className="text-amber-600" />}
+              label="Chỉnh Rank & LP"
+              hint={`${actionMember.eloScore || 0} LP`}
+              onClick={() => {
+                const m = actionMember
+                setActionMember(null)
+                openRankEditor(m)
+              }}
+            />
+            {actionMember.role !== 'HOST' && (
+              <>
+                <ActionListItem
+                  icon={<KeyRound size={18} />}
+                  label="Đặt lại mật khẩu"
+                  hint="Về mặc định 123456"
+                  onClick={() => {
+                    setConfirmResetPassMember(actionMember)
+                    setActionMember(null)
+                  }}
+                />
+                <ActionListItem
+                  icon={<Edit2 size={18} />}
+                  label="Đổi giới tính"
+                  hint={`Hiện tại: ${actionMember.gender === 'FEMALE' ? 'Nữ' : 'Nam'}`}
+                  onClick={() => {
+                    setEditingGenderMember(actionMember)
+                    setActionMember(null)
+                  }}
+                />
+                {actionMember.membershipType === 'PENDING_FIXED' ? (
+                  <>
+                    <ActionListItem
+                      icon={
+                        isMemberPending(actionMember.id) ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <CheckCircle2 size={18} className="text-emerald-600" />
+                        )
+                      }
+                      label={isMemberPending(actionMember.id) ? 'Đang xử lý...' : 'Duyệt Cố Định'}
+                      disabled={isMemberPending(actionMember.id)}
+                      onClick={() => approveMutation.mutate(actionMember.id)}
+                    />
+                    <ActionListItem
+                      icon={<XCircle size={18} />}
+                      label="Từ chối (giữ Vãng Lai)"
+                      disabled={isMemberPending(actionMember.id)}
+                      onClick={() => rejectMutation.mutate(actionMember.id)}
+                    />
+                  </>
+                ) : actionMember.membershipType === 'FIXED' ? (
+                  <ActionListItem
+                    icon={<UserMinus size={18} />}
+                    label="Chuyển về Vãng Lai"
+                    onClick={() => {
+                      setConfirmDowngradeMember(actionMember)
+                      setActionMember(null)
+                    }}
+                  />
+                ) : (
+                  <ActionListItem
+                    icon={<Sparkles size={18} className="text-amber-500" />}
+                    label="Level Up Cố Định"
+                    onClick={() => {
+                      setConfirmUpgradeMember(actionMember)
+                      setActionMember(null)
+                    }}
+                  />
+                )}
+                <ActionListDivider />
+                <ActionListItem
+                  icon={<Trash2 size={18} />}
+                  label="Xóa tài khoản"
+                  hint="Có thể khôi phục lại"
+                  destructive
+                  onClick={() => {
+                    setConfirmDeleteMember(actionMember)
+                    setActionMember(null)
+                  }}
+                />
+              </>
+            )}
+          </ul>
+        )}
+      </BottomSheet>
+
+      {/* Host Manual Rank Editor */}
+      <BottomSheet
+        open={!!editingRankMember}
+        onClose={() => !updateRankMutation.isPending && setEditingRankMember(null)}
+        closeOnBackdrop={!updateRankMutation.isPending}
+        title={editingRankMember ? `Chỉnh Rank & LP: ${editingRankMember.fullName}` : undefined}
+        ariaLabel="Chỉnh Rank & LP"
+        footer={
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setEditingRankMember(null)}
+              disabled={updateRankMutation.isPending}
+              className="min-h-11 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm sm:text-xs rounded-xl transition disabled:opacity-50"
+            >
+              Hủy
+            </button>
+            <button
+              disabled={updateRankMutation.isPending}
+              onClick={() => {
+                if (!editingRankMember) return
+                updateRankMutation.mutate({
+                  userId: editingRankMember.id,
+                  eloScore: manualLpInput,
+                  placementMatches: manualPlacementsInput,
+                  shieldMatches: manualShieldInput,
+                })
+              }}
+              className="min-h-11 bg-slate-950 hover:bg-slate-800 text-white font-black text-sm sm:text-xs rounded-xl shadow active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {updateRankMutation.isPending ? 'Đang lưu...' : 'Lưu Bậc Rank'}
+            </button>
+          </div>
+        }
+      >
+        {editingRankMember && (
+          <div className="space-y-4 text-sm sm:text-xs">
+            <div>
+              <label htmlFor="rank-lp-input" className="block text-slate-700 font-bold mb-1.5">
+                Điểm LP Tích Lũy Tổng (Total LP):
+              </label>
+              <input
+                id="rank-lp-input"
+                type="number"
+                inputMode="numeric"
+                step="10"
+                min="0"
+                value={manualLpInput}
+                onChange={(e) => setManualLpInput(Math.max(0, Number(e.target.value)))}
+                className="w-full min-h-11 border border-slate-300 rounded-xl px-3 text-slate-900 font-mono font-bold text-base focus:outline-none focus:border-slate-900"
+              />
             </div>
 
-            <div className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-700 font-bold mb-1.5">
-                  Điểm LP Tích Lũy Tổng (Total LP):
-                </label>
-                <input
-                  type="number"
-                  step="10"
-                  min="0"
-                  value={manualLpInput}
-                  onChange={(e) => setManualLpInput(Math.max(0, Number(e.target.value)))}
-                  className="w-full border border-slate-300 rounded-xl p-3 text-slate-900 font-mono font-bold text-base focus:outline-none focus:border-slate-900"
-                />
+            {/* Quick LP Tier Select Buttons for Host Convenience */}
+            <div>
+              <span className="block text-slate-500 font-bold text-[11px] mb-1.5">Gợi ý chọn mốc Rank nhanh:</span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {LOL_RANKS.map((r) => (
+                  <button
+                    key={r.tier}
+                    type="button"
+                    onClick={() => setManualLpInput(r.minScore)}
+                    className={`min-h-10 px-2 py-1.5 rounded-lg border text-[11px] font-black transition ${
+                      manualLpInput >= r.minScore && manualLpInput <= r.maxScore
+                        ? 'bg-slate-950 text-white border-slate-950'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {r.badge} ({r.minScore} LP)
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {/* Quick LP Tier Select Buttons for Host Convenience */}
-              <div>
-                <label className="block text-slate-500 font-bold text-[11px] mb-1.5">
-                  Gợi ý chọn mốc Rank nhanh:
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {LOL_RANKS.map((r) => (
-                    <button
-                      key={r.tier}
-                      type="button"
-                      onClick={() => setManualLpInput(r.minScore)}
-                      className={`px-2 py-1.5 rounded-lg border text-[10px] font-black transition ${
-                        manualLpInput >= r.minScore && manualLpInput <= r.maxScore
-                          ? 'bg-slate-950 text-white border-slate-950'
-                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      {r.badge} ({r.minScore} LP)
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div>
+              <label htmlFor="rank-placement-select" className="block text-slate-700 font-bold mb-1.5">
+                Trạng thái trận Phân Hạng (0..5 trận):
+              </label>
+              <select
+                id="rank-placement-select"
+                value={manualPlacementsInput}
+                onChange={(e) => setManualPlacementsInput(Number(e.target.value))}
+                className="w-full min-h-11 border border-slate-300 rounded-xl px-2.5 text-slate-900 font-bold focus:outline-none focus:border-slate-900 bg-white"
+              >
+                <option value={5}>✅ Đã hoàn thành phân hạng (Hiện Bậc Rank & Đoàn)</option>
+                <option value={0}>⏳ Chưa đánh trận nào (0/5)</option>
+                <option value={1}>⏳ Đã đánh 1 trận (1/5)</option>
+                <option value={2}>⏳ Đã đánh 2 trận (2/5)</option>
+                <option value={3}>⏳ Đã đánh 3 trận (3/5)</option>
+                <option value={4}>⏳ Đã đánh 4 trận (4/5)</option>
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-slate-700 font-bold mb-1.5">
-                  Trạng thái trận Phân Hạng (0..5 trận):
-                </label>
-                <select
-                  value={manualPlacementsInput}
-                  onChange={(e) => setManualPlacementsInput(Number(e.target.value))}
-                  className="w-full border border-slate-300 rounded-xl p-2.5 text-slate-900 font-bold focus:outline-none focus:border-slate-900"
-                >
-                  <option value={5}>✅ Đã hoàn thành phân hạng (Hiện Bậc Rank & Đoàn)</option>
-                  <option value={0}>⏳ Chưa đánh trận nào (0/5)</option>
-                  <option value={1}>⏳ Đã đánh 1 trận (1/5)</option>
-                  <option value={2}>⏳ Đã đánh 2 trận (2/5)</option>
-                  <option value={3}>⏳ Đã đánh 3 trận (3/5)</option>
-                  <option value={4}>⏳ Đã đánh 4 trận (4/5)</option>
-                </select>
-              </div>
+            <div>
+              <label htmlFor="rank-shield-input" className="block text-slate-700 font-bold mb-1.5">
+                Số trận Giáp Bảo Vệ Rank (Demotion Shield):
+              </label>
+              <input
+                id="rank-shield-input"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                max="10"
+                value={manualShieldInput}
+                onChange={(e) => setManualShieldInput(Math.max(0, Number(e.target.value)))}
+                className="w-full min-h-11 border border-slate-300 rounded-xl px-3 text-slate-900 font-bold focus:outline-none focus:border-slate-900"
+              />
+              <span className="text-[11px] text-slate-500 block mt-1">
+                🛡️ Khi thua ở 0 LP, nếu còn giáp sẽ không bị rớt rank (giữ nguyên ở 0 LP).
+              </span>
+            </div>
 
-              <div>
-                <label className="block text-slate-700 font-bold mb-1.5">
-                  Số trận Giáp Bảo Vệ Rank (Demotion Shield):
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={manualShieldInput}
-                  onChange={(e) => setManualShieldInput(Math.max(0, Number(e.target.value)))}
-                  className="w-full border border-slate-300 rounded-xl p-2.5 text-slate-900 font-bold focus:outline-none focus:border-slate-900"
-                />
-                <span className="text-[11px] text-slate-500 block mt-1">
-                  🛡️ Khi thua ở 0 LP, nếu còn giáp sẽ không bị rớt rank (giữ nguyên ở 0 LP).
-                </span>
-              </div>
-
-              {/* Preview Result */}
-              {(() => {
-                const preview = getPlayerRankDisplay(manualLpInput, manualPlacementsInput, manualShieldInput)
-                return (
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] text-slate-500 font-bold uppercase block">Xem trước Rank:</span>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className={`font-black text-sm ${preview.textColor}`}>
-                          {preview.name}
+            {/* Preview Result */}
+            {(() => {
+              const preview = getPlayerRankDisplay(manualLpInput, manualPlacementsInput, manualShieldInput)
+              return (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Xem trước Rank:</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`font-black text-sm ${preview.textColor}`}>{preview.name}</span>
+                      {manualShieldInput > 0 && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 font-bold text-[10px]">
+                          🛡️ {manualShieldInput} giáp
                         </span>
-                        {manualShieldInput > 0 && (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 font-bold text-[10px]">
-                            🛡️ {manualShieldInput} giáp
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right font-mono font-bold text-slate-900">
-                      <span>{manualLpInput} LP</span>
+                      )}
                     </div>
                   </div>
-                )
-              })()}
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
-              <button
-                onClick={() => setEditingRankMember(null)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
-              >
-                Hủy
-              </button>
-              <button
-                disabled={updateRankMutation.isPending}
-                onClick={() => {
-                  updateRankMutation.mutate({
-                    userId: editingRankMember.id,
-                    eloScore: manualLpInput,
-                    placementMatches: manualPlacementsInput,
-                    shieldMatches: manualShieldInput,
-                  })
-                }}
-                className="px-5 py-2 text-xs font-black bg-slate-950 hover:bg-slate-800 text-white rounded-xl shadow active:scale-95 transition"
-              >
-                {updateRankMutation.isPending ? 'Đang lưu...' : 'Lưu Bậc Rank'}
-              </button>
-            </div>
+                  <div className="text-right font-mono font-bold text-slate-900">
+                    <span>{manualLpInput} LP</span>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
-        </div>
-      )}
+        )}
+      </BottomSheet>
 
-      {/* Host Restore Deleted Members Modal */}
-      {showRestoreModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <RotateCcw size={18} className="text-emerald-600" />
-                <h3 className="font-black text-slate-900 text-sm">
-                  Khôi Phục Thành Viên Đã Xóa
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowRestoreModal(false)}
-                className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700"
-              >
-                <X size={16} />
-              </button>
+      {/* Host Restore Deleted Members */}
+      <BottomSheet
+        open={showRestoreModal}
+        onClose={() => setShowRestoreModal(false)}
+        title="Khôi phục thành viên đã xóa"
+        panelClassName="sm:max-w-lg"
+      >
+        <div className="space-y-4">
+          <p className="text-sm sm:text-xs text-slate-600 leading-relaxed">
+            Các tài khoản thành viên từng bị xóa. Nhấn <span className="font-bold text-emerald-700">"Khôi phục"</span> để đưa
+            thành viên trở lại hoạt động với đầy đủ lịch sử, LP và phân loại.
+          </p>
+
+          {isLoadingDeleted ? (
+            <div className="py-10 text-center text-xs text-slate-500 font-semibold animate-pulse">
+              Đang tải danh sách thành viên đã xóa...
             </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Dưới đây là các tài khoản thành viên thật từng bị xóa. Bạn có thể nhấn <span className="font-bold text-emerald-700">"Khôi phục"</span> để đưa thành viên trở lại hoạt động bình thường với đầy đủ lịch sử, LP và phân loại.
-            </p>
-
-            {isLoadingDeleted ? (
-              <div className="py-10 text-center text-xs text-slate-500 font-semibold animate-pulse">
-                Đang tải danh sách thành viên đã xóa...
-              </div>
-            ) : deletedMembers.length === 0 ? (
-              <div className="py-10 text-center text-xs text-slate-500 space-y-2">
-                <DuckMascot size={36} rounded="xl" className="mx-auto opacity-50" />
-                <p className="font-bold text-slate-700">Không có thành viên nào bị xóa gần đây!</p>
-                <p className="text-[11px] text-slate-400">Dữ liệu toàn bộ thành viên đều đang an toàn và đầy đủ.</p>
-              </div>
-            ) : (
-              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 pr-1 space-y-1">
-                {deletedMembers.map((dm) => (
-                  <div key={dm.id} className="py-2.5 flex items-center justify-between gap-3">
+          ) : deletedMembers.length === 0 ? (
+            <div className="py-10 text-center text-xs text-slate-500 space-y-2">
+              <DuckMascot size={36} rounded="xl" className="mx-auto opacity-50" />
+              <p className="font-bold text-slate-700">Không có thành viên nào bị xóa gần đây!</p>
+              <p className="text-[11px] text-slate-400">Dữ liệu toàn bộ thành viên đều đang an toàn và đầy đủ.</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {deletedMembers.map((dm) => {
+                const restoring = restoreMemberMutation.isPending && restoreMemberMutation.variables === dm.id
+                return (
+                  <li key={dm.id} className="py-2.5 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img
                         src={dm.avatarUrl || '/duck-mascot.png'}
@@ -914,145 +1120,106 @@ export const MemberListView: React.FC = () => {
                         className="w-8 h-8 rounded-full border border-slate-200 object-cover shrink-0"
                       />
                       <div className="min-w-0">
-                        <div className="font-black text-slate-900 text-xs truncate">{dm.fullName}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{dm.phone || 'Không có SĐT'} • {dm.membershipType === 'FIXED' ? 'Cố định' : 'Vãng lai'}</div>
+                        <div className="font-black text-slate-900 text-sm sm:text-xs truncate">{dm.fullName}</div>
+                        <div className="text-[11px] text-slate-500 font-mono">
+                          {dm.phone || 'Không có SĐT'} • {dm.membershipType === 'FIXED' ? 'Cố định' : 'Vãng lai'}
+                        </div>
                       </div>
                     </div>
 
                     <button
                       onClick={() => restoreMemberMutation.mutate(dm.id)}
-                      disabled={restoreMemberMutation.isPending}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1 shrink-0"
+                      disabled={restoring}
+                      className="min-h-11 sm:min-h-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-[11px] font-bold rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1 shrink-0 disabled:opacity-60"
                     >
                       <RotateCcw size={12} />
-                      <span>{restoreMemberMutation.isPending ? 'Đang...' : 'Khôi phục'}</span>
+                      <span>{restoring ? 'Đang...' : 'Khôi phục'}</span>
                     </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex justify-end pt-3 border-t border-slate-200">
-              <button
-                onClick={() => setShowRestoreModal(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 rounded-xl"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
-      )}
+      </BottomSheet>
 
-      {/* Modern Center Modal: Confirm Delete Member */}
-      {confirmDeleteMember && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto shadow-sm">
-              <Trash2 size={24} />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-black text-slate-900 text-base">Xác nhận xóa thành viên</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Bạn có chắc chắn muốn xóa tài khoản của <b className="text-slate-900 font-bold">"{confirmDeleteMember.fullName}"</b> ({confirmDeleteMember.phone || 'Không có SĐT'})?
-              </p>
-              <p className="text-[11px] text-emerald-700 font-medium bg-emerald-50 p-2 rounded-xl border border-emerald-200 mt-2">
-                💡 Dữ liệu không bị mất. Bạn có thể khôi phục lại bất kỳ lúc nào qua nút "Khôi phục thành viên"!
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                onClick={() => setConfirmDeleteMember(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                disabled={deleteMemberMutation.isPending}
-                onClick={() => {
-                  deleteMemberMutation.mutate(confirmDeleteMember.id, {
-                    onSettled: () => setConfirmDeleteMember(null),
-                  })
-                }}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 disabled:opacity-50"
-              >
-                {deleteMemberMutation.isPending ? 'Đang xóa...' : 'Đồng ý xóa'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Xác nhận xóa thành viên */}
+      <ConfirmSheet
+        open={!!confirmDeleteMember}
+        onClose={() => setConfirmDeleteMember(null)}
+        title="Xác nhận xóa thành viên"
+        confirmLabel="Đồng ý xóa"
+        pendingLabel="Đang xóa..."
+        cancelLabel="Hủy bỏ"
+        destructive
+        pending={deleteMemberMutation.isPending}
+        onConfirm={() => {
+          if (!confirmDeleteMember) return
+          deleteMemberMutation.mutate(confirmDeleteMember.id, {
+            onSettled: () => setConfirmDeleteMember(null),
+          })
+        }}
+      >
+        {confirmDeleteMember && (
+          <>
+            <p>
+              Xóa tài khoản của <b className="text-slate-900">"{confirmDeleteMember.fullName}"</b> (
+              {confirmDeleteMember.phone || 'Không có SĐT'})?
+            </p>
+            <p className="text-xs text-emerald-700 font-medium bg-emerald-50 p-2 rounded-xl border border-emerald-200">
+              💡 Dữ liệu không bị mất. Có thể khôi phục bất kỳ lúc nào qua nút "Khôi phục thành viên".
+            </p>
+          </>
+        )}
+      </ConfirmSheet>
 
-      {/* Modern Center Modal: Confirm Reset Password */}
-      {confirmResetPassMember && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center mx-auto shadow-sm">
-              <KeyRound size={24} />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-black text-slate-900 text-base">Đặt lại mật khẩu</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Đặt lại mật khẩu của <b className="text-slate-900 font-bold">{confirmResetPassMember.fullName}</b> về mặc định <code className="px-1.5 py-0.5 bg-slate-100 rounded text-amber-800 font-bold">123456</code> và thông báo về Telegram?
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                onClick={() => setConfirmResetPassMember(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
-              >
-                Hủy
-              </button>
-              <button
-                disabled={resetPasswordMutation.isPending}
-                onClick={() => {
-                  const targetMember = confirmResetPassMember
-                  resetPasswordMutation.mutate(targetMember.id, {
-                    onSettled: () => setConfirmResetPassMember(null),
-                  })
-                }}
-                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 disabled:opacity-50"
-              >
-                {resetPasswordMutation.isPending ? 'Đang cấp...' : 'Đặt lại'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Xác nhận đặt lại mật khẩu */}
+      <ConfirmSheet
+        open={!!confirmResetPassMember}
+        onClose={() => setConfirmResetPassMember(null)}
+        title="Đặt lại mật khẩu"
+        confirmLabel="Đặt lại"
+        pendingLabel="Đang cấp..."
+        pending={resetPasswordMutation.isPending}
+        onConfirm={() => {
+          if (!confirmResetPassMember) return
+          resetPasswordMutation.mutate(confirmResetPassMember.id, {
+            onSettled: () => setConfirmResetPassMember(null),
+          })
+        }}
+      >
+        {confirmResetPassMember && (
+          <p>
+            Đặt lại mật khẩu của <b className="text-slate-900">{confirmResetPassMember.fullName}</b> về mặc định{' '}
+            <code className="px-1.5 py-0.5 bg-slate-100 rounded text-amber-800 font-bold">123456</code> và thông báo về
+            Telegram?
+          </p>
+        )}
+      </ConfirmSheet>
 
-      {/* Modern Center Modal: Confirm Downgrade to Casual */}
-      {confirmDowngradeMember && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
-            <div className="space-y-1">
-              <h3 className="font-black text-slate-900 text-base">Chuyển về Vãng Lai</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Bạn có chắc chắn muốn chuyển <b className="text-slate-900 font-bold">{confirmDowngradeMember.fullName}</b> từ Cố Định về <b className="text-amber-700 font-bold">Khách Vãng Lai</b>?
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                onClick={() => setConfirmDowngradeMember(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
-              >
-                Hủy
-              </button>
-              <button
-                disabled={updateTypeMutation.isPending}
-                onClick={() => {
-                  updateTypeMutation.mutate(
-                    { userId: confirmDowngradeMember.id, type: 'CASUAL' },
-                    { onSettled: () => setConfirmDowngradeMember(null) }
-                  )
-                }}
-                className="flex-1 py-2.5 bg-slate-950 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95"
-              >
-                Xác nhận
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Xác nhận chuyển về Vãng Lai */}
+      <ConfirmSheet
+        open={!!confirmDowngradeMember}
+        onClose={() => setConfirmDowngradeMember(null)}
+        title="Chuyển về Vãng Lai"
+        confirmLabel="Xác nhận"
+        pendingLabel="Đang lưu..."
+        pending={updateTypeMutation.isPending}
+        onConfirm={() => {
+          if (!confirmDowngradeMember) return
+          updateTypeMutation.mutate(
+            { userId: confirmDowngradeMember.id, type: 'CASUAL' },
+            { onSettled: () => setConfirmDowngradeMember(null) }
+          )
+        }}
+      >
+        {confirmDowngradeMember && (
+          <p>
+            Chuyển <b className="text-slate-900">{confirmDowngradeMember.fullName}</b> từ Cố Định về{' '}
+            <b className="text-amber-700">Khách Vãng Lai</b>?
+          </p>
+        )}
+      </ConfirmSheet>
 
       {/* Host: Sửa giới tính thành viên */}
       {editingGenderMember && (
@@ -1122,42 +1289,51 @@ export const MemberListView: React.FC = () => {
         </div>
       )}
 
-      {/* Modern Center Modal: Confirm Upgrade to Fixed */}
-      {confirmUpgradeMember && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-sm w-full shadow-2xl border border-slate-200 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-sm">
-              <Sparkles size={24} className="text-amber-500" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="font-black text-slate-900 text-base">Nâng cấp Cố Định</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Nâng cấp trực tiếp thành viên <b className="text-slate-900 font-bold">{confirmUpgradeMember.fullName}</b> lên <b className="text-emerald-700 font-bold">Thành Viên Cố Định</b> chính thức của CLB?
-              </p>
-            </div>
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                onClick={() => setConfirmUpgradeMember(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
-              >
-                Hủy
-              </button>
-              <button
-                disabled={updateTypeMutation.isPending}
-                onClick={() => {
-                  updateTypeMutation.mutate(
-                    { userId: confirmUpgradeMember.id, type: 'FIXED' },
-                    { onSettled: () => setConfirmUpgradeMember(null) }
-                  )
-                }}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95"
-              >
-                Đồng ý
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Xác nhận nâng cấp Cố Định */}
+      <ConfirmSheet
+        open={!!confirmUpgradeMember}
+        onClose={() => setConfirmUpgradeMember(null)}
+        title="Nâng cấp Cố Định"
+        confirmLabel="Đồng ý"
+        pendingLabel="Đang lưu..."
+        pending={updateTypeMutation.isPending}
+        onConfirm={() => {
+          if (!confirmUpgradeMember) return
+          updateTypeMutation.mutate(
+            { userId: confirmUpgradeMember.id, type: 'FIXED' },
+            { onSettled: () => setConfirmUpgradeMember(null) }
+          )
+        }}
+      >
+        {confirmUpgradeMember && (
+          <p>
+            Nâng cấp <b className="text-slate-900">{confirmUpgradeMember.fullName}</b> lên{' '}
+            <b className="text-emerald-700">Thành Viên Cố Định</b> chính thức của CLB?
+          </p>
+        )}
+      </ConfirmSheet>
+
+      {/* Xác nhận tối ưu ảnh đại diện (thay window.confirm) */}
+      <ConfirmSheet
+        open={!!optimizePreview}
+        onClose={() => setOptimizePreview(null)}
+        title="Thu nhỏ ảnh đại diện"
+        confirmLabel="Tiếp tục thu nhỏ"
+        pendingLabel="Đang xử lý..."
+        destructive
+        pending={optimizeAvatarsMutation.isPending}
+        onConfirm={handleApplyOptimizeAvatars}
+      >
+        {optimizePreview && (
+          <>
+            <p>
+              Sẽ thu nhỏ <b>{optimizePreview.changed}</b> ảnh đại diện ({optimizePreview.beforeKb} KB → {optimizePreview.afterKb}{' '}
+              KB, tiết kiệm khoảng {optimizePreview.savedKb} KB mỗi lần tải danh sách).
+            </p>
+            <p className="text-xs text-rose-700 font-bold">Thao tác này ghi đè ảnh cũ và không thể hoàn tác.</p>
+          </>
+        )}
+      </ConfirmSheet>
     </div>
   )
 }

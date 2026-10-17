@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { Search, X, ChevronDown, Check, UserCheck } from 'lucide-react'
+import React, { useState, useRef, useEffect, useMemo, useId } from 'react'
+import { Search, X, ChevronDown, Check } from 'lucide-react'
 import { DuckMascot } from './DuckMascot'
 import { Participant } from '../types'
 import { getPlayerRankDisplay } from '../lib/ranks'
@@ -12,6 +12,8 @@ interface PlayerSelectProps {
   placeholder?: string
   colorTheme?: 'blue' | 'rose'
   allowClear?: boolean
+  /** Nhãn cho trình đọc màn hình (VD: "Team Blue - Player 1") */
+  ariaLabel?: string
 }
 
 // Remove Vietnamese accents for fast fuzzy search
@@ -24,6 +26,12 @@ const removeVietnameseTones = (str: string) => {
     .toLowerCase()
 }
 
+/** Thiết bị cảm ứng (điện thoại): không tự focus ô tìm kiếm để bàn phím không bật lên che danh sách */
+const isCoarsePointer = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(pointer: coarse)').matches
+
 export const PlayerSelect: React.FC<PlayerSelectProps> = ({
   value,
   onChange,
@@ -32,11 +40,13 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
   placeholder = 'Chọn tay vợt...',
   colorTheme = 'blue',
   allowClear = true,
+  ariaLabel,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const listId = useId()
 
   // Find currently selected player
   const selectedPlayer = useMemo(() => {
@@ -44,27 +54,43 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
     return options.find((p) => String(p.userId || p.id) === String(value))
   }, [value, options])
 
-  // Focus input on dropdown open
+  // Đóng danh sách luôn xóa từ khóa tìm kiếm
+  const setOpen = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) setSearchTerm('')
+  }
+
+  // Focus ô tìm kiếm khi mở (chỉ với chuột / bàn phím)
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => {
-        searchInputRef.current?.focus()
-      }, 50)
-    } else {
-      setSearchTerm('')
-    }
+    if (!isOpen || isCoarsePointer()) return
+    const t = setTimeout(() => {
+      searchInputRef.current?.focus()
+    }, 50)
+    return () => clearTimeout(t)
   }, [isOpen])
 
-  // Close when clicking outside
+  // Đóng khi chạm / bấm ra ngoài (pointerdown chạy được cả trên iOS Safari)
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    if (!isOpen) return
+    const handlePointerDownOutside = (event: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false)
+        setSearchTerm('')
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+        setSearchTerm('')
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDownOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
 
   // Filter options based on search query (Name or Phone or Rank)
   const filteredOptions = useMemo(() => {
@@ -86,65 +112,78 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
     <div className="relative w-full" ref={containerRef}>
       {/* Selected Box Trigger */}
       <div
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full bg-white border border-slate-200 rounded-xl p-2 sm:p-2.5 flex items-center justify-between gap-2 cursor-pointer shadow-xs transition select-none ${themeHover} ${
+        className={`w-full bg-white border border-slate-200 rounded-xl flex items-center shadow-xs transition ${themeHover} ${
           isOpen ? themeBorderFocus : ''
         }`}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {selectedPlayer ? (
-            <>
-              <DuckMascot
-                src={selectedPlayer.avatarUrl || '/duck-mascot.png'}
-                size={24}
-                rounded="xl"
-                className="shrink-0 border border-slate-200"
-              />
-              <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
-                <span className="font-bold text-slate-900 text-xs truncate">
-                  {selectedPlayer.name}
-                </span>
-                <span
-                  className={`text-[9px] px-1 py-0.2 rounded font-bold shrink-0 ${
-                    selectedPlayer.gender === 'FEMALE'
-                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                      : 'bg-blue-50 text-blue-700 border border-blue-200'
-                  }`}
-                >
-                  {selectedPlayer.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
-                </span>
-                {(() => {
-                  const rank = getPlayerRankDisplay(selectedPlayer.eloScore || 0, selectedPlayer.placementMatches ?? 5)
-                  const stats = playerStatsMap[String(selectedPlayer.userId || selectedPlayer.id)]
-                  return (
-                    <span className="text-[10px] text-slate-500 font-semibold shrink-0">
-                      • {rank.name} | 🏸 {stats?.totalSets || 0} set
-                    </span>
-                  )
-                })()}
-              </div>
-            </>
-          ) : (
-            <span className="text-xs text-slate-400 font-medium truncate">{placeholder}</span>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(!isOpen)}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-controls={isOpen ? listId : undefined}
+          aria-label={
+            ariaLabel
+              ? `${ariaLabel}: ${selectedPlayer ? selectedPlayer.name : placeholder}`
+              : undefined
+          }
+          className="min-h-11 flex-1 min-w-0 flex items-center justify-between gap-2 pl-2 sm:pl-2.5 pr-2 py-1.5 text-left cursor-pointer select-none rounded-xl"
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {selectedPlayer ? (
+              <>
+                <DuckMascot
+                  src={selectedPlayer.avatarUrl || '/duck-mascot.png'}
+                  size={24}
+                  rounded="xl"
+                  className="shrink-0 border border-slate-200"
+                />
+                <div className="min-w-0 flex-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="font-bold text-slate-900 text-sm sm:text-xs truncate">{selectedPlayer.name}</span>
+                  <span
+                    className={`text-[9px] px-1 py-0.2 rounded font-bold shrink-0 ${
+                      selectedPlayer.gender === 'FEMALE'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                    }`}
+                  >
+                    {selectedPlayer.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
+                  </span>
+                  {(() => {
+                    const rank = getPlayerRankDisplay(selectedPlayer.eloScore || 0, selectedPlayer.placementMatches ?? 5)
+                    const stats = playerStatsMap[String(selectedPlayer.userId || selectedPlayer.id)]
+                    return (
+                      <span className="text-[10px] text-slate-500 font-semibold shrink-0">
+                        • {rank.name} | 🏸 {stats?.totalSets || 0} set
+                      </span>
+                    )
+                  })()}
+                </div>
+              </>
+            ) : (
+              <span className="text-sm sm:text-xs text-slate-400 font-medium truncate">{placeholder}</span>
+            )}
+          </div>
+          <ChevronDown
+            size={14}
+            className={`text-slate-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
 
-        <div className="flex items-center gap-1 shrink-0">
-          {allowClear && selectedPlayer && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                onChange('')
-              }}
-              className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50 transition"
-              title="Xóa lựa chọn"
-            >
-              <X size={13} />
-            </button>
-          )}
-          <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-        </div>
+        {allowClear && selectedPlayer && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange('')
+              setOpen(false)
+            }}
+            aria-label={`Bỏ chọn ${selectedPlayer.name}`}
+            title="Xóa lựa chọn"
+            className="min-h-11 min-w-11 inline-flex items-center justify-center shrink-0 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Dropdown Menu with Fast Search Input */}
@@ -160,35 +199,41 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Gõ tên hoặc số ĐT để tìm..."
-                className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-7 py-1.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
+                aria-label="Tìm tay vợt"
+                autoComplete="off"
+                className="w-full min-h-11 bg-white border border-slate-200 rounded-lg pl-8 pr-11 py-1.5 text-base sm:text-xs font-bold text-slate-900 focus:outline-none focus:border-slate-900 shadow-2xs"
               />
               {searchTerm && (
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-2 text-slate-400 hover:text-slate-600 p-0.5"
+                  aria-label="Xóa từ khóa tìm kiếm"
+                  className="absolute right-0 min-h-11 min-w-11 inline-flex items-center justify-center text-slate-400 hover:text-slate-600"
                 >
-                  <X size={12} />
+                  <X size={14} />
                 </button>
               )}
             </div>
           </div>
 
           {/* List Options */}
-          <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 p-1">
+          <div id={listId} role="listbox" className="max-h-60 overflow-y-auto overscroll-contain divide-y divide-slate-100 p-1">
             {allowClear && (
-              <div
+              <button
+                type="button"
+                role="option"
+                aria-selected={!value}
                 onClick={() => {
                   onChange('')
-                  setIsOpen(false)
+                  setOpen(false)
                 }}
-                className={`p-2 rounded-xl text-xs font-semibold cursor-pointer transition flex items-center justify-between ${
+                className={`w-full min-h-11 p-2 rounded-xl text-xs font-semibold cursor-pointer transition flex items-center justify-between text-left ${
                   !value ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-500 hover:bg-slate-50'
                 }`}
               >
                 <span>{placeholder.includes('Đánh đơn') ? '(Không có - Đánh đơn)' : '(Bỏ chọn - Để trống)'}</span>
                 {!value && <Check size={14} className="text-slate-900" />}
-              </div>
+              </button>
             )}
 
             {filteredOptions.length === 0 ? (
@@ -203,13 +248,16 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
                 const stats = playerStatsMap[uId] || { totalSets: 0, wins: 0, losses: 0 }
 
                 return (
-                  <div
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
                     key={u.id}
                     onClick={() => {
                       onChange(uId)
-                      setIsOpen(false)
+                      setOpen(false)
                     }}
-                    className={`p-2 rounded-xl text-xs cursor-pointer transition flex items-center justify-between gap-2 ${
+                    className={`w-full min-h-11 p-2 rounded-xl text-xs cursor-pointer transition flex items-center justify-between gap-2 text-left ${
                       isSelected
                         ? colorTheme === 'blue'
                           ? 'bg-blue-50 text-blue-950 font-bold'
@@ -242,7 +290,7 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5">
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-0.5 flex-wrap">
                           <span className={rank.textColor}>{rank.name} ({u.eloScore || 0} LP)</span>
                           <span>•</span>
                           <span className="font-extrabold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded">
@@ -258,7 +306,7 @@ export const PlayerSelect: React.FC<PlayerSelectProps> = ({
                         className={`shrink-0 ${colorTheme === 'blue' ? 'text-blue-600' : 'text-rose-600'}`}
                       />
                     )}
-                  </div>
+                  </button>
                 )
               })
             )}
