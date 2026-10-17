@@ -44,6 +44,8 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	// H2 chỉ dùng cho test kiểm tra truy vấn JPQL (@DataJpaTest), phiên bản do Spring Boot BOM quản lý
+	testRuntimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {

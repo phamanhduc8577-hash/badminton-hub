@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { useToast } from '../components/ToastProvider'
-import { formatSessionDateTime } from '../lib/dateUtils'
+import { durationHours, formatSessionDateTime, parseServerDateTime, serverToDateTimeInput } from '../lib/dateUtils'
 import { getEffectiveSessionStatus, SESSION_STATUS_LABEL } from '../lib/sessionStatus'
 import {
   Clock,
@@ -54,10 +54,11 @@ export const SessionListView: React.FC = () => {
     memberFemalePrice: 0,
     guestMalePrice: 0,
     guestFemalePrice: 0,
-    memberMalePrice2h: 0,
-    memberFemalePrice2h: 0,
-    guestMalePrice2h: 0,
-    guestFemalePrice2h: 0,
+    // Giá gói 2h: null = để trống (ca không có giá 2h cho ô này)
+    memberMalePrice2h: null as number | null,
+    memberFemalePrice2h: null as number | null,
+    guestMalePrice2h: null as number | null,
+    guestFemalePrice2h: null as number | null,
     costCourt: 0,
     costShuttlecock: 0,
     costDrinks: 0,
@@ -87,8 +88,11 @@ export const SessionListView: React.FC = () => {
       const res = await api.put(`/sessions/${sessionId}`, payload)
       return res.data
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      // Trang chi tiết ca / dashboard Host dùng khóa id dạng chuỗi (lấy từ URL)
+      queryClient.invalidateQueries({ queryKey: ['session', String(vars.sessionId)] })
+      queryClient.invalidateQueries({ queryKey: ['report', String(vars.sessionId)] })
       setEditingSession(null)
       showToast('Đã cập nhật thông tin ca đánh thành công!', 'success')
     },
@@ -97,13 +101,7 @@ export const SessionListView: React.FC = () => {
     },
   })
 
-  const formatForDateTimeLocal = (dStr: string) => {
-    if (!dStr) return ''
-    const d = new Date(dStr)
-    if (isNaN(d.getTime())) return ''
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  }
+  const formatForDateTimeLocal = (dStr: string) => serverToDateTimeInput(dStr)
 
   const handleOpenEditModal = (e: React.MouseEvent, session: SessionItem) => {
     e.stopPropagation()
@@ -120,10 +118,10 @@ export const SessionListView: React.FC = () => {
       memberFemalePrice: session.memberFemalePrice || 0,
       guestMalePrice: session.guestMalePrice || 0,
       guestFemalePrice: session.guestFemalePrice || 0,
-      memberMalePrice2h: session.memberMalePrice2h || 0,
-      memberFemalePrice2h: session.memberFemalePrice2h || 0,
-      guestMalePrice2h: session.guestMalePrice2h || 0,
-      guestFemalePrice2h: session.guestFemalePrice2h || 0,
+      memberMalePrice2h: session.memberMalePrice2h ?? null,
+      memberFemalePrice2h: session.memberFemalePrice2h ?? null,
+      guestMalePrice2h: session.guestMalePrice2h ?? null,
+      guestFemalePrice2h: session.guestFemalePrice2h ?? null,
       costCourt: session.costCourt || 0,
       costShuttlecock: session.costShuttlecock || 0,
       costDrinks: session.costDrinks || 0,
@@ -143,8 +141,8 @@ export const SessionListView: React.FC = () => {
       return
     }
     if (editForm.startTime && editForm.endTime) {
-      const s = new Date(editForm.startTime).getTime()
-      const end = new Date(editForm.endTime).getTime()
+      const s = parseServerDateTime(editForm.startTime).getTime()
+      const end = parseServerDateTime(editForm.endTime).getTime()
       if (end <= s) {
         showToast('Giờ kết thúc phải sau giờ bắt đầu!', 'error')
         return
@@ -157,6 +155,19 @@ export const SessionListView: React.FC = () => {
       return val.length === 16 ? `${val}:00` : val
     }
 
+    // Giá gói 2h: xóa trống cả 4 ô → gửi clearTwoHourPrices để server bỏ hẳn gói 2h.
+    // Server hiểu null = "giữ nguyên", nên không thể xóa riêng 1 ô đã có giá → báo Host xóa cả 4.
+    const twoHourKeys = ['memberMalePrice2h', 'memberFemalePrice2h', 'guestMalePrice2h', 'guestFemalePrice2h'] as const
+    const allTwoHourEmpty = twoHourKeys.every((k) => editForm[k] === null)
+    const hadTwoHourPrice = twoHourKeys.some((k) => editingSession[k] !== null && editingSession[k] !== undefined)
+    const clearedSome = twoHourKeys.some(
+      (k) => editForm[k] === null && editingSession[k] !== null && editingSession[k] !== undefined
+    )
+    if (!allTwoHourEmpty && clearedSome) {
+      showToast('Muốn bỏ giá gói 2 tiếng, vui lòng xóa trống cả 4 ô giá 2 tiếng (hoặc nhập lại giá cho ô vừa xóa)!', 'error')
+      return
+    }
+    const clearTwoHourPrices = allTwoHourEmpty && hadTwoHourPrice
     updateSessionMutation.mutate({
       sessionId: editingSession.id,
       payload: {
@@ -171,10 +182,11 @@ export const SessionListView: React.FC = () => {
         memberFemalePrice: Number(editForm.memberFemalePrice),
         guestMalePrice: Number(editForm.guestMalePrice),
         guestFemalePrice: Number(editForm.guestFemalePrice),
-        memberMalePrice2h: editForm.memberMalePrice2h ? Number(editForm.memberMalePrice2h) : null,
-        memberFemalePrice2h: editForm.memberFemalePrice2h ? Number(editForm.memberFemalePrice2h) : null,
-        guestMalePrice2h: editForm.guestMalePrice2h ? Number(editForm.guestMalePrice2h) : null,
-        guestFemalePrice2h: editForm.guestFemalePrice2h ? Number(editForm.guestFemalePrice2h) : null,
+        memberMalePrice2h: editForm.memberMalePrice2h,
+        memberFemalePrice2h: editForm.memberFemalePrice2h,
+        guestMalePrice2h: editForm.guestMalePrice2h,
+        guestFemalePrice2h: editForm.guestFemalePrice2h,
+        ...(clearTwoHourPrices ? { clearTwoHourPrices: true } : {}),
         costCourt: Number(editForm.costCourt || 0),
         costShuttlecock: Number(editForm.costShuttlecock || 0),
         costDrinks: Number(editForm.costDrinks || 0),
@@ -213,8 +225,8 @@ export const SessionListView: React.FC = () => {
 
       if (orderA !== orderB) return orderA - orderB
 
-      const timeA = new Date(a.startTime).getTime()
-      const timeB = new Date(b.startTime).getTime()
+      const timeA = parseServerDateTime(a.startTime).getTime()
+      const timeB = parseServerDateTime(b.startTime).getTime()
 
       if (a.effectiveStatus === 'COMPLETED' || a.effectiveStatus === 'CANCELLED') {
         return timeB - timeA // Ca mới kết thúc xếp trên
@@ -522,6 +534,8 @@ export const SessionListView: React.FC = () => {
                               ? 'bg-rose-50 text-rose-700 border-rose-300 shadow-sm animate-pulse'
                               : effectiveStatus === 'UPCOMING'
                               ? 'bg-slate-950 text-white border-slate-950 shadow-sm'
+                              : effectiveStatus === 'CANCELLED'
+                              ? 'bg-rose-600 text-white border-rose-600'
                               : 'bg-slate-200/80 text-slate-600 border-slate-300'
                           }`}
                         >
@@ -576,9 +590,9 @@ export const SessionListView: React.FC = () => {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <Sparkles size={13} className="text-amber-500 shrink-0" />
                         <span className="text-[10px] sm:text-[11px] text-slate-800 font-black">Ưu đãi:</span>
-                        {session.startTime && session.endTime && (
+                        {durationHours(session.startTime, session.endTime) !== null && (
                           <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white text-slate-700 border border-slate-200">
-                            Ca {Math.round(((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60)) * 10) / 10}h
+                            Ca {durationHours(session.startTime, session.endTime)}h
                           </span>
                         )}
                       </div>
@@ -806,8 +820,8 @@ export const SessionListView: React.FC = () => {
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Cố định Nam</label>
                     <CurrencyInput
-                      value={editForm.memberMalePrice2h || 0}
-                      onChange={(val) => setEditForm({ ...editForm, memberMalePrice2h: val })}
+                      value={editForm.memberMalePrice2h ?? undefined}
+                      onChange={(val) => setEditForm({ ...editForm, memberMalePrice2h: val > 0 ? val : null })}
                       placeholder="0"
                       suffix=""
                       className="text-xs !p-2 rounded-lg"
@@ -816,8 +830,8 @@ export const SessionListView: React.FC = () => {
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Cố định Nữ</label>
                     <CurrencyInput
-                      value={editForm.memberFemalePrice2h || 0}
-                      onChange={(val) => setEditForm({ ...editForm, memberFemalePrice2h: val })}
+                      value={editForm.memberFemalePrice2h ?? undefined}
+                      onChange={(val) => setEditForm({ ...editForm, memberFemalePrice2h: val > 0 ? val : null })}
                       placeholder="0"
                       suffix=""
                       className="text-xs !p-2 rounded-lg"
@@ -826,8 +840,8 @@ export const SessionListView: React.FC = () => {
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Vãng lai Nam</label>
                     <CurrencyInput
-                      value={editForm.guestMalePrice2h || 0}
-                      onChange={(val) => setEditForm({ ...editForm, guestMalePrice2h: val })}
+                      value={editForm.guestMalePrice2h ?? undefined}
+                      onChange={(val) => setEditForm({ ...editForm, guestMalePrice2h: val > 0 ? val : null })}
                       placeholder="0"
                       suffix=""
                       className="text-xs !p-2 rounded-lg"
@@ -836,8 +850,8 @@ export const SessionListView: React.FC = () => {
                   <div>
                     <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2h Vãng lai Nữ</label>
                     <CurrencyInput
-                      value={editForm.guestFemalePrice2h || 0}
-                      onChange={(val) => setEditForm({ ...editForm, guestFemalePrice2h: val })}
+                      value={editForm.guestFemalePrice2h ?? undefined}
+                      onChange={(val) => setEditForm({ ...editForm, guestFemalePrice2h: val > 0 ? val : null })}
                       placeholder="0"
                       suffix=""
                       className="text-xs !p-2 rounded-lg"

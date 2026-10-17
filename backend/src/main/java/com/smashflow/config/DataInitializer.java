@@ -76,6 +76,27 @@ public class DataInitializer {
                 log.warn("Không thêm được cột mới cho session_participants: {}", e.getMessage());
             }
 
+            // Đợt 5: LP thực tế từng người trên mỗi trận (sửa/xóa trận đảo ngược đúng phần LP)
+            try {
+                jdbcTemplate.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS a1_lp_delta INT;");
+                jdbcTemplate.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS a2_lp_delta INT;");
+                jdbcTemplate.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS b1_lp_delta INT;");
+                jdbcTemplate.execute("ALTER TABLE matches ADD COLUMN IF NOT EXISTS b2_lp_delta INT;");
+            } catch (Exception e) {
+                log.warn("Không thêm được cột LP delta cho matches: {}", e.getMessage());
+            }
+
+            // Đợt 6: xóa vĩnh viễn (ẩn danh hóa) thành viên
+            try {
+                jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS purged BOOLEAN DEFAULT FALSE;");
+                jdbcTemplate.execute("UPDATE users SET purged = FALSE WHERE purged IS NULL;");
+            } catch (Exception e) {
+                log.warn("Không thêm được cột purged cho users: {}", e.getMessage());
+            }
+
+            // Đợt 5.3: chỉ mục duy nhất (session_id, user_id) — chỉ tạo khi DB không còn bản ghi trùng
+            ensureParticipantUniqueIndex();
+
             // Ensure host account exists and has proper role & membership (SĐT Host cấu hình qua HOST_PHONE)
             userRepository.findByPhone(hostPhone).ifPresentOrElse(
                     host -> {
@@ -132,6 +153,35 @@ public class DataInitializer {
                 venueRepository.save(venue);
             }
         };
+    }
+
+    static final String DUPLICATE_PARTICIPANT_GROUPS_SQL =
+            "SELECT COUNT(*) FROM (SELECT session_id, user_id FROM session_participants " +
+            "WHERE user_id IS NOT NULL GROUP BY session_id, user_id HAVING COUNT(*) > 1) dup";
+
+    static final String CREATE_PARTICIPANT_UNIQUE_INDEX_SQL =
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_participant_session_user " +
+            "ON session_participants(session_id, user_id) WHERE user_id IS NOT NULL";
+
+    /**
+     * Tạo chỉ mục duy nhất (session_id, user_id) khi không còn nhóm trùng; còn trùng thì chỉ cảnh báo
+     * (không tự xóa dữ liệu — Host xử lý tay trước).
+     * @return true nếu đã chạy lệnh tạo chỉ mục.
+     */
+    boolean ensureParticipantUniqueIndex() {
+        try {
+            Long duplicates = jdbcTemplate.queryForObject(DUPLICATE_PARTICIPANT_GROUPS_SQL, Long.class);
+            long count = duplicates != null ? duplicates : 0L;
+            if (count > 0) {
+                log.warn("Bỏ qua tạo chỉ mục ux_participant_session_user: còn {} nhóm (session_id, user_id) bị trùng trong session_participants. Vui lòng xử lý bản ghi trùng trước.", count);
+                return false;
+            }
+            jdbcTemplate.execute(CREATE_PARTICIPANT_UNIQUE_INDEX_SQL);
+            return true;
+        } catch (Exception e) {
+            log.warn("Không tạo được chỉ mục ux_participant_session_user: {}", e.getMessage());
+            return false;
+        }
     }
 }
 

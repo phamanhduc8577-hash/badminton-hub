@@ -25,7 +25,12 @@ export const LoginView: React.FC = () => {
   const { user, token, setAuth } = useAuthStore()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const redirectPath = searchParams.get('redirect') || '/'
+  // Chỉ chấp nhận đường dẫn nội bộ (chặn "//evil.com", "https://…") và không quay lại chính /login
+  const rawRedirect = searchParams.get('redirect') || '/'
+  const redirectPath =
+    rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') && !rawRedirect.startsWith('/\\') && !rawRedirect.startsWith('/login')
+      ? rawRedirect
+      : '/'
   const { showToast } = useToast()
 
   // If already logged in, redirect to target or home

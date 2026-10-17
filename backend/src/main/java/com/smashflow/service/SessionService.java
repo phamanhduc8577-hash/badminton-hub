@@ -15,7 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -32,13 +38,36 @@ public class SessionService {
     private final LoyaltyRewardRepository loyaltyRewardRepository;
 
     public List<SessionResponse> getAllSessions(User currentUser) {
-        List<Long> bookedSessionIds = (currentUser != null)
-                ? participantRepository.findBookedSessionIdsByUserIdOrPhone(currentUser.getId(), currentUser.getPhone())
-                : List.of();
+        return toSummaries(sessionRepository.findAllWithDetailsOrderByStartTimeDesc(), currentUser);
+    }
 
-        return sessionRepository.findAllByOrderByStartTimeDesc().stream()
+    /** "Ca sắp tới": chưa hủy, endTime > now, ca sớm nhất trước. */
+    public List<SessionResponse> getUpcomingSessions(User currentUser) {
+        return toSummaries(sessionRepository.findUpcomingWithDetails(LocalDateTime.now()), currentUser);
+    }
+
+    /** Dựng danh sách: đếm slot gộp 1 truy vấn cho mọi ca, giá/cọc của người xem tính 1 lần. */
+    private List<SessionResponse> toSummaries(List<Session> sessions, User currentUser) {
+        if (sessions.isEmpty()) return new java.util.ArrayList<>();
+
+        List<Long> ids = sessions.stream().map(Session::getId).toList();
+        Map<Long, long[]> counts = new HashMap<>();
+        for (Object[] row : participantRepository.countSlotsBySessionIds(ids)) {
+            if (row == null || row[0] == null) continue;
+            counts.put(((Number) row[0]).longValue(), new long[]{toLong(row[1]), toLong(row[2])});
+        }
+
+        Set<Long> bookedSessionIds = (currentUser != null)
+                ? new HashSet<>(participantRepository.findBookedSessionIdsByUserIdOrPhone(currentUser.getId(), currentUser.getPhone()))
+                : Set.of();
+        Boolean requiresDeposit = requiresDeposit(currentUser);
+        LocalDateTime now = LocalDateTime.now();
+
+        return sessions.stream()
                 .map(s -> {
-                    SessionResponse res = toSessionResponseSummary(s);
+                    long[] c = counts.getOrDefault(s.getId(), new long[]{0, 0});
+                    SessionResponse res = toSessionResponseSummary(s, c[0], c[1], now);
+                    applyViewerFields(res, s, currentUser, requiresDeposit);
                     if (currentUser != null) {
                         res.setIsBookedByCurrentUser(bookedSessionIds.contains(s.getId()));
                     }
@@ -48,21 +77,8 @@ public class SessionService {
                 .collect(Collectors.toList());
     }
 
-    public List<SessionResponse> getUpcomingSessions(User currentUser) {
-        List<Long> bookedSessionIds = (currentUser != null)
-                ? participantRepository.findBookedSessionIdsByUserIdOrPhone(currentUser.getId(), currentUser.getPhone())
-                : List.of();
-
-        return sessionRepository.findByStatusOrderByStartTimeDesc(SessionStatus.UPCOMING).stream()
-                .map(s -> {
-                    SessionResponse res = toSessionResponseSummary(s);
-                    if (currentUser != null) {
-                        res.setIsBookedByCurrentUser(bookedSessionIds.contains(s.getId()));
-                    }
-                    hideCheckinTokenIfNotHost(res, currentUser);
-                    return res;
-                })
-                .collect(Collectors.toList());
+    private static long toLong(Object o) {
+        return o instanceof Number n ? n.longValue() : 0L;
     }
 
     public SessionResponse getSessionDetail(Long id) {
@@ -79,6 +95,7 @@ public class SessionService {
 
         SessionResponse response = toSessionResponseSummary(session);
         response.setParticipants(participants);
+        applyViewerFields(response, session, currentUser, requiresDeposit(currentUser));
         if (currentUser != null) {
             boolean isBooked = participants.stream()
                     .anyMatch(p -> ((p.getUserId() != null && p.getUserId().equals(currentUser.getId())) || (p.getPhone() != null && p.getPhone().equals(currentUser.getPhone()))) && p.getCheckinStatus() != CheckinStatus.ABSENT);
@@ -88,6 +105,38 @@ public class SessionService {
         hideCheckinTokenIfNotHost(response, currentUser);
         PhoneMasking.maskForViewer(participants, currentUser);
         return response;
+    }
+
+    /** Hạng giá thành viên: Host hoặc thành viên cố định đã duyệt (FIXED). Cùng quy tắc với memberJoinSession. */
+    static boolean isMemberTier(User user) {
+        return user.getRole() == Role.HOST || user.getMembershipType() == MembershipType.FIXED;
+    }
+
+    /** Cùng quy tắc với memberJoinSession: không phải thành viên chính thức và chưa từng đặt lượt nào. null = khách ẩn danh. */
+    private Boolean requiresDeposit(User viewer) {
+        if (viewer == null) return null;
+        if (isMemberTier(viewer)) return false;
+        return participantRepository.countPastBookingsByPhone(viewer.getPhone()) == 0;
+    }
+
+    /** Giá gốc (trước voucher) mà người xem sẽ bị tính khi join — dùng chung PricingCalculator. */
+    static SessionResponse.ViewerPricing viewerPricing(Session session, User viewer) {
+        if (viewer == null) return null;
+        boolean memberTier = isMemberTier(viewer);
+        Gender gender = viewer.getGender();
+        BigDecimal twoHour = PricingCalculator.hasTwoHourPrice(session, memberTier, gender)
+                ? PricingCalculator.baseFee(session, memberTier, gender, PricingCalculator.TWO_HOURS)
+                : null;
+        return SessionResponse.ViewerPricing.builder()
+                .memberTier(memberTier)
+                .fullPrice(PricingCalculator.baseFee(session, memberTier, gender, null))
+                .twoHourPrice(twoHour)
+                .build();
+    }
+
+    private void applyViewerFields(SessionResponse res, Session session, User viewer, Boolean requiresDeposit) {
+        res.setViewerPricing(viewerPricing(session, viewer));
+        res.setRequiresDeposit(requiresDeposit);
     }
 
     private static boolean isHost(User user) {
@@ -198,26 +247,25 @@ public class SessionService {
     public ParticipantResponse bookPublicSlot(Long sessionId, PublicBookingRequest request) {
         Session session = sessionRepository.findByIdWithLock(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
+        ensureOpenForBooking(session);
 
-        // Check if session has ended or is cancelled
-        LocalDateTime now = LocalDateTime.now();
-        if (session.getStatus() == SessionStatus.CANCELLED || now.isAfter(session.getEndTime())) {
-            throw new RuntimeException("Ca đánh này đã kết thúc hoặc đã bị hủy, không thể đăng ký thêm!");
+        String phone = request.getGuestPhone();
+
+        // SĐT đã thuộc tài khoản thành viên / Host → phải đăng nhập để đăng ký (tránh tạo lượt trùng, không điểm danh được)
+        Optional<User> existingUser = userRepository.findByPhone(phone);
+        if (existingUser.isPresent() && existingUser.get().getRole() != Role.GUEST) {
+            throw new RuntimeException("SĐT này đã có tài khoản thành viên, vui lòng đăng nhập để đăng ký!");
         }
 
-        long currentCount = participantRepository.countActiveBookedSlots(sessionId);
-        if (currentCount >= session.getMaxSlots()) {
-            throw new RuntimeException("Ca đánh này đã đủ quân số (" + currentCount + "/" + session.getMaxSlots() + " slots), không thể đăng ký thêm!");
-        }
-
-        if (participantRepository.findBySessionIdAndGuestPhone(sessionId, request.getGuestPhone()).isPresent()) {
-            throw new RuntimeException("Số điện thoại này đã đăng ký ca này rồi!");
-        }
+        // Trùng theo cả user lẫn SĐT; lượt cũ bị đánh vắng (chưa thanh toán, không bị giữ cọc) thì dùng lại dòng cũ
+        SessionParticipant reusable = findReusableBooking(sessionId, existingUser.map(User::getId).orElse(null), phone,
+                "Số điện thoại này đã đăng ký ca này rồi!");
+        ensureCapacity(session);
 
         // Auto-create or link User account for Guest so they can participate in matchmaker and leaderboards
-        User guestUser = userRepository.findByPhone(request.getGuestPhone()).orElseGet(() -> {
+        User guestUser = existingUser.orElseGet(() -> {
             User newUser = User.builder()
-                    .phone(request.getGuestPhone())
+                    .phone(phone)
                     .fullName(request.getGuestName())
                     .gender(request.getGender())
                     .role(Role.GUEST)
@@ -232,44 +280,47 @@ public class SessionService {
 
         BigDecimal baseFee = PricingCalculator.baseFee(session, false, request.getGender(), request.getDurationHours());
 
-        // Logic cọc 20k/30%: Chỉ bắt buộc cọc với khách lần đầu đăng ký tham gia CLB SmashHub (past active bookings = 0)
-        // Nếu đã từng tham gia từ lần 2 trở đi thì miễn cọc (depositAmount = 0, depositStatus = NONE)
-        long pastBookings = participantRepository.countPastBookingsByPhone(request.getGuestPhone());
+        // Cọc: chỉ bắt buộc với khách lần đầu đăng ký tham gia CLB (past active bookings = 0)
+        long pastBookings = participantRepository.countPastBookingsByPhone(phone);
         boolean isFirstTime = (pastBookings == 0);
-        BigDecimal effectiveDeposit = isFirstTime ? (session.getDepositAmount() != null ? session.getDepositAmount() : new BigDecimal("20000")) : BigDecimal.ZERO;
-        DepositStatus initialDepositStatus = isFirstTime ? DepositStatus.PENDING : DepositStatus.NONE;
 
-        SessionParticipant participant = SessionParticipant.builder()
-                .session(session)
-                .user(guestUser)
-                .isGuest(true)
-                .guestName(request.getGuestName())
-                .guestPhone(request.getGuestPhone())
-                .gender(request.getGender())
-                .durationHours(request.getDurationHours())
-                .slotWindow(request.getSlotWindow())
-                .checkinStatus(CheckinStatus.PENDING)
-                .depositStatus(initialDepositStatus)
-                .depositAmount(effectiveDeposit)
-                .baseFee(baseFee)
-                .adjustmentAmount(BigDecimal.ZERO)
-                .finalFee(baseFee)
-                .paymentStatus(PaymentStatus.UNPAID)
-                .build();
+        SessionParticipant participant;
+        if (reusable != null) {
+            participant = reusable;
+            resetForRebooking(participant);
+        } else {
+            participant = SessionParticipant.builder().session(session).build();
+        }
+        participant.setUser(guestUser);
+        participant.setIsGuest(true);
+        participant.setGuestName(request.getGuestName());
+        participant.setGuestPhone(phone);
+        participant.setGender(request.getGender());
+        participant.setDurationHours(request.getDurationHours());
+        participant.setSlotWindow(request.getSlotWindow());
+        participant.setCheckinStatus(CheckinStatus.PENDING);
+        applyDepositRule(participant, session, isFirstTime);
+        participant.setBaseFee(baseFee);
+        participant.setAdjustmentAmount(BigDecimal.ZERO);
+        participant.setAdjustmentReason(null);
+        participant.setFinalFee(baseFee);
+        participant.setPaymentStatus(PaymentStatus.UNPAID);
 
         participantRepository.save(participant);
 
         // Gửi thông báo Telegram tức thì cho Host (Khách vãng lai book công khai)
         try {
             String timeRange = session.getStartTime().toLocalTime() + " - " + session.getEndTime().toLocalTime();
-            String feeNote = isFirstTime ? "Cần cọc 20.000đ (Khách vãng lai lần 1)" : "Miễn cọc (Đã từng tham gia)";
+            String feeNote = participant.getDepositStatus() == DepositStatus.PENDING
+                    ? "Cần cọc " + formatVnd(participant.getDepositAmount()) + " (Khách vãng lai lần 1)"
+                    : "Miễn cọc (Đã từng tham gia)";
             telegramNotificationService.notifyNewBooking(
                     session.getTitle(),
                     timeRange,
                     request.getGuestName(),
-                    request.getGuestPhone(),
+                    phone,
                     request.getGender().name(),
-                    "Khách vãng lai",
+                    reusable != null ? "Khách vãng lai (đặt lại sau khi vắng)" : "Khách vãng lai",
                     feeNote
             );
         } catch (Exception ignored) {}
@@ -281,36 +332,31 @@ public class SessionService {
     public ParticipantResponse memberJoinSession(Long sessionId, User user, com.smashflow.dto.JoinSessionRequest request) {
         Session session = sessionRepository.findByIdWithLock(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
+        ensureOpenForBooking(session);
 
-        // Check if session has ended or is cancelled
-        LocalDateTime now = LocalDateTime.now();
-        if (session.getStatus() == SessionStatus.CANCELLED || now.isAfter(session.getEndTime())) {
-            throw new RuntimeException("Ca đánh này đã kết thúc hoặc đã bị hủy, không thể đăng ký thêm!");
-        }
-
-        long currentCount = participantRepository.countActiveBookedSlots(sessionId);
-        if (currentCount >= session.getMaxSlots()) {
-            throw new RuntimeException("Ca đánh này đã đủ quân số (" + currentCount + "/" + session.getMaxSlots() + " slots), không thể đăng ký thêm!");
-        }
-
-        if (participantRepository.findBySessionIdAndUserId(sessionId, user.getId()).isPresent()) {
-            throw new RuntimeException("Bạn đã tham gia ca này rồi!");
-        }
+        // Trùng theo cả user lẫn SĐT; lượt cũ bị đánh vắng (chưa thanh toán, không bị giữ cọc) thì dùng lại dòng cũ
+        SessionParticipant reusable = findReusableBooking(sessionId, user.getId(), user.getPhone(), "Bạn đã tham gia ca này rồi!");
+        ensureCapacity(session);
 
         // Chỉ thành viên chính thức (FIXED hoặc HOST) mới được nhận giá Thành viên CLB, còn PENDING_FIXED / CASUAL nhận giá Vãng lai
-        boolean isOfficialFixedMember = user.getRole() == Role.HOST || user.getMembershipType() == com.smashflow.model.MembershipType.FIXED;
+        boolean isOfficialFixedMember = isMemberTier(user);
 
         BigDecimal durationHours = (request != null && request.getDurationHours() != null) ? request.getDurationHours() : null;
 
         BigDecimal baseFee = PricingCalculator.baseFee(session, isOfficialFixedMember, user.getGender(), durationHours);
 
-        // Logic cọc 20k: Nếu là thành viên vãng lai (hoặc chưa duyệt cố định) và là LẦN ĐẦU tham gia CLB (pastBookings == 0) -> Bắt buộc cọc
+        // Cọc: thành viên vãng lai (hoặc chưa duyệt cố định) và LẦN ĐẦU tham gia CLB (pastBookings == 0) → bắt buộc cọc
         long pastBookings = participantRepository.countPastBookingsByPhone(user.getPhone());
         boolean needDeposit = !isOfficialFixedMember && (pastBookings == 0);
-        BigDecimal effectiveDeposit = needDeposit
-                ? (session.getDepositAmount() != null ? session.getDepositAmount() : new BigDecimal("20000"))
-                : BigDecimal.ZERO;
-        DepositStatus initialDepositStatus = needDeposit ? DepositStatus.PENDING : DepositStatus.NONE;
+
+        SessionParticipant participant;
+        if (reusable != null) {
+            participant = reusable;
+            // Hoàn voucher cũ (nếu có) trước khi tự áp lại bên dưới
+            resetForRebooking(participant);
+        } else {
+            participant = SessionParticipant.builder().session(session).build();
+        }
 
         // Auto apply voucher if user has unclaimed voucher reward
         BigDecimal adjustmentAmount = BigDecimal.ZERO;
@@ -332,23 +378,19 @@ public class SessionService {
 
         BigDecimal finalFee = PricingCalculator.finalFee(baseFee, adjustmentAmount);
 
-        SessionParticipant participant = SessionParticipant.builder()
-                .session(session)
-                .user(user)
-                .isGuest(!isOfficialFixedMember)
-                .gender(user.getGender())
-                .durationHours(durationHours)
-                .slotWindow(request != null ? request.getSlotWindow() : null)
-                .checkinStatus(CheckinStatus.PENDING)
-                .depositStatus(initialDepositStatus)
-                .depositAmount(effectiveDeposit)
-                .baseFee(baseFee)
-                .adjustmentAmount(adjustmentAmount)
-                .adjustmentReason(adjustmentReason)
-                .voucherRewardId(voucherRewardId)
-                .finalFee(finalFee)
-                .paymentStatus(PaymentStatus.UNPAID)
-                .build();
+        participant.setUser(user);
+        participant.setIsGuest(!isOfficialFixedMember);
+        participant.setGender(user.getGender());
+        participant.setDurationHours(durationHours);
+        participant.setSlotWindow(request != null ? request.getSlotWindow() : null);
+        participant.setCheckinStatus(CheckinStatus.PENDING);
+        applyDepositRule(participant, session, needDeposit);
+        participant.setBaseFee(baseFee);
+        participant.setAdjustmentAmount(adjustmentAmount);
+        participant.setAdjustmentReason(adjustmentReason);
+        participant.setVoucherRewardId(voucherRewardId);
+        participant.setFinalFee(finalFee);
+        participant.setPaymentStatus(PaymentStatus.UNPAID);
 
         participantRepository.save(participant);
 
@@ -359,7 +401,10 @@ public class SessionService {
             String mTypeName = isOfficialFixedMember
                     ? "Thành viên Cố định" + durationText
                     : ((user.getSessionsAttended() != null && user.getSessionsAttended() > 0) ? "Thành viên CLB (Miễn cọc)" + durationText : "Vãng lai lần 1" + durationText);
-            String feeNote = needDeposit ? "Cần cọc 20.000đ (Khách lần 1)" : "Miễn cọc (Thành viên CLB)";
+            if (reusable != null) mTypeName += " - đặt lại sau khi vắng";
+            String feeNote = participant.getDepositStatus() == DepositStatus.PENDING
+                    ? "Cần cọc " + formatVnd(participant.getDepositAmount()) + " (Khách lần 1)"
+                    : "Miễn cọc (Thành viên CLB)";
 
             telegramNotificationService.notifyNewBooking(
                     session.getTitle(),
@@ -375,10 +420,151 @@ public class SessionService {
         return toParticipantResponse(participant);
     }
 
+    /** Ca đã hủy / đã kết thúc không nhận đăng ký mới. */
+    private static void ensureOpenForBooking(Session session) {
+        LocalDateTime now = LocalDateTime.now();
+        if (session.getStatus() == SessionStatus.CANCELLED || now.isAfter(session.getEndTime())) {
+            throw new RuntimeException("Ca đánh này đã kết thúc hoặc đã bị hủy, không thể đăng ký thêm!");
+        }
+    }
+
+    private void ensureCapacity(Session session) {
+        long currentCount = participantRepository.countActiveBookedSlots(session.getId());
+        if (currentCount >= session.getMaxSlots()) {
+            throw new RuntimeException("Ca đánh này đã đủ quân số (" + currentCount + "/" + session.getMaxSlots() + " slots), không thể đăng ký thêm!");
+        }
+    }
+
+    /**
+     * Kiểm tra trùng theo user id và SĐT (guestPhone / SĐT tài khoản).
+     * @return dòng cũ bị đánh vắng (ABSENT, chưa thanh toán, không bị giữ cọc) để dùng lại; null nếu chưa từng đặt.
+     */
+    private SessionParticipant findReusableBooking(Long sessionId, Long userId, String phone, String alreadyBookedMessage) {
+        List<SessionParticipant> rows = participantRepository.findBySessionAndUserOrPhone(sessionId, userId, phone);
+        if (rows == null || rows.isEmpty()) return null;
+        if (rows.stream().anyMatch(p -> p.getCheckinStatus() != CheckinStatus.ABSENT)) {
+            throw new RuntimeException(alreadyBookedMessage);
+        }
+        if (rows.stream().anyMatch(p -> p.getDepositStatus() == DepositStatus.FORFEITED)) {
+            throw new RuntimeException("Bạn đã bị giữ cọc ở ca này, vui lòng liên hệ Host!");
+        }
+        return rows.stream()
+                .filter(p -> p.getPaymentStatus() != PaymentStatus.PAID)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Lượt đăng ký cũ ở ca này đã thanh toán, vui lòng liên hệ Host!"));
+    }
+
+    /** Đưa dòng ABSENT về trạng thái đăng ký mới (hoàn voucher cũ, xóa dữ liệu điểm danh / thu tiền). */
+    private void resetForRebooking(SessionParticipant p) {
+        refundAppliedVoucher(p);
+        p.setVoucherRewardId(null);
+        p.setAdjustmentAmount(BigDecimal.ZERO);
+        p.setAdjustmentReason(null);
+        p.setCheckinStatus(CheckinStatus.PENDING);
+        p.setCheckinAt(null);
+        p.setPaymentStatus(PaymentStatus.UNPAID);
+        p.setPaymentMethod(null);
+        p.setPaidAt(null);
+        p.setPaidBy(null);
+        p.setUpdatedAt(LocalDateTime.now());
+    }
+
+    /** Cọc theo quy tắc lần đầu; dòng dùng lại đã có cọc được Host xác nhận (PAID) thì giữ nguyên. */
+    private static void applyDepositRule(SessionParticipant p, Session session, boolean needDeposit) {
+        if (p.getDepositStatus() == DepositStatus.PAID) return;
+        if (needDeposit) {
+            p.setDepositStatus(DepositStatus.PENDING);
+            p.setDepositAmount(session.getDepositAmount() != null ? session.getDepositAmount() : new BigDecimal("20000"));
+        } else {
+            p.setDepositStatus(DepositStatus.NONE);
+            p.setDepositAmount(BigDecimal.ZERO);
+        }
+    }
+
+    private static String formatVnd(BigDecimal amount) {
+        long v = amount != null ? amount.longValue() : 0L;
+        return String.format("%,d", v).replace(',', '.') + "đ";
+    }
+
+    /**
+     * Host hủy cả ca (5.2): lưu CANCELLED, cọc đã nhận → REFUNDED (Host tự chuyển trả), hoàn voucher đã tự áp,
+     * báo Telegram. Chặn khi ca đã hủy / đã kết thúc / đã có người thanh toán.
+     */
+    @Transactional
+    public SessionResponse cancelSession(Long sessionId, String reason, User host) {
+        Session session = sessionRepository.findByIdWithLock(sessionId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
+
+        if (session.getStatus() == SessionStatus.CANCELLED) {
+            throw new RuntimeException("Ca này đã bị hủy rồi!");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (session.getEndTime() != null && now.isAfter(session.getEndTime())) {
+            throw new RuntimeException("Ca đã kết thúc, không thể hủy!");
+        }
+
+        List<SessionParticipant> participants = participantRepository.findBySessionId(sessionId);
+        // Lượt giữ cọc do vắng (FORFEITED) mang trạng thái PAID nhưng không hoàn tác được → không chặn hủy ca
+        boolean hasPaid = participants.stream()
+                .anyMatch(p -> p.getPaymentStatus() == PaymentStatus.PAID && p.getDepositStatus() != DepositStatus.FORFEITED);
+        if (hasPaid) {
+            throw new RuntimeException("Ca đã có người thanh toán, vui lòng hoàn tác thu tiền trước khi hủy ca!");
+        }
+
+        session.setStatus(SessionStatus.CANCELLED);
+        session.setUpdatedAt(now);
+        sessionRepository.save(session);
+
+        List<String> refundNames = new ArrayList<>();
+        int activeCount = 0;
+        for (SessionParticipant p : participants) {
+            if (p.getCheckinStatus() != CheckinStatus.ABSENT) activeCount++;
+            boolean changed = false;
+            if (p.getDepositStatus() == DepositStatus.PAID) {
+                p.setDepositStatus(DepositStatus.REFUNDED);
+                refundNames.add(participantDisplayName(p) + " - " + formatVnd(p.getDepositAmount()));
+                changed = true;
+            }
+            if (p.getDepositStatus() != DepositStatus.FORFEITED
+                    && (p.getVoucherRewardId() != null || p.getAdjustmentReason() != null)) {
+                refundAppliedVoucher(p);
+                if (p.getVoucherRewardId() != null) {
+                    p.setVoucherRewardId(null);
+                    changed = true;
+                }
+            }
+            if (changed) {
+                p.setUpdatedAt(now);
+                participantRepository.save(p);
+            }
+        }
+
+        try {
+            String timeRange = session.getStartTime().toLocalDate() + " " + session.getStartTime().toLocalTime()
+                    + " - " + session.getEndTime().toLocalTime();
+            telegramNotificationService.notifySessionCancelled(session.getTitle(), timeRange, reason, activeCount, refundNames);
+        } catch (Exception ignored) {}
+
+        SessionResponse response = toSessionResponseSummary(session);
+        applyViewerFields(response, session, host, requiresDeposit(host));
+        return response;
+    }
+
+    private static String participantDisplayName(SessionParticipant p) {
+        if (p.getUser() != null && p.getUser().getFullName() != null && !p.getUser().getFullName().isBlank()) {
+            return p.getUser().getFullName();
+        }
+        return p.getGuestName() != null && !p.getGuestName().isBlank() ? p.getGuestName() : "N/A";
+    }
+
     @Transactional
     public ParticipantResponse confirmDeposit(Long participantId) {
         SessionParticipant participant = participantRepository.findByIdForUpdate(participantId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
+
+        if (participant.getSession() != null && participant.getSession().getStatus() == SessionStatus.CANCELLED) {
+            throw new RuntimeException("Ca này đã bị hủy, không thể xác nhận cọc!");
+        }
 
         // Chỉ xác nhận được từ trạng thái đang chờ cọc (không "hồi sinh" cọc đã giữ / đã hoàn)
         if (participant.getDepositStatus() != DepositStatus.PENDING) {
@@ -481,41 +667,49 @@ public class SessionService {
             }
         }
         if (request.getVenueName() != null && !request.getVenueName().isBlank()) {
-            Venue venue = session.getVenue();
-            if (venue != null) {
-                venue.setName(request.getVenueName().trim());
-                if (request.getVenueAddress() != null && !request.getVenueAddress().isBlank()) {
-                    venue.setAddress(request.getVenueAddress().trim());
-                }
-                venueRepository.save(venue);
-            }
+            updateSessionVenue(session, request.getVenueName().trim(),
+                    request.getVenueAddress() != null && !request.getVenueAddress().isBlank() ? request.getVenueAddress().trim() : null);
         }
+        boolean clear2h = Boolean.TRUE.equals(request.getClearTwoHourPrices());
         PricingCalculator.validateSessionPrices(
                 request.getMemberMalePrice() != null ? request.getMemberMalePrice() : session.getMemberMalePrice(),
                 request.getMemberFemalePrice() != null ? request.getMemberFemalePrice() : session.getMemberFemalePrice(),
                 request.getGuestMalePrice() != null ? request.getGuestMalePrice() : session.getGuestMalePrice(),
                 request.getGuestFemalePrice() != null ? request.getGuestFemalePrice() : session.getGuestFemalePrice(),
-                request.getMemberMalePrice2h(), request.getMemberFemalePrice2h(),
-                request.getGuestMalePrice2h(), request.getGuestFemalePrice2h());
+                clear2h ? null : request.getMemberMalePrice2h(), clear2h ? null : request.getMemberFemalePrice2h(),
+                clear2h ? null : request.getGuestMalePrice2h(), clear2h ? null : request.getGuestFemalePrice2h());
 
         // Chỉ tính lại giá người tham gia khi có trường giá thực sự thay đổi (sửa tiêu đề/giờ/sân thì không)
         boolean pricesChanged = priceChanged(session.getMemberMalePrice(), request.getMemberMalePrice())
                 | priceChanged(session.getMemberFemalePrice(), request.getMemberFemalePrice())
                 | priceChanged(session.getGuestMalePrice(), request.getGuestMalePrice())
-                | priceChanged(session.getGuestFemalePrice(), request.getGuestFemalePrice())
-                | priceChanged(session.getMemberMalePrice2h(), request.getMemberMalePrice2h())
-                | priceChanged(session.getMemberFemalePrice2h(), request.getMemberFemalePrice2h())
-                | priceChanged(session.getGuestMalePrice2h(), request.getGuestMalePrice2h())
-                | priceChanged(session.getGuestFemalePrice2h(), request.getGuestFemalePrice2h());
+                | priceChanged(session.getGuestFemalePrice(), request.getGuestFemalePrice());
+        if (clear2h) {
+            // Xóa giá gói 2h: đổi giá khi trước đó ca có ít nhất một giá 2h
+            pricesChanged |= session.getMemberMalePrice2h() != null || session.getMemberFemalePrice2h() != null
+                    || session.getGuestMalePrice2h() != null || session.getGuestFemalePrice2h() != null;
+        } else {
+            pricesChanged |= priceChanged(session.getMemberMalePrice2h(), request.getMemberMalePrice2h())
+                    | priceChanged(session.getMemberFemalePrice2h(), request.getMemberFemalePrice2h())
+                    | priceChanged(session.getGuestMalePrice2h(), request.getGuestMalePrice2h())
+                    | priceChanged(session.getGuestFemalePrice2h(), request.getGuestFemalePrice2h());
+        }
 
         if (request.getMemberMalePrice() != null) session.setMemberMalePrice(request.getMemberMalePrice());
         if (request.getMemberFemalePrice() != null) session.setMemberFemalePrice(request.getMemberFemalePrice());
         if (request.getGuestMalePrice() != null) session.setGuestMalePrice(request.getGuestMalePrice());
         if (request.getGuestFemalePrice() != null) session.setGuestFemalePrice(request.getGuestFemalePrice());
-        if (request.getMemberMalePrice2h() != null) session.setMemberMalePrice2h(request.getMemberMalePrice2h());
-        if (request.getMemberFemalePrice2h() != null) session.setMemberFemalePrice2h(request.getMemberFemalePrice2h());
-        if (request.getGuestMalePrice2h() != null) session.setGuestMalePrice2h(request.getGuestMalePrice2h());
-        if (request.getGuestFemalePrice2h() != null) session.setGuestFemalePrice2h(request.getGuestFemalePrice2h());
+        if (clear2h) {
+            session.setMemberMalePrice2h(null);
+            session.setMemberFemalePrice2h(null);
+            session.setGuestMalePrice2h(null);
+            session.setGuestFemalePrice2h(null);
+        } else {
+            if (request.getMemberMalePrice2h() != null) session.setMemberMalePrice2h(request.getMemberMalePrice2h());
+            if (request.getMemberFemalePrice2h() != null) session.setMemberFemalePrice2h(request.getMemberFemalePrice2h());
+            if (request.getGuestMalePrice2h() != null) session.setGuestMalePrice2h(request.getGuestMalePrice2h());
+            if (request.getGuestFemalePrice2h() != null) session.setGuestFemalePrice2h(request.getGuestFemalePrice2h());
+        }
         if (request.getDepositAmount() != null) session.setDepositAmount(request.getDepositAmount());
         if (request.getCostCourt() != null) session.setCostCourt(request.getCostCourt());
         if (request.getCostShuttlecock() != null) session.setCostShuttlecock(request.getCostShuttlecock());
@@ -544,6 +738,46 @@ public class SessionService {
     private static boolean priceChanged(BigDecimal current, BigDecimal requested) {
         if (requested == null) return false;
         return current == null || current.compareTo(requested) != 0;
+    }
+
+    /**
+     * Đổi địa điểm của MỘT ca (5.4): dùng venue có sẵn cùng tên + địa chỉ, hoặc tạo venue mới.
+     * Chỉ sửa trực tiếp venue hiện tại khi không ca nào khác dùng chung venue đó.
+     */
+    private void updateSessionVenue(Session session, String name, String addressOrNull) {
+        Venue current = session.getVenue();
+        String address = addressOrNull != null ? addressOrNull
+                : (current != null && current.getAddress() != null ? current.getAddress() : name);
+        if (current != null && name.equals(current.getName()) && address.equals(current.getAddress())) {
+            return; // không đổi gì
+        }
+
+        Optional<Venue> existing = venueRepository.findFirstByNameIgnoreCaseAndAddressIgnoreCaseOrderByIdAsc(name, address);
+        if (existing.isPresent() && (current == null || !existing.get().getId().equals(current.getId()))) {
+            session.setVenue(existing.get());
+            return;
+        }
+
+        boolean shared = current != null && current.getId() != null
+                && sessionRepository.countByVenueIdAndIdNot(current.getId(), session.getId()) > 0;
+        if (current != null && !shared) {
+            current.setName(name);
+            current.setAddress(address);
+            venueRepository.save(current);
+            return;
+        }
+        if (current != null && existing.isPresent()) {
+            return; // chỉ khác hoa/thường với venue dùng chung → giữ nguyên, không sửa venue của ca khác
+        }
+
+        Venue created = Venue.builder()
+                .name(name)
+                .address(address)
+                .latitude(current != null && current.getLatitude() != null ? current.getLatitude() : new BigDecimal("10.7380120"))
+                .longitude(current != null && current.getLongitude() != null ? current.getLongitude() : new BigDecimal("106.7153450"))
+                .radiusMeters(current != null && current.getRadiusMeters() != null ? current.getRadiusMeters() : 150)
+                .build();
+        session.setVenue(venueRepository.save(created));
     }
 
     @Transactional
@@ -651,19 +885,12 @@ public class SessionService {
     private SessionResponse toSessionResponseSummary(Session session) {
         long booked = participantRepository.countActiveBookedSlots(session.getId());
         long checkedIn = participantRepository.countBySessionIdAndCheckinStatus(session.getId(), CheckinStatus.CHECKED_IN);
+        return toSessionResponseSummary(session, booked, checkedIn, LocalDateTime.now());
+    }
 
-        // Real-time status sync based on actual wall-clock time
-        LocalDateTime now = LocalDateTime.now();
-        SessionStatus effectiveStatus = session.getStatus();
-        if (effectiveStatus != SessionStatus.CANCELLED) {
-            if (now.isAfter(session.getEndTime())) {
-                effectiveStatus = SessionStatus.COMPLETED;
-            } else if (now.isAfter(session.getStartTime()) && now.isBefore(session.getEndTime())) {
-                effectiveStatus = SessionStatus.ACTIVE;
-            } else if (now.isBefore(session.getStartTime())) {
-                effectiveStatus = SessionStatus.UPCOMING;
-            }
-        }
+    private SessionResponse toSessionResponseSummary(Session session, long booked, long checkedIn, LocalDateTime now) {
+        // Trạng thái theo giờ thực (CANCELLED là trạng thái duy nhất được lưu bởi thao tác Hủy ca)
+        SessionStatus effectiveStatus = SessionStatusResolver.effective(session, now);
 
         return SessionResponse.builder()
                 .id(session.getId())
@@ -679,6 +906,7 @@ public class SessionService {
                 .startTime(session.getStartTime())
                 .endTime(session.getEndTime())
                 .status(effectiveStatus)
+                .effectiveStatus(effectiveStatus)
                 .maxSlots(session.getMaxSlots())
                 .courtCount(session.getCourtCount() != null ? session.getCourtCount() : 2)
                 .courtNames(session.getCourtNames() != null ? session.getCourtNames() : "Sân 1, Sân 2")

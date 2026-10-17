@@ -181,6 +181,35 @@ public class TelegramNotificationService {
     }
 
     /**
+     * Template: Host hủy cả ca đánh
+     */
+    public void notifySessionCancelled(String sessionTitle, String timeRange, String reason,
+                                       int participantCount, java.util.List<String> depositRefundNames) {
+        StringBuilder refunds = new StringBuilder();
+        if (depositRefundNames == null || depositRefundNames.isEmpty()) {
+            refunds.append("Không có ai cần hoàn cọc.");
+        } else {
+            for (String name : depositRefundNames) {
+                refunds.append("\n• ").append(escapeHtml(name));
+            }
+        }
+        String msg = String.format(
+                "🚫 <b>[SmashFlow] ĐÃ HỦY CA ĐÁNH!</b>\n\n" +
+                "🏸 <b>Ca đánh:</b> %s\n" +
+                "⏰ <b>Thời gian:</b> %s\n" +
+                "📝 <b>Lý do:</b> %s\n" +
+                "👥 <b>Số người đã đăng ký:</b> %d\n" +
+                "💸 <b>Cần hoàn cọc (chuyển khoản tay):</b> %s",
+                escapeHtml(sessionTitle),
+                escapeHtml(timeRange),
+                escapeHtml(reason != null && !reason.isBlank() ? reason.trim() : "Không ghi lý do"),
+                participantCount,
+                refunds
+        );
+        sendNotification(msg);
+    }
+
+    /**
      * Template: New User Registration & Pending Approval Notice
      */
     public void notifyNewUserRegistered(String fullName, String phone, String gender, String membershipType) {

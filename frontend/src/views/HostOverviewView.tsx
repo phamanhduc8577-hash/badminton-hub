@@ -25,7 +25,8 @@ import {
 import { api } from '../lib/api'
 import { MonthlyReport, ReconciliationEntry } from '../types'
 import { DuckMascot } from '../components/DuckMascot'
-import { parseServerDate } from '../lib/dateUtils'
+import { formatVnDate, formatVnTime, getVnParts } from '../lib/dateUtils'
+import { getEffectiveSessionStatus } from '../lib/sessionStatus'
 
 /**
  * Thẻ chỉ-đọc cho Host: các lượt đã thu tiền + có cọc, thu trước bản sửa lỗi trừ cọc.
@@ -104,7 +105,7 @@ export const ReconciliationCard: React.FC<{ formatVnd: (n?: number) => string }>
                 <div className="text-xs text-slate-600 font-medium truncate">
                   {r.sessionTitle}
                   {r.sessionStartTime && (
-                    <> • {parseServerDate(r.sessionStartTime).toLocaleDateString('vi-VN')}</>
+                    <> • {formatVnDate(r.sessionStartTime)}</>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
@@ -137,13 +138,14 @@ const DEPOSIT_LABEL: Record<ReconciliationEntry['depositStatus'], string> = {
 
 export const HostOverviewView: React.FC = () => {
   const navigate = useNavigate()
-  const now = new Date()
+  // Tháng/năm hiện tại theo giờ Việt Nam
+  const now = getVnParts(new Date())
   const [selectedYear, setSelectedYear] = useState<number>(() => {
     // If year is 2026/2025
-    return now.getFullYear()
+    return now.year
   })
   const [selectedMonth, setSelectedMonth] = useState<number>(() => {
-    return now.getMonth() + 1
+    return now.month
   })
 
   const { data: report, isLoading } = useQuery<MonthlyReport>({
@@ -174,16 +176,8 @@ export const HostOverviewView: React.FC = () => {
     }
   }
 
-  const getEffectiveStatus = (s: { startTime?: string; endTime?: string; status?: string }) => {
-    if (s.status === 'CANCELLED') return 'CANCELLED'
-    if (!s.startTime || !s.endTime) return s.status || 'UPCOMING'
-    const nowMs = new Date().getTime()
-    const startMs = new Date(s.startTime).getTime()
-    const endMs = new Date(s.endTime).getTime()
-    if (nowMs > endMs) return 'COMPLETED'
-    if (nowMs >= startMs && nowMs <= endMs) return 'ACTIVE'
-    return 'UPCOMING'
-  }
+  const getEffectiveStatus = (s: MonthlyReport['sessionSummaries'][number]) =>
+    getEffectiveSessionStatus({ status: s.status || 'UPCOMING', startTime: s.startTime ?? '', endTime: s.endTime ?? '' })
 
   const formatVnd = (num?: number) => {
     if (num === undefined || num === null) return '0 ₫'
@@ -530,12 +524,12 @@ export const HostOverviewView: React.FC = () => {
                       <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-slate-500 font-medium flex-wrap">
                         <span className="flex items-center gap-1">
                           <Calendar size={12} className="text-slate-400" />
-                          {s.startTime ? new Date(s.startTime).toLocaleDateString('vi-VN') : '--'}
+                          {s.startTime ? formatVnDate(s.startTime) : '--'}
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Clock size={12} className="text-slate-400" />
-                          {s.startTime ? new Date(s.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '--'}
+                          {s.startTime ? formatVnTime(s.startTime) : '--'}
                         </span>
                         <span>•</span>
                         <span>Quân số: <b className="text-slate-800">{s.checkedInPlayers}/{s.totalPlayers}</b></span>

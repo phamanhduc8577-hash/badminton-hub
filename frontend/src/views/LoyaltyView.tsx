@@ -7,6 +7,13 @@ import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { GiftGraphic } from '../components/GiftGraphic'
 import { BottomSheet } from '../components/BottomSheet'
+import { formatVnTime, getVnParts, vnDateKey } from '../lib/dateUtils'
+
+/** Ngày 1 của tháng hiện tại theo giờ Việt Nam (con trỏ tháng cho lịch điểm danh) */
+const vnMonthStart = () => {
+  const p = getVnParts(new Date())
+  return new Date(p.year, p.month - 1, 1)
+}
 import {
   Gift,
   CheckCircle2,
@@ -43,7 +50,7 @@ export const LoyaltyView: React.FC = () => {
   })
 
   // Calendar date view state
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [currentDate, setCurrentDate] = useState(vnMonthStart)
 
   // Unboxing Modal State
   const [unboxingMilestone, setUnboxingMilestone] = useState<{
@@ -213,18 +220,16 @@ export const LoyaltyView: React.FC = () => {
 
   // Convert checkinAt dates to Map for fast lookup + session info (1 ngày có thể có nhiều ca)
   const attendanceMap = new Map<string, AttendanceRecord[]>()
+  // Ngày điểm danh tính theo giờ Việt Nam (máy để múi giờ khác vẫn đúng ngày)
   ;(history || []).forEach((h) => {
-    const d = new Date(h.checkinAt)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-      d.getDate()
-    ).padStart(2, '0')}`
+    const key = vnDateKey(h.checkinAt)
+    if (!key) return
     attendanceMap.set(key, [...(attendanceMap.get(key) || []), h])
   })
 
-  const thisMonthAttendedCount = (history || []).filter((h) => {
-    const d = new Date(h.checkinAt)
-    return d.getFullYear() === year && d.getMonth() === month
-  }).length
+  const monthKeyPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`
+  const todayKey = vnDateKey(new Date())
+  const thisMonthAttendedCount = (history || []).filter((h) => vnDateKey(h.checkinAt).startsWith(monthKeyPrefix)).length
 
   const attendanceRate = Math.round((thisMonthAttendedCount / (totalDaysInMonth || 30)) * 100)
 
@@ -237,7 +242,7 @@ export const LoyaltyView: React.FC = () => {
   }
 
   const setMonthToday = () => {
-    setCurrentDate(new Date())
+    setCurrentDate(vnMonthStart())
   }
 
   const monthNamesVi = [
@@ -438,10 +443,7 @@ export const LoyaltyView: React.FC = () => {
               const dayRecords = attendanceMap.get(dateKey) || []
               const attendInfo = dayRecords[dayRecords.length - 1]
               const isAttended = dayRecords.length > 0
-              const isToday =
-                new Date().getDate() === dayNum &&
-                new Date().getMonth() === month &&
-                new Date().getFullYear() === year
+              const isToday = dateKey === todayKey
               const dayLabel = `${String(dayNum).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}/${year}`
               const CellTag = isAttended ? 'button' : 'div'
 
@@ -798,7 +800,7 @@ export const LoyaltyView: React.FC = () => {
                 <Check size={13} strokeWidth={3} className="shrink-0" />
                 <span>
                   Điểm danh lúc{' '}
-                  {new Date(r.checkinAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  {formatVnTime(r.checkinAt)}
                 </span>
               </p>
             </div>

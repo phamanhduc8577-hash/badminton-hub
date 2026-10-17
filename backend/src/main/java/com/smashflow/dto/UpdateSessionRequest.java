@@ -31,6 +31,9 @@ public class UpdateSessionRequest {
     private BigDecimal guestMalePrice2h;
     private BigDecimal guestFemalePrice2h;
 
+    /** true → xóa toàn bộ giá gói 2 tiếng của ca (4 giá 2h về null), bỏ qua các giá 2h gửi kèm. */
+    private Boolean clearTwoHourPrices;
+
     private BigDecimal depositAmount;
     private BigDecimal costCourt;
     private BigDecimal costShuttlecock;

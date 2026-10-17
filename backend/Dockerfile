@@ -19,5 +19,8 @@ COPY --from=builder /app/build/libs/*.jar app.jar
 
 EXPOSE 8081
 
+# Múi giờ cố định Việt Nam (không phụ thuộc code khởi động / máy chủ)
+ENV TZ=Asia/Ho_Chi_Minh
+
 # JVM flags to fit in 512MB RAM (Free tier limit)
-ENTRYPOINT ["java", "-XX:+UseSerialGC", "-Xss512k", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:+UseSerialGC", "-Xss512k", "-XX:MaxRAMPercentage=75.0", "-Duser.timezone=Asia/Ho_Chi_Minh", "-jar", "app.jar"]

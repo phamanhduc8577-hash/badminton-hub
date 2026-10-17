@@ -26,5 +26,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllByOrderByCreatedAtDesc();
     List<User> findTop20ByOrderBySessionsAttendedDesc();
     List<User> findTop20ByOrderByWinCountDesc();
+
+    /** Bảng xếp hạng chuyên cần: bỏ tài khoản đã xóa (kể cả đã ẩn danh hóa) và tài khoản GUEST. */
+    @Query("SELECT u FROM User u WHERE (u.deleted IS NULL OR u.deleted = false) " +
+           "AND u.role <> com.smashflow.model.Role.GUEST " +
+           "ORDER BY COALESCE(u.sessionsAttended, 0) DESC, u.id ASC")
+    List<User> findAttendanceLeaderboard();
+
+    /** Bảng xếp hạng Elo: LP giảm dần, hòa thì nhiều trận thắng hơn đứng trên. */
+    @Query("SELECT u FROM User u WHERE (u.deleted IS NULL OR u.deleted = false) " +
+           "AND u.role <> com.smashflow.model.Role.GUEST " +
+           "ORDER BY COALESCE(u.eloScore, 0) DESC, COALESCE(u.winCount, 0) DESC, u.id ASC")
+    List<User> findEloLeaderboard();
 }
 

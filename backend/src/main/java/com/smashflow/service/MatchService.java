@@ -13,13 +13,37 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+/**
+ * Ghi / sửa / xóa trận và cập nhật LP.
+ *
+ * Toàn vẹn LP (5.1): mỗi trận lưu LP thực tế từng người nhận/mất (a1/a2/b1/b2_lp_delta).
+ * Sửa/xóa trận có đủ delta → chỉ đảo ngược đúng phần LP + thắng/thua của trận đó (rồi áp kết quả mới khi sửa),
+ * LP các trận khác và người khác không đổi.
+ *  - Trận phân hạng: giảm placementMatches nếu trận đó được tính là trận phân hạng
+ *    (người chơi có tổng số trận ≤ 5 tính cả trận này — placementMatches luôn = min(5, số trận)).
+ *  - Chuỗi thắng/thua (currentStreak): tính lại chính xác từ lịch sử kết quả.
+ *  - Khiên (shieldMatches): best-effort — đảo ngược trận thắng làm tụt đoàn (tức trận đó đã thăng hạng và cấp khiên)
+ *    → khiên về 0; đảo ngược trận thua 0 LP đang ở đúng sàn đoàn (tức trận đó đã tiêu 1 khiên) → trả lại 1 khiên.
+ *    Các trường hợp khác giữ nguyên khiên.
+ * Trận cũ chưa có delta: tính lại lịch sử từng người bị ảnh hưởng theo thứ tự ID tăng dần, trận theo thời gian,
+ * LP đồng đội / đối thủ lấy theo ảnh chụp lúc bắt đầu (kết quả không phụ thuộc thứ tự). Hạn chế: không phải
+ * replay toàn CLB, LP đối thủ là giá trị hiện tại chứ không phải tại thời điểm trận.
+ */
 @Service
 @RequiredArgsConstructor
 public class MatchService {
+
+    private static final int PLACEMENT_MATCHES = 5;
 
     private final MatchRepository matchRepository;
     private final SessionRepository sessionRepository;
@@ -41,18 +65,7 @@ public class MatchService {
         Long pB1Id = request.getTeamBPlayer1Id();
         Long pB2Id = request.getTeamBPlayer2Id();
 
-        // 1. Validation: All selected players in a match must be distinct
-        java.util.Set<Long> playerIds = new java.util.HashSet<>();
-        playerIds.add(pA1Id);
-        if (pA2Id != null && !playerIds.add(pA2Id)) {
-            throw new RuntimeException("Một người chơi không thể cùng lúc ở 2 vị trí trong một trận đấu!");
-        }
-        if (!playerIds.add(pB1Id)) {
-            throw new RuntimeException("Một người chơi không thể đối đầu với chính mình hoặc trùng lặp vị trí!");
-        }
-        if (pB2Id != null && !playerIds.add(pB2Id)) {
-            throw new RuntimeException("Một người chơi không thể cùng lúc ở 2 vị trí trong một trận đấu!");
-        }
+        validateDistinctPlayers(pA1Id, pA2Id, pB1Id, pB2Id);
 
         User pA1 = userRepository.findById(pA1Id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy Player 1 Team A!"));
@@ -81,39 +94,34 @@ public class MatchService {
                 .courtName(request.getCourtName())
                 .build();
 
+        // Cập nhật thắng/thua/LP 4 người và lưu LP thực tế từng người vào trận
+        applyResultAndStoreDeltas(match);
         matchRepository.save(match);
-
-        // Calculate Team LP Averages for dynamic underdog/favorite LP gain calculation
-        int teamALp = calculateTeamAvgLp(pA1, pA2);
-        int teamBLp = calculateTeamAvgLp(pB1, pB2);
-
-        // Update Win/Loss/Elo Stats for all players with LOL dynamic LP & placement calibration
-        if (request.getWinningTeam() == WinningTeam.A) {
-            applyMatchOutcome(pA1, true, teamALp, teamBLp);
-            if (pA2 != null) applyMatchOutcome(pA2, true, teamALp, teamBLp);
-            applyMatchOutcome(pB1, false, teamBLp, teamALp);
-            if (pB2 != null) applyMatchOutcome(pB2, false, teamBLp, teamALp);
-        } else {
-            applyMatchOutcome(pA1, false, teamALp, teamBLp);
-            if (pA2 != null) applyMatchOutcome(pA2, false, teamALp, teamBLp);
-            applyMatchOutcome(pB1, true, teamBLp, teamALp);
-            if (pB2 != null) applyMatchOutcome(pB2, true, teamBLp, teamALp);
-        }
 
         return toMatchResponse(match);
     }
 
     /**
-     * Delete (Undo) match: Reverts all win/loss and matches, restores Elo/Rank and cleans up record.
+     * Delete (Undo) match: đảo ngược đúng phần LP / thắng-thua của trận rồi xóa bản ghi.
      */
     @Transactional
     public void deleteMatch(Long matchId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu!"));
 
-        recalculateStatsForUsersInMatch(match, null);
+        Set<Long> affected = playerIds(match);
 
-        matchRepository.delete(match);
+        if (hasAllDeltas(match)) {
+            reverseMatch(match);
+            matchRepository.delete(match);
+            for (Long uId : sorted(affected)) {
+                recomputeStreak(uId, matchId);
+            }
+        } else {
+            // Trận cũ chưa có delta: tính lại lịch sử (bỏ trận này) cho người bị ảnh hưởng
+            legacyReplay(affected, matchId);
+            matchRepository.delete(match);
+        }
     }
 
     /**
@@ -129,18 +137,7 @@ public class MatchService {
         Long pB1Id = request.getTeamBPlayer1Id();
         Long pB2Id = request.getTeamBPlayer2Id();
 
-        // Validation: distinct players
-        java.util.Set<Long> playerIds = new java.util.HashSet<>();
-        playerIds.add(pA1Id);
-        if (pA2Id != null && !playerIds.add(pA2Id)) {
-            throw new RuntimeException("Một người chơi không thể cùng lúc ở 2 vị trí trong một trận đấu!");
-        }
-        if (!playerIds.add(pB1Id)) {
-            throw new RuntimeException("Một người chơi không thể đối đầu với chính mình hoặc trùng lặp vị trí!");
-        }
-        if (pB2Id != null && !playerIds.add(pB2Id)) {
-            throw new RuntimeException("Một người chơi không thể cùng lúc ở 2 vị trí trong một trận đấu!");
-        }
+        validateDistinctPlayers(pA1Id, pA2Id, pB1Id, pB2Id);
 
         User pA1 = userRepository.findById(pA1Id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy Player 1 Team A!"));
@@ -151,17 +148,22 @@ public class MatchService {
 
         validateRankDifference(pA1, pA2, pB1, pB2);
 
-        // Collect old and new user IDs for recalculation
-        java.util.Set<Long> affectedUserIds = new java.util.HashSet<>();
-        affectedUserIds.add(match.getTeamAPlayer1().getId());
-        if (match.getTeamAPlayer2() != null) affectedUserIds.add(match.getTeamAPlayer2().getId());
-        affectedUserIds.add(match.getTeamBPlayer1().getId());
-        if (match.getTeamBPlayer2() != null) affectedUserIds.add(match.getTeamBPlayer2().getId());
-
+        // Người bị ảnh hưởng: đội hình cũ + đội hình mới
+        Set<Long> affectedUserIds = new LinkedHashSet<>(playerIds(match));
         affectedUserIds.add(pA1.getId());
         if (pA2 != null) affectedUserIds.add(pA2.getId());
         affectedUserIds.add(pB1.getId());
         if (pB2 != null) affectedUserIds.add(pB2.getId());
+
+        boolean exact = hasAllDeltas(match);
+        if (exact) {
+            // 1. Đảo ngược đúng LP / thắng-thua của kết quả cũ (trước khi đổi đội hình)
+            reverseMatch(match);
+            // Chuỗi thắng/thua "trước trận này" để áp lại kết quả mới
+            for (Long uId : sorted(affectedUserIds)) {
+                recomputeStreak(uId, matchId);
+            }
+        }
 
         match.setTeamAPlayer1(pA1);
         match.setTeamAPlayer2(pA2);
@@ -172,75 +174,255 @@ public class MatchService {
             match.setCourtName(request.getCourtName());
         }
 
-        matchRepository.save(match);
-
-        // Replay/Recalculate entire match history for affected users to ensure exact LOL Elo/LP and win/loss parity
-        for (Long uId : affectedUserIds) {
-            recalculateUserHistory(uId);
+        if (exact) {
+            // 2. Áp kết quả mới theo LP hiện tại (sau khi đã đảo ngược) và lưu delta mới
+            applyResultAndStoreDeltas(match);
+            matchRepository.save(match);
+            for (Long uId : sorted(affectedUserIds)) {
+                recomputeStreak(uId, null);
+            }
+        } else {
+            clearDeltas(match);
+            matchRepository.save(match);
+            legacyReplay(affectedUserIds, null);
         }
 
         return toMatchResponse(match);
     }
 
-    private void recalculateStatsForUsersInMatch(Match matchToDelete, Match matchToUpdate) {
-        java.util.Set<Long> affectedUserIds = new java.util.HashSet<>();
-        if (matchToDelete != null) {
-            affectedUserIds.add(matchToDelete.getTeamAPlayer1().getId());
-            if (matchToDelete.getTeamAPlayer2() != null) affectedUserIds.add(matchToDelete.getTeamAPlayer2().getId());
-            affectedUserIds.add(matchToDelete.getTeamBPlayer1().getId());
-            if (matchToDelete.getTeamBPlayer2() != null) affectedUserIds.add(matchToDelete.getTeamBPlayer2().getId());
-        }
+    // ------------------------------------------------------------------
+    // LP delta helpers
+    // ------------------------------------------------------------------
 
-        // Before deleting matchToDelete, we remove it or bypass it during replay
-        Long matchToDeleteId = matchToDelete != null ? matchToDelete.getId() : null;
+    private static User[] players(Match m) {
+        return new User[]{m.getTeamAPlayer1(), m.getTeamAPlayer2(), m.getTeamBPlayer1(), m.getTeamBPlayer2()};
+    }
 
-        for (Long uId : affectedUserIds) {
-            recalculateUserHistoryExcluding(uId, matchToDeleteId);
+    private static Integer getDelta(Match m, int slot) {
+        return switch (slot) {
+            case 0 -> m.getA1LpDelta();
+            case 1 -> m.getA2LpDelta();
+            case 2 -> m.getB1LpDelta();
+            default -> m.getB2LpDelta();
+        };
+    }
+
+    private static void setDelta(Match m, int slot, Integer delta) {
+        switch (slot) {
+            case 0 -> m.setA1LpDelta(delta);
+            case 1 -> m.setA2LpDelta(delta);
+            case 2 -> m.setB1LpDelta(delta);
+            default -> m.setB2LpDelta(delta);
         }
     }
 
-    private void recalculateUserHistory(Long userId) {
-        recalculateUserHistoryExcluding(userId, null);
+    private static void clearDeltas(Match m) {
+        for (int i = 0; i < 4; i++) setDelta(m, i, null);
     }
 
-    private void recalculateUserHistoryExcluding(Long userId, Long excludedMatchId) {
+    /** Trận có đủ LP delta cho mọi vị trí có người chơi. */
+    static boolean hasAllDeltas(Match m) {
+        User[] ps = players(m);
+        for (int i = 0; i < 4; i++) {
+            if (ps[i] != null && getDelta(m, i) == null) return false;
+        }
+        return true;
+    }
+
+    private static Set<Long> playerIds(Match m) {
+        Set<Long> ids = new LinkedHashSet<>();
+        for (User u : players(m)) {
+            if (u != null) ids.add(u.getId());
+        }
+        return ids;
+    }
+
+    private static List<Long> sorted(Set<Long> ids) {
+        return new ArrayList<>(new TreeSet<>(ids));
+    }
+
+    private static boolean isWinner(Match m, int slot) {
+        boolean teamA = slot < 2;
+        return teamA == (m.getWinningTeam() == WinningTeam.A);
+    }
+
+    /** Áp kết quả trận cho 4 người (LP đội tính trước khi cập nhật ai) và ghi LP thực tế vào trận. */
+    private void applyResultAndStoreDeltas(Match match) {
+        int teamALp = calculateTeamAvgLp(match.getTeamAPlayer1(), match.getTeamAPlayer2());
+        int teamBLp = calculateTeamAvgLp(match.getTeamBPlayer1(), match.getTeamBPlayer2());
+        User[] ps = players(match);
+        for (int i = 0; i < 4; i++) {
+            User p = ps[i];
+            if (p == null) {
+                setDelta(match, i, null);
+                continue;
+            }
+            boolean teamA = i < 2;
+            int delta = applyMatchOutcome(p, isWinner(match, i), teamA ? teamALp : teamBLp, teamA ? teamBLp : teamALp);
+            setDelta(match, i, delta);
+        }
+    }
+
+    /** Đảo ngược đúng phần LP, thắng/thua, trận phân hạng (và khiên best-effort) của một trận có đủ delta. */
+    private void reverseMatch(Match match) {
+        User[] ps = players(match);
+        for (int i = 0; i < 4; i++) {
+            User u = ps[i];
+            if (u == null) continue;
+            int delta = getDelta(match, i);
+            boolean won = isWinner(match, i);
+
+            int before = u.getEloScore();
+            int after = Math.max(0, before - delta);
+            u.setEloScore(after);
+
+            if (won) {
+                u.setWinCount(Math.max(0, nz(u.getWinCount()) - 1));
+            } else {
+                u.setLossCount(Math.max(0, nz(u.getLossCount()) - 1));
+            }
+
+            // Trận phân hạng: placementMatches = min(5, số trận) → trận này là phân hạng khi tổng số trận (gồm trận này) ≤ 5
+            long totalMatches = matchRepository.countAllByUserId(u.getId());
+            int placement = nz(u.getPlacementMatches());
+            boolean wasPlacement = totalMatches <= PLACEMENT_MATCHES && placement > 0;
+            if (wasPlacement) {
+                u.setPlacementMatches(placement - 1);
+            } else {
+                int shield = nz(u.getShieldMatches());
+                if (won && getDivisionFloor(after) < getDivisionFloor(before)) {
+                    // Trận thắng này đã đưa lên đoàn/bậc mới và cấp khiên → thu hồi
+                    u.setShieldMatches(0);
+                } else if (!won && delta == 0 && after > 0 && getDivisionFloor(after) == after) {
+                    // Trận thua giữ ở sàn đoàn nhờ khiên → trả lại khiên đã tiêu
+                    u.setShieldMatches(Math.min(3, shield + 1));
+                }
+            }
+            userRepository.save(u);
+        }
+    }
+
+    /** Chuỗi thắng/thua tính lại từ lịch sử kết quả (mới nhất trước). */
+    private void recomputeStreak(Long userId, Long excludedMatchId) {
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) return;
+        List<Match> history = matchRepository.findAllByUserId(userId).stream()
+                .filter(m -> excludedMatchId == null || !excludedMatchId.equals(m.getId()))
+                .sorted(chronological().reversed())
+                .toList();
+        int streak = 0;
+        for (Match m : history) {
+            boolean won = isWinner(m, slotOf(m, userId));
+            if (streak == 0) {
+                streak = won ? 1 : -1;
+            } else if (streak > 0 && won) {
+                streak++;
+            } else if (streak < 0 && !won) {
+                streak--;
+            } else {
+                break;
+            }
+        }
+        user.setCurrentStreak(streak);
+        userRepository.save(user);
+    }
 
-        // Reset user stats to base
-        user.setWinCount(0);
-        user.setLossCount(0);
-        user.setEloScore(0);
-        user.setPlacementMatches(0);
-        user.setCurrentStreak(0);
-        user.setShieldMatches(0);
+    private static Comparator<Match> chronological() {
+        return Comparator.comparing(Match::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(Match::getId, Comparator.nullsFirst(Comparator.naturalOrder()));
+    }
 
-        // Fetch all matches for this user ordered chronologically (createdAt ASC, id ASC)
-        List<Match> allUserMatches = matchRepository.findAllByUserId(userId).stream()
-                .filter(m -> excludedMatchId == null || !m.getId().equals(excludedMatchId))
-                .sorted((m1, m2) -> {
-                    int c = m1.getCreatedAt().compareTo(m2.getCreatedAt());
-                    if (c != 0) return c;
-                    return m1.getId().compareTo(m2.getId());
-                })
-                .collect(Collectors.toList());
+    private static int slotOf(Match m, Long userId) {
+        User[] ps = players(m);
+        for (int i = 0; i < 4; i++) {
+            if (ps[i] != null && userId.equals(ps[i].getId())) return i;
+        }
+        return -1;
+    }
 
-        for (Match m : allUserMatches) {
-            boolean isTeamA = m.getTeamAPlayer1().getId().equals(userId) ||
-                    (m.getTeamAPlayer2() != null && m.getTeamAPlayer2().getId().equals(userId));
-            boolean isWin = (isTeamA && m.getWinningTeam() == WinningTeam.A) ||
-                    (!isTeamA && m.getWinningTeam() == WinningTeam.B);
+    /**
+     * Trận cũ chưa có delta: tính lại lịch sử từng người bị ảnh hưởng (ID tăng dần, trận theo thời gian).
+     * LP đồng đội / đối thủ lấy từ ảnh chụp trước khi tính lại → kết quả xác định, không phụ thuộc thứ tự.
+     * LP người được tính lại ở mỗi trận ghi vào vị trí của người đó trên trận (để lần sửa sau dùng đường chính xác).
+     */
+    private void legacyReplay(Set<Long> affectedUserIds, Long excludedMatchId) {
+        List<Long> ids = sorted(affectedUserIds);
+        Map<Long, List<Match>> histories = new HashMap<>();
+        Map<Long, Integer> snapshot = new HashMap<>();
 
-            int teamALp = calculateTeamAvgLp(m.getTeamAPlayer1(), m.getTeamAPlayer2());
-            int teamBLp = calculateTeamAvgLp(m.getTeamBPlayer1(), m.getTeamBPlayer2());
-
-            int myTeamLp = isTeamA ? teamALp : teamBLp;
-            int oppTeamLp = isTeamA ? teamBLp : teamALp;
-
-            applyMatchOutcome(user, isWin, myTeamLp, oppTeamLp);
+        for (Long uId : ids) {
+            List<Match> history = matchRepository.findAllByUserId(uId).stream()
+                    .filter(m -> excludedMatchId == null || !excludedMatchId.equals(m.getId()))
+                    .sorted(chronological())
+                    .toList();
+            histories.put(uId, history);
+            for (Match m : history) {
+                for (User p : players(m)) {
+                    if (p != null) snapshot.putIfAbsent(p.getId(), p.getEloScore());
+                }
+            }
         }
 
-        userRepository.save(user);
+        Set<Match> touched = new LinkedHashSet<>();
+        for (Long uId : ids) {
+            User user = userRepository.findById(uId).orElse(null);
+            if (user == null) continue;
+
+            user.setWinCount(0);
+            user.setLossCount(0);
+            user.setEloScore(0);
+            user.setPlacementMatches(0);
+            user.setCurrentStreak(0);
+            user.setShieldMatches(0);
+
+            for (Match m : histories.getOrDefault(uId, List.of())) {
+                int slot = slotOf(m, uId);
+                if (slot < 0) continue;
+                boolean teamA = slot < 2;
+                User[] ps = players(m);
+                int myTeam = replayTeamLp(user, ps[teamA ? 0 : 2], ps[teamA ? 1 : 3], snapshot);
+                int oppTeam = snapshotTeamLp(ps[teamA ? 2 : 0], ps[teamA ? 3 : 1], snapshot);
+                int delta = applyMatchOutcome(user, isWinner(m, slot), myTeam, oppTeam);
+                setDelta(m, slot, delta);
+                touched.add(m);
+            }
+            userRepository.save(user);
+        }
+        if (!touched.isEmpty()) {
+            matchRepository.saveAll(touched);
+        }
+    }
+
+    /** LP đội của người đang tính lại: LP hiện tại của chính họ + LP ảnh chụp của đồng đội. */
+    private static int replayTeamLp(User self, User p1, User p2, Map<Long, Integer> snapshot) {
+        User partner = (p1 != null && self.getId().equals(p1.getId())) ? p2 : p1;
+        if (partner == null) return self.getEloScore();
+        return (self.getEloScore() + snapshot.getOrDefault(partner.getId(), partner.getEloScore())) / 2;
+    }
+
+    private static int snapshotTeamLp(User p1, User p2, Map<Long, Integer> snapshot) {
+        int lp1 = snapshot.getOrDefault(p1.getId(), p1.getEloScore());
+        if (p2 == null) return lp1;
+        return (lp1 + snapshot.getOrDefault(p2.getId(), p2.getEloScore())) / 2;
+    }
+
+    private static int nz(Integer v) {
+        return v != null ? v : 0;
+    }
+
+    private static void validateDistinctPlayers(Long pA1Id, Long pA2Id, Long pB1Id, Long pB2Id) {
+        // All selected players in a match must be distinct
+        Set<Long> playerIds = new java.util.HashSet<>();
+        playerIds.add(pA1Id);
+        if (pA2Id != null && !playerIds.add(pA2Id)) {
+            throw new RuntimeException("Một người chơi không thể cùng lúc ở 2 vị trí trong một trận đấu!");
+        }
+        if (!playerIds.add(pB1Id)) {
+            throw new RuntimeException("Một người chơi không thể đối đầu với chính mình hoặc trùng lặp vị trí!");
+        }
+        if (pB2Id != null && !playerIds.add(pB2Id)) {
+            throw new RuntimeException("Một người chơi không thể cùng lúc ở 2 vị trí trong một trận đấu!");
+        }
     }
 
     private int calculateTeamAvgLp(User p1, User p2) {
@@ -265,7 +447,8 @@ public class MatchService {
      *     + Nếu hết khiên (shieldMatches == 0): Rớt hạng, đặt về 75 LP của Đoàn/Bậc dưới.
      * - Floor protection: Iron 0 LP (cannot drop below 0 LP)
      */
-    private void applyMatchOutcome(User user, boolean isWin, int myTeamLp, int oppTeamLp) {
+    /** @return LP thực tế thay đổi của người chơi ở trận này (sau mọi luật phân hạng / khiên / sàn 0 LP). */
+    private int applyMatchOutcome(User user, boolean isWin, int myTeamLp, int oppTeamLp) {
         int placementCount = user.getPlacementMatches() != null ? user.getPlacementMatches() : 0;
         boolean inPlacements = placementCount < 5;
         int currentLp = user.getEloScore();
@@ -357,6 +540,7 @@ public class MatchService {
         }
 
         userRepository.save(user);
+        return user.getEloScore() - currentLp;
     }
 
     /**

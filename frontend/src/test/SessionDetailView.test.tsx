@@ -120,7 +120,8 @@ describe('SessionDetailView - mobile cho thành viên', () => {
     ;(api.post as any).mockRejectedValue(rejectWith('Mã điểm danh không đúng hoặc đã hết hạn!'))
     renderView()
     fireEvent.click(await screen.findByRole('button', { name: /Quét QR sân/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'mock-scan' }))
+    // Máy quét được lazy load → chờ module tải xong
+    fireEvent.click(await screen.findByRole('button', { name: 'mock-scan' }))
 
     const dialog = await screen.findByRole('dialog', { name: /Điểm danh 1-Chạm/i })
     expect(within(dialog).getByRole('alert')).toHaveTextContent('Mã điểm danh không đúng hoặc đã hết hạn!')
@@ -133,7 +134,7 @@ describe('SessionDetailView - mobile cho thành viên', () => {
   it('nút "Nhập mã bằng tay" trong máy quét mở thẳng form nhập tay', async () => {
     renderView()
     fireEvent.click(await screen.findByRole('button', { name: /Quét QR sân/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'mock-manual' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'mock-manual' }))
     expect(screen.queryByTestId('mock-scanner')).not.toBeInTheDocument()
     const dialog = await screen.findByRole('dialog', { name: /Điểm danh 1-Chạm/i })
     const input = within(dialog).getByLabelText(/Mã Token/i)

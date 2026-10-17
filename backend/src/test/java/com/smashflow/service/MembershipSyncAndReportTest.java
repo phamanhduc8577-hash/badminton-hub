@@ -117,10 +117,10 @@ class MembershipSyncAndReportTest {
         when(sessionRepository.findById(5L)).thenReturn(Optional.of(s));
         SessionParticipant p1 = SessionParticipant.builder().id(1L).session(s).user(veteran).checkinStatus(CheckinStatus.CHECKED_IN).build();
         SessionParticipant p2 = SessionParticipant.builder().id(2L).session(s).user(rookie).checkinStatus(CheckinStatus.CHECKED_IN).build();
-        when(participantRepository.findBySessionId(5L)).thenReturn(List.of(p1, p2));
+        when(participantRepository.findBySessionIdInWithUser(List.of(5L))).thenReturn(List.of(p1, p2));
         Match m1 = Match.builder().id(1L).session(s).teamAPlayer1(rookie).teamBPlayer1(veteran).winningTeam(WinningTeam.A).build();
         Match m2 = Match.builder().id(2L).session(s).teamAPlayer1(rookie).teamBPlayer1(veteran).winningTeam(WinningTeam.A).build();
-        when(matchRepository.findBySessionIdOrderByCreatedAtDesc(5L)).thenReturn(List.of(m1, m2));
+        when(matchRepository.findBySessionIdIn(List.of(5L))).thenReturn(List.of(m1, m2));
 
         MonthlyFinancialReport r = service.getMonthlyFinancialReport(2026, 3);
 

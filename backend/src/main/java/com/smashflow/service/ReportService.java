@@ -27,8 +27,12 @@ public class ReportService {
     public HostSessionReport getSessionFinancialReport(Long sessionId) {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
+        return buildSessionReport(session,
+                participantRepository.findBySessionId(sessionId),
+                matchRepository.findBySessionIdOrderByCreatedAtDesc(sessionId));
+    }
 
-        List<SessionParticipant> allParticipants = participantRepository.findBySessionId(sessionId);
+    private HostSessionReport buildSessionReport(Session session, List<SessionParticipant> allParticipants, List<Match> matches) {
         List<SessionParticipant> activeParticipants = allParticipants.stream()
                 .filter(p -> p.getCheckinStatus() != CheckinStatus.ABSENT)
                 .toList();
@@ -63,7 +67,6 @@ public class ReportService {
         BigDecimal netProfit = totalRevenue.subtract(totalExpenses);
 
         // Compute Session MVP
-        List<Match> matches = matchRepository.findBySessionIdOrderByCreatedAtDesc(sessionId);
         Map<Long, int[]> playerStats = new HashMap<>(); // userId -> [wins, losses]
         Map<Long, String> playerNames = new HashMap<>();
         Map<Long, String> playerAvatars = new HashMap<>();
@@ -201,8 +204,24 @@ public class ReportService {
         Map<Long, int[]> monthStats = new HashMap<>();
         Map<Long, User> monthUsers = new HashMap<>();
 
+        // Nạp gộp lượt đăng ký + trận của mọi ca trong tháng (2 truy vấn thay vì 3 truy vấn × số ca)
+        List<Long> sessionIds = sessions.stream().map(Session::getId).toList();
+        Map<Long, List<SessionParticipant>> partsBySession = new HashMap<>();
+        Map<Long, List<Match>> matchesBySession = new HashMap<>();
+        if (!sessionIds.isEmpty()) {
+            for (SessionParticipant p : participantRepository.findBySessionIdInWithUser(sessionIds)) {
+                partsBySession.computeIfAbsent(p.getSession().getId(), k -> new java.util.ArrayList<>()).add(p);
+            }
+            for (Match m : matchRepository.findBySessionIdIn(sessionIds)) {
+                matchesBySession.computeIfAbsent(m.getSession().getId(), k -> new java.util.ArrayList<>()).add(m);
+            }
+        }
+        java.time.LocalDateTime nowTime = java.time.LocalDateTime.now();
+
         for (Session session : sessions) {
-            HostSessionReport sRep = getSessionFinancialReport(session.getId());
+            List<SessionParticipant> parts = partsBySession.getOrDefault(session.getId(), List.of());
+            List<Match> sessionMatches = matchesBySession.getOrDefault(session.getId(), List.of());
+            HostSessionReport sRep = buildSessionReport(session, parts, sessionMatches);
 
             totalRevenue = totalRevenue.add(sRep.getTotalRevenue());
             totalExpenses = totalExpenses.add(sRep.getTotalExpenses());
@@ -214,7 +233,6 @@ public class ReportService {
             totalPlayerTurnout += sRep.getTotalPlayers();
             totalCheckedIn += sRep.getCheckedInPlayers();
 
-            List<SessionParticipant> parts = participantRepository.findBySessionId(session.getId());
             for (SessionParticipant p : parts) {
                 if (p.getCheckinStatus() != CheckinStatus.ABSENT) {
                     if (p.getIsGuest() != null && p.getIsGuest()) {
@@ -251,7 +269,7 @@ public class ReportService {
             }
 
             // Thắng/thua trong các trận của ca này
-            for (Match m : matchRepository.findBySessionIdOrderByCreatedAtDesc(session.getId())) {
+            for (Match m : sessionMatches) {
                 boolean teamAWon = m.getWinningTeam() == WinningTeam.A;
                 recordMonthMatch(monthStats, monthUsers, m.getTeamAPlayer1(), teamAWon);
                 recordMonthMatch(monthStats, monthUsers, m.getTeamAPlayer2(), teamAWon);
@@ -259,19 +277,8 @@ public class ReportService {
                 recordMonthMatch(monthStats, monthUsers, m.getTeamBPlayer2(), !teamAWon);
             }
 
-            // Determine dynamic real-time status based on current time
-            java.time.LocalDateTime nowTime = java.time.LocalDateTime.now();
-            String effectiveStatus = session.getStatus().name();
-            if (session.getStatus() != SessionStatus.CANCELLED) {
-                if (session.getEndTime() != null && nowTime.isAfter(session.getEndTime())) {
-                    effectiveStatus = "COMPLETED";
-                } else if (session.getStartTime() != null && session.getEndTime() != null &&
-                        !nowTime.isBefore(session.getStartTime()) && !nowTime.isAfter(session.getEndTime())) {
-                    effectiveStatus = "ACTIVE";
-                } else {
-                    effectiveStatus = "UPCOMING";
-                }
-            }
+            // Trạng thái theo giờ thực (dùng chung quy tắc với API ca)
+            String effectiveStatus = SessionStatusResolver.effective(session, nowTime).name();
 
             summaries.add(com.smashflow.dto.MonthlyFinancialReport.SessionFinancialSummary.builder()
                     .sessionId(session.getId())

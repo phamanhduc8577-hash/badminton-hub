@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,8 +25,48 @@ public interface SessionParticipantRepository extends JpaRepository<SessionParti
     long countDistinctCheckedInSessions(@Param("userId") Long userId);
 
     List<SessionParticipant> findBySessionId(Long sessionId);
-    Optional<SessionParticipant> findBySessionIdAndUserId(Long sessionId, Long userId);
-    Optional<SessionParticipant> findBySessionIdAndGuestPhone(Long sessionId, String guestPhone);
+
+    List<SessionParticipant> findAllBySessionIdAndUserIdOrderByIdAsc(Long sessionId, Long userId);
+    List<SessionParticipant> findAllBySessionIdAndGuestPhoneOrderByIdAsc(Long sessionId, String guestPhone);
+
+    /**
+     * Lượt đăng ký của user trong ca. Dữ liệu cũ có thể có dòng trùng → không ném lỗi,
+     * ưu tiên dòng chưa bị đánh vắng (ABSENT), không có thì lấy dòng đầu tiên.
+     */
+    default Optional<SessionParticipant> findBySessionIdAndUserId(Long sessionId, Long userId) {
+        return preferActive(findAllBySessionIdAndUserIdOrderByIdAsc(sessionId, userId));
+    }
+
+    default Optional<SessionParticipant> findBySessionIdAndGuestPhone(Long sessionId, String guestPhone) {
+        return preferActive(findAllBySessionIdAndGuestPhoneOrderByIdAsc(sessionId, guestPhone));
+    }
+
+    static Optional<SessionParticipant> preferActive(List<SessionParticipant> rows) {
+        if (rows == null || rows.isEmpty()) return Optional.empty();
+        return rows.stream()
+                .filter(p -> p.getCheckinStatus() != CheckinStatus.ABSENT)
+                .findFirst()
+                .or(() -> Optional.of(rows.get(0)));
+    }
+
+    /** Mọi lượt trong ca thuộc cùng user HOẶC cùng SĐT (guestPhone / SĐT của user) — chống đăng ký trùng. */
+    @Query("SELECT sp FROM SessionParticipant sp LEFT JOIN sp.user u WHERE sp.session.id = :sessionId " +
+           "AND (u.id = :userId OR sp.guestPhone = :phone OR u.phone = :phone) ORDER BY sp.id ASC")
+    List<SessionParticipant> findBySessionAndUserOrPhone(@Param("sessionId") Long sessionId,
+                                                         @Param("userId") Long userId,
+                                                         @Param("phone") String phone);
+
+    /** Đếm gộp cho danh sách ca: [sessionId, số slot đã đặt (không tính ABSENT), số đã điểm danh]. */
+    @Query("SELECT sp.session.id, " +
+           "SUM(CASE WHEN sp.checkinStatus <> com.smashflow.model.CheckinStatus.ABSENT THEN 1 ELSE 0 END), " +
+           "SUM(CASE WHEN sp.checkinStatus = com.smashflow.model.CheckinStatus.CHECKED_IN THEN 1 ELSE 0 END) " +
+           "FROM SessionParticipant sp WHERE sp.session.id IN :sessionIds GROUP BY sp.session.id")
+    List<Object[]> countSlotsBySessionIds(@Param("sessionIds") Collection<Long> sessionIds);
+
+    /** Báo cáo tháng: nạp một lần mọi lượt của các ca trong tháng (kèm user). */
+    @Query("SELECT sp FROM SessionParticipant sp LEFT JOIN FETCH sp.user u WHERE sp.session.id IN :sessionIds ORDER BY sp.id ASC")
+    List<SessionParticipant> findBySessionIdInWithUser(@Param("sessionIds") Collection<Long> sessionIds);
+
     long countBySessionId(Long sessionId);
     long countBySessionIdAndCheckinStatus(Long sessionId, CheckinStatus status);
 

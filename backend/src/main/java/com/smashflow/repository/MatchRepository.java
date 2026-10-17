@@ -13,4 +13,11 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     @Query("SELECT m FROM Match m WHERE m.teamAPlayer1.id = :userId OR m.teamAPlayer2.id = :userId OR m.teamBPlayer1.id = :userId OR m.teamBPlayer2.id = :userId ORDER BY m.createdAt DESC")
     List<Match> findAllByUserId(Long userId);
+
+    @Query("SELECT COUNT(m) FROM Match m WHERE m.teamAPlayer1.id = :userId OR m.teamAPlayer2.id = :userId OR m.teamBPlayer1.id = :userId OR m.teamBPlayer2.id = :userId")
+    long countAllByUserId(Long userId);
+
+    /** Báo cáo tháng: mọi trận của các ca trong tháng trong 1 truy vấn. */
+    @Query("SELECT m FROM Match m WHERE m.session.id IN :sessionIds ORDER BY m.createdAt DESC")
+    List<Match> findBySessionIdIn(java.util.Collection<Long> sessionIds);
 }

@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -21,23 +20,13 @@ public class LeaderboardService {
     private final UserRepository userRepository;
 
     public LeaderboardPageResponse getAttendanceLeaderboard(int page, int size, User currentUser) {
-        List<User> ranked = userRepository.findAll().stream()
-                .filter(u -> !Boolean.TRUE.equals(u.getDeleted()))
-                .sorted(Comparator.<User>comparingInt(u -> nz(u.getSessionsAttended())).reversed()
-                        .thenComparing(User::getId))
-                .toList();
-        return buildPage(ranked, page, size, currentUser);
+        // Lọc (bỏ đã xóa / GUEST) và sắp xếp bằng SQL
+        return buildPage(userRepository.findAttendanceLeaderboard(), page, size, currentUser);
     }
 
     public LeaderboardPageResponse getWinRateLeaderboard(int page, int size, User currentUser) {
-        // Elo ranking: điểm Elo giảm dần, hòa thì ai nhiều trận thắng hơn đứng trên
-        List<User> ranked = userRepository.findAll().stream()
-                .filter(u -> !Boolean.TRUE.equals(u.getDeleted()))
-                .sorted(Comparator.<User>comparingInt(u -> nz(u.getEloScore())).reversed()
-                        .thenComparing(Comparator.<User>comparingInt(u -> nz(u.getWinCount())).reversed())
-                        .thenComparing(User::getId))
-                .toList();
-        return buildPage(ranked, page, size, currentUser);
+        // Elo ranking: điểm Elo giảm dần, hòa thì ai nhiều trận thắng hơn đứng trên (sắp xếp bằng SQL)
+        return buildPage(userRepository.findEloLeaderboard(), page, size, currentUser);
     }
 
     private LeaderboardPageResponse buildPage(List<User> ranked, int page, int size, User currentUser) {

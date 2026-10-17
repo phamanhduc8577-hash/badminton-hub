@@ -6,6 +6,14 @@ import { DollarSign, Plus, ArrowLeft, Receipt, MapPin } from 'lucide-react'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { useToast } from '../components/ToastProvider'
 import { validateSlotCount } from '../components/host/hostUtils'
+import { durationHours, getVnParts, parseServerDateTime, toVnDateTimeInput } from '../lib/dateUtils'
+
+/** "yyyy-MM-ddTHH:mm" (giờ VN) + n giờ → "yyyy-MM-ddTHH:mm" (giờ VN); lỗi → '' */
+const addHoursToInput = (value: string, hours: number): string => {
+  const d = parseServerDateTime(value)
+  if (isNaN(d.getTime())) return ''
+  return toVnDateTimeInput(new Date(d.getTime() + hours * 60 * 60 * 1000))
+}
 
 const MIN_COURTS = 1
 const MAX_COURTS = 10
@@ -32,29 +40,24 @@ export const CreateSessionView: React.FC = () => {
   const navigate = useNavigate()
   const { showToast } = useToast()
 
+  // Ô datetime-local chứa giờ "đồng hồ treo tường" Việt Nam (server dùng LocalDateTime giờ VN),
+  // nên mọi phép tính giờ đi qua dateUtils để điện thoại khác múi giờ vẫn đúng.
   const getInitialDates = () => {
     const now = new Date()
-    const start = new Date(now)
-    // Default to tomorrow 20:00 to avoid any past time validation issue
-    start.setDate(start.getDate() + 1)
-    start.setHours(20, 0, 0, 0)
-
-    const end = new Date(start)
-    end.setHours(start.getHours() + 2)
-
+    // Default to tomorrow 20:00 (giờ VN) to avoid any past time validation issue
+    const p = getVnParts(now)
+    const tomorrow = new Date(Date.UTC(p.year, p.month - 1, p.day + 1))
     const pad = (n: number) => String(n).padStart(2, '0')
-    const formatForInput = (d: Date) => {
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-    }
+    const startStr = `${tomorrow.getUTCFullYear()}-${pad(tomorrow.getUTCMonth() + 1)}-${pad(tomorrow.getUTCDate())}T20:00`
+    const endStr = addHoursToInput(startStr, 2)
 
     return {
-      startStr: formatForInput(start),
-      endStr: formatForInput(end),
-      minStr: formatForInput(now),
-      minEndStr: formatForInput(end),
+      startStr,
+      endStr,
+      minStr: toVnDateTimeInput(now),
+      minEndStr: endStr,
     }
   }
-
   const initialDates = React.useMemo(() => getInitialDates(), [])
 
   const [title, setTitle] = useState('')
@@ -85,46 +88,24 @@ export const CreateSessionView: React.FC = () => {
   const [costDrinks, setCostDrinks] = useState(30000)
 
   // Calculate session duration in hours
-  const sessionHours = React.useMemo(() => {
-    try {
-      const start = new Date(startTime).getTime()
-      const end = new Date(endTime).getTime()
-      if (start && end && end > start) {
-        const diffHours = (end - start) / (1000 * 60 * 60)
-        return Math.round(diffHours * 10) / 10
-      }
-    } catch {}
-    return 2
-  }, [startTime, endTime])
+  const sessionHours = React.useMemo(() => durationHours(startTime, endTime) ?? 2, [startTime, endTime])
 
   // Helper to compute min EndTime (at least 2h after startTime)
-  const minEndTimeStr = React.useMemo(() => {
-    try {
-      if (startTime) {
-        const s = new Date(startTime)
-        s.setHours(s.getHours() + 2)
-        const pad = (n: number) => String(n).padStart(2, '0')
-        return `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}T${pad(s.getHours())}:${pad(s.getMinutes())}`
-      }
-    } catch {}
-    return initialDates.minStr
-  }, [startTime, initialDates.minStr])
+  const minEndTimeStr = React.useMemo(
+    () => (startTime ? addHoursToInput(startTime, 2) || initialDates.minStr : initialDates.minStr),
+    [startTime, initialDates.minStr]
+  )
 
   const handleStartTimeChange = (newStartStr: string) => {
     setStartTime(newStartStr)
-    try {
-      const s = new Date(newStartStr)
-      const e = new Date(endTime)
-      // If new duration is less than 2 hours, automatically push end time forward to 2 hours
-      if (isNaN(e.getTime()) || (e.getTime() - s.getTime()) < 2 * 60 * 60 * 1000) {
-        const autoEnd = new Date(s)
-        autoEnd.setHours(autoEnd.getHours() + 2)
-        const pad = (n: number) => String(n).padStart(2, '0')
-        setEndTime(`${autoEnd.getFullYear()}-${pad(autoEnd.getMonth() + 1)}-${pad(autoEnd.getDate())}T${pad(autoEnd.getHours())}:${pad(autoEnd.getMinutes())}`)
-      }
-    } catch {}
+    const s = parseServerDateTime(newStartStr)
+    const e = parseServerDateTime(endTime)
+    if (isNaN(s.getTime())) return
+    // If new duration is less than 2 hours, automatically push end time forward to 2 hours
+    if (isNaN(e.getTime()) || e.getTime() - s.getTime() < 2 * 60 * 60 * 1000) {
+      setEndTime(addHoursToInput(newStartStr, 2))
+    }
   }
-
   const courtCountError = validateCourtCount(courtCountInput)
   const maxSlotsError = validateSlotCount(maxSlotsInput)
   const courtNameList = parseCourtNames(courtNames)

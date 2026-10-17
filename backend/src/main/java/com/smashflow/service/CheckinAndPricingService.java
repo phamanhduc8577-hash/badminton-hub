@@ -37,6 +37,10 @@ public class CheckinAndPricingService {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
 
+        if (session.getStatus() == SessionStatus.CANCELLED) {
+            throw new RuntimeException("Ca này đã bị hủy, không thể điểm danh!");
+        }
+
         // 1. Verify Dynamic QR Token
         if (session.getCheckinToken() == null || !session.getCheckinToken().equalsIgnoreCase(request.getToken())) {
             throw new RuntimeException("Mã QR điểm danh không chính xác!");
@@ -106,6 +110,7 @@ public class CheckinAndPricingService {
         if (participant.getCheckinStatus() == CheckinStatus.CHECKED_IN) {
             throw new RuntimeException("Người này đã điểm danh rồi!");
         }
+        ensureSessionNotCancelled(participant, "Ca này đã bị hủy, không thể điểm danh!");
 
         User user = participant.getUser();
         if (user != null) {
@@ -216,6 +221,7 @@ public class CheckinAndPricingService {
         if (participant.getPaymentStatus() == PaymentStatus.PAID) {
             throw new RuntimeException("Lượt này đã thanh toán rồi!");
         }
+        ensureSessionNotCancelled(participant, "Ca này đã bị hủy, không thể thu tiền!");
 
         // Số tiền thu = tiền còn lại theo cọc THỰC NHẬN (tính trước khi đổi trạng thái).
         // Không tự đổi trạng thái cọc: cọc PENDING vẫn là PENDING (chưa nhận) nên không được trừ.
@@ -280,6 +286,12 @@ public class CheckinAndPricingService {
         } catch (Exception ignored) {}
 
         return toParticipantResponse(participant);
+    }
+
+    private static void ensureSessionNotCancelled(SessionParticipant p, String message) {
+        if (p.getSession() != null && p.getSession().getStatus() == SessionStatus.CANCELLED) {
+            throw new RuntimeException(message);
+        }
     }
 
     private static String participantName(SessionParticipant p) {

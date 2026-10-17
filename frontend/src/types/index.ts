@@ -64,10 +64,10 @@ export interface SessionItem {
   memberFemalePrice: number
   guestMalePrice: number
   guestFemalePrice: number
-  memberMalePrice2h?: number
-  memberFemalePrice2h?: number
-  guestMalePrice2h?: number
-  guestFemalePrice2h?: number
+  memberMalePrice2h?: number | null
+  memberFemalePrice2h?: number | null
+  guestMalePrice2h?: number | null
+  guestFemalePrice2h?: number | null
   depositAmount: number
   costCourt: number
   costShuttlecock: number
@@ -76,6 +76,20 @@ export interface SessionItem {
   tokenExpiresAt?: string
   isBookedByCurrentUser?: boolean
   participants?: Participant[]
+  /** Trạng thái do server tính theo giờ (backend mới; `status` cũng bằng giá trị này) */
+  effectiveStatus?: 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
+  /** Giá dự kiến cho người đang xem (null với khách chưa đăng nhập; thiếu với backend cũ) */
+  viewerPricing?: ViewerPricing | null
+  /** Người đang xem có phải đặt cọc khi tham gia không (null/thiếu: chưa biết) */
+  requiresDeposit?: boolean | null
+}
+
+export interface ViewerPricing {
+  /** true = tính giá Thành viên, false = giá Vãng lai */
+  memberTier: boolean
+  fullPrice: number
+  /** null = ca không có gói 2 tiếng áp được cho người xem */
+  twoHourPrice: number | null
 }
 
 export interface Participant {

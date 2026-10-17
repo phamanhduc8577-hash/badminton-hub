@@ -134,6 +134,15 @@ public class SessionController {
         return ResponseEntity.ok(sessionService.updateSession(sessionId, request));
     }
 
+    @PostMapping("/{sessionId}/cancel")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<SessionResponse> cancelSession(@PathVariable Long sessionId,
+                                                         @AuthenticationPrincipal User host,
+                                                         @Valid @RequestBody(required = false) CancelSessionRequest request) {
+        String reason = request != null ? request.getReason() : null;
+        return ResponseEntity.ok(sessionService.cancelSession(sessionId, reason, host));
+    }
+
     @PutMapping("/{sessionId}/courts")
     @PreAuthorize("hasRole('HOST')")
     public ResponseEntity<SessionResponse> updateCourts(@PathVariable Long sessionId,

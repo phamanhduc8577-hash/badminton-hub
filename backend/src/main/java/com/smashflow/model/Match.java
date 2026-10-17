@@ -48,6 +48,22 @@ public class Match {
     @Column(length = 50)
     private String courtName; // e.g. "Sân 1", "Sân 2", "Sân 3"
 
+    /*
+     * LP thực tế từng người nhận/mất ở trận này (sau luật phân hạng / khiên / sàn 0 LP).
+     * Dùng để sửa/xóa trận đảo ngược đúng phần LP của trận. Trận cũ (trước khi có cột) = null.
+     */
+    @Column(name = "a1_lp_delta")
+    private Integer a1LpDelta;
+
+    @Column(name = "a2_lp_delta")
+    private Integer a2LpDelta;
+
+    @Column(name = "b1_lp_delta")
+    private Integer b1LpDelta;
+
+    @Column(name = "b2_lp_delta")
+    private Integer b2LpDelta;
+
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

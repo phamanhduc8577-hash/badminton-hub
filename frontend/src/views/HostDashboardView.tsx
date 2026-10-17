@@ -9,14 +9,15 @@ import { useToast } from '../components/ToastProvider'
 import { getLolRank } from '../lib/ranks'
 import { PlayerSelect } from '../components/PlayerSelect'
 import { BottomSheet } from '../components/BottomSheet'
-import { formatMatchTime } from '../lib/dateUtils'
-import { getEffectiveSessionStatus } from '../lib/sessionStatus'
+import { formatMatchTime, formatVnTime } from '../lib/dateUtils'
+import { getEffectiveSessionStatus, isSessionClosed, SESSION_STATUS_LABEL } from '../lib/sessionStatus'
 import { RosterCard } from '../components/host/RosterCard'
 import { ParticipantActionsSheet } from '../components/host/ParticipantActionsSheet'
 import { UndoPaymentSheet } from '../components/host/UndoPaymentSheet'
 import { OverrideBillSheet, OverrideBillPayload } from '../components/host/OverrideBillSheet'
 import { CourtSettingsSheet } from '../components/host/CourtSettingsSheet'
 import { ConfirmSheet } from '../components/host/ConfirmSheet'
+import { CancelSessionSheet } from '../components/host/CancelSessionSheet'
 import { UndoSnackbar } from '../components/host/UndoSnackbar'
 import {
   HostParticipant,
@@ -140,6 +141,11 @@ export const HostDashboardView: React.FC = () => {
   const [newCourtNameInput, setNewCourtNameInput] = useState('')
   const [showCourtEditModal, setShowCourtEditModal] = useState(false)
 
+  // Hủy ca
+  const [showCancelSession, setShowCancelSession] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelSessionError, setCancelSessionError] = useState('')
+
   // Trận đấu
   const [editingMatch, setEditingMatch] = useState<Match | null>(null)
   const [editMatchTeamAP1, setEditMatchTeamAP1] = useState<string>('')
@@ -187,7 +193,14 @@ export const HostDashboardView: React.FC = () => {
     }
   }, [courtDrafts, id])
 
-  const { data: session, isLoading } = useQuery<SessionItem>({
+  const {
+    data: session,
+    isLoading,
+    isError,
+    error: sessionError,
+    refetch: refetchSession,
+    isFetching: sessionFetching,
+  } = useQuery<SessionItem>({
     queryKey: ['session', id],
     queryFn: async () => {
       const res = await api.get(`/sessions/${id}`)
@@ -415,8 +428,10 @@ export const HostDashboardView: React.FC = () => {
     onSettled: (_data, _err, participantId) => {
       setRowPending(participantId, false)
       queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
       queryClient.invalidateQueries({ queryKey: ['pending-handovers'] })
       queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
     },
   })
 
@@ -429,6 +444,7 @@ export const HostDashboardView: React.FC = () => {
     onMutate: (participantId: number) => setRowPending(participantId, true),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
       queryClient.invalidateQueries({ queryKey: ['pending-handovers'] })
       queryClient.invalidateQueries({ queryKey: ['members'] })
       queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
@@ -541,6 +557,7 @@ export const HostDashboardView: React.FC = () => {
     onMutate: (vars) => setRowPending(vars.participantId, true),
     onSuccess: (data: any) => {
       invalidateSessionData()
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
       showToast(data?.message || 'Đã xử lý thành công!')
     },
     onError: (err: any) => {
@@ -564,9 +581,35 @@ export const HostDashboardView: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['session', id] })
       queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
     },
     onError: (err: any) => {
       showToast(getErrorMessage(err, 'Không thể cập nhật danh sách sân!'), 'error')
+    },
+  })
+
+  // Hủy ca (Host): lượt chưa thanh toán bị hủy, cọc đã nhận chuyển "Đã hoàn cọc" (Host tự hoàn tiền)
+  const cancelSessionMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const res = await api.post(`/sessions/${id}/cancel`, reason ? { reason } : {})
+      return res.data as SessionItem
+    },
+    onMutate: () => setCancelSessionError(''),
+    onSuccess: (data) => {
+      if (data && typeof data === 'object' && 'id' in data) {
+        queryClient.setQueryData<SessionItem>(['session', id], (prev) => ({ ...prev, ...data }))
+      }
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      queryClient.invalidateQueries({ queryKey: ['report', id] })
+      setShowCancelSession(false)
+      setCancelReason('')
+      showToast('Đã hủy ca. Nhớ hoàn lại tiền cọc đã nhận cho khách nhé!', 'success')
+    },
+    onError: (err: any) => {
+      const msg = getErrorMessage(err, 'Không thể hủy ca!')
+      setCancelSessionError(msg)
+      showToast(msg, 'error')
     },
   })
 
@@ -655,6 +698,8 @@ export const HostDashboardView: React.FC = () => {
       setCourtDrafts((prev) => ({ ...prev, [vars.court]: { ...EMPTY_DRAFT } }))
       queryClient.invalidateQueries({ queryKey: ['matches', id] })
       queryClient.invalidateQueries({ queryKey: ['report', id] })
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
       const winnerLabel = vars.winningTeam === 'A' ? 'Team Blue' : 'Team Red'
       if (data && typeof data.id === 'number') {
         setUndoMatch({
@@ -898,6 +943,47 @@ export const HostDashboardView: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['report', id] })
   }
 
+  if (isError && !session) {
+    const notFound = (sessionError as any)?.response?.status === 404
+    return (
+      <div className="max-w-md mx-auto py-16">
+        <div role="alert" className="saas-card rounded-3xl p-6 sm:p-8 text-center space-y-4 border border-slate-200">
+          <DuckMascot size={56} rounded="2xl" className="mx-auto opacity-80" />
+          <div className="space-y-1">
+            <h2 className="text-lg font-black text-slate-950">
+              {notFound ? 'Không tìm thấy ca đánh' : 'Không tải được dữ liệu ca đánh'}
+            </h2>
+            <p className="text-sm text-slate-600">
+              {notFound
+                ? 'Ca đánh này không tồn tại hoặc đã bị xóa.'
+                : getErrorMessage(sessionError, 'Vui lòng kiểm tra kết nối mạng và thử lại.')}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            {!notFound && (
+              <button
+                type="button"
+                onClick={() => refetchSession()}
+                disabled={sessionFetching}
+                className="min-h-11 px-5 rounded-xl bg-slate-950 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-bold inline-flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={15} className={sessionFetching ? 'animate-spin' : ''} aria-hidden="true" />
+                <span>{sessionFetching ? 'Đang thử lại...' : 'Thử lại'}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate('/host')}
+              className="min-h-11 px-5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold"
+            >
+              Về trang tổng quan Host
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (isLoading || !session) {
     return (
       <div className="text-center py-24 text-slate-600 text-sm animate-pulse space-y-3">
@@ -907,6 +993,10 @@ export const HostDashboardView: React.FC = () => {
     )
   }
 
+  const sessionStatus = getEffectiveSessionStatus(session)
+  const sessionCancelled = sessionStatus === 'CANCELLED'
+  const canCancelSession = !isSessionClosed(sessionStatus)
+
   const menuParticipant = findParticipant(menuParticipantId)
   const editingBillParticipant = findParticipant(editingBillId)
   const settlingParticipant = findParticipant(settlingId)
@@ -914,8 +1004,7 @@ export const HostDashboardView: React.FC = () => {
   const cancelCheckinParticipant = findParticipant(confirmCancelCheckinId)
   const removeParticipant = findParticipant(confirmRemoveId)
 
-  const formatClock = (s: string) =>
-    new Date(s).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const formatClock = (s: string) => formatVnTime(s)
 
   const tabButtonClass = (active: boolean) =>
     `flex-1 sm:flex-initial min-h-11 px-3 sm:px-3.5 rounded-xl transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
@@ -965,12 +1054,33 @@ export const HostDashboardView: React.FC = () => {
 
       {/* Host Command Center Banner (thu gọn trên mobile) */}
       <div className="saas-card rounded-3xl p-4 sm:p-8 space-y-4 sm:space-y-6 relative overflow-hidden">
+        {sessionCancelled && (
+          <div
+            role="alert"
+            className="relative z-10 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm sm:text-xs font-bold"
+          >
+            Ca này đã bị hủy. Đăng ký đã đóng; cọc đã nhận được đánh dấu "Đã hoàn cọc" — Host vui lòng hoàn tiền cho khách.
+          </div>
+        )}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6 relative z-10">
           <div className="space-y-3 sm:space-y-4 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2">
               <span className="hidden sm:flex text-[11px] font-black uppercase tracking-wider px-3 py-1 bg-slate-900 text-white rounded-full items-center gap-1.5 shadow-xs">
                 <Shield size={13} className="text-rose-400" />
                 <span>Host Control Center</span>
+              </span>
+
+              <span
+                data-testid="host-session-status"
+                className={`text-[11px] font-black uppercase px-3 py-1 rounded-full border ${
+                  sessionCancelled
+                    ? 'bg-rose-600 text-white border-rose-600'
+                    : sessionStatus === 'ACTIVE'
+                    ? 'bg-rose-50 text-rose-700 border-rose-300'
+                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}
+              >
+                {SESSION_STATUS_LABEL[sessionStatus]}
               </span>
 
               <button
@@ -1081,6 +1191,21 @@ export const HostDashboardView: React.FC = () => {
               {matches?.length || 0} Trận ({courtList.length} Sân)
             </span>
           </div>
+          {canCancelSession && (
+            <div className="col-span-2 md:col-span-4 flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelSessionError('')
+                  setShowCancelSession(true)
+                }}
+                className="min-h-11 sm:min-h-9 px-3 inline-flex items-center gap-1.5 rounded-xl text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 text-sm sm:text-xs font-bold transition"
+              >
+                <Trash2 size={13} aria-hidden="true" />
+                <span>Hủy ca</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2394,6 +2519,18 @@ export const HostDashboardView: React.FC = () => {
           <li>Tỉ số Thắng / Thua và điểm Elo/Rank được tính lại.</li>
         </ul>
       </ConfirmSheet>
+
+      {/* Hủy ca */}
+      <CancelSessionSheet
+        open={showCancelSession}
+        onClose={() => setShowCancelSession(false)}
+        sessionTitle={session.title}
+        reason={cancelReason}
+        onReasonChange={setCancelReason}
+        pending={cancelSessionMutation.isPending}
+        error={cancelSessionError}
+        onConfirm={() => cancelSessionMutation.mutate(cancelReason.trim())}
+      />
 
       {/* Hoàn tác kết quả trận vừa ghi (5 giây) */}
       <UndoSnackbar

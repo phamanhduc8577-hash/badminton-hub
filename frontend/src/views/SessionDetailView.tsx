@@ -1,15 +1,16 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { SessionItem, Participant, Match } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
-import { QrCameraScanner } from '../components/QrCameraScanner'
 import { DuckMascot } from '../components/DuckMascot'
 import { BottomSheet } from '../components/BottomSheet'
+import { PageLoader } from '../components/PageLoader'
 import { useToast } from '../components/ToastProvider'
-import { formatSessionDateTime, parseServerDate } from '../lib/dateUtils'
-import { getEffectiveSessionStatus, SESSION_STATUS_LABEL } from '../lib/sessionStatus'
+import { durationHours, formatSessionDateTime, formatVnTime, parseServerDateTime } from '../lib/dateUtils'
+import { getEffectiveSessionStatus, isSessionClosed, SESSION_STATUS_LABEL } from '../lib/sessionStatus'
+import { baseFee, formatMoney, hasTwoHourPrice, resolveRequiresDeposit, resolveViewerPricing } from '../lib/pricing'
 import {
   Clock,
   MapPin,
@@ -22,11 +23,15 @@ import {
   DollarSign,
   Shield,
   ArrowLeft,
-  Calendar,
-  Sparkles,
   Check,
   Loader2,
+  RefreshCw,
 } from 'lucide-react'
+
+// Máy quét QR (html5-qrcode khá nặng) chỉ tải khi bấm mở camera
+const QrCameraScanner = lazy(() =>
+  import('../components/QrCameraScanner').then((m) => ({ default: m.QrCameraScanner }))
+)
 
 const getErrorMessage = (err: any, fallback: string): string =>
   err?.response?.data?.message || fallback
@@ -40,16 +45,7 @@ const formatParticipantPhone = (phone: string | undefined | null, viewerIsHost: 
   return `${value.slice(0, 4)}***${value.slice(-3)}`
 }
 
-/**
- * Ca có giá 2 tiếng áp được cho hạng + giới tính này không (cùng quy tắc PricingCalculator ở server):
- * cần giá 2h nam của hạng; nữ cần thêm giá 2h nữ (thiếu thì server tính giá nữ full ca).
- */
-const hasTwoHourPrice = (session: SessionItem, memberTier: boolean, gender: Participant['gender']): boolean => {
-  const male2h = memberTier ? session.memberMalePrice2h : session.guestMalePrice2h
-  const female2h = memberTier ? session.memberFemalePrice2h : session.guestFemalePrice2h
-  if (male2h === undefined || male2h === null) return false
-  return gender !== 'FEMALE' || (female2h !== undefined && female2h !== null)
-}
+const HOUR_MS = 60 * 60 * 1000
 
 export const SessionDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -78,12 +74,19 @@ export const SessionDetailView: React.FC = () => {
   const [checkinError, setCheckinError] = useState('')
   const [checkinSuccess, setCheckinSuccess] = useState(false)
   const [checkinSubmitting, setCheckinSubmitting] = useState(false)
-  const autoCheckinTriggered = useRef(false)
+  const tokenHandledRef = useRef(false)
 
   const findMyParticipant = (s: SessionItem | undefined) =>
     s?.participants?.find((p) => (user?.id && p.userId === user.id) || (user?.phone && p.phone === user.phone))
 
-  const { data: session, isLoading } = useQuery<SessionItem>({
+  const {
+    data: session,
+    isLoading,
+    isError,
+    error: sessionError,
+    refetch: refetchSession,
+    isFetching: sessionFetching,
+  } = useQuery<SessionItem>({
     queryKey: ['session', id],
     queryFn: async () => {
       const res = await api.get(`/sessions/${id}`)
@@ -191,64 +194,50 @@ export const SessionDetailView: React.FC = () => {
     return bestPlayer
   }, [matches, session?.participants, playerStatsMap])
 
-  // Calculate total session hours
-  const totalSessionHours = useMemo(() => {
-    if (!session?.startTime || !session?.endTime) return 2
-    try {
-      const start = new Date(session.startTime).getTime()
-      const end = new Date(session.endTime).getTime()
-      if (start && end && end > start) {
-        return Math.round(((end - start) / (1000 * 60 * 60)) * 10) / 10
-      }
-    } catch (_) {}
-    return 2
-  }, [session?.startTime, session?.endTime])
+  // Calculate total session hours (giờ ca hiểu theo giờ Việt Nam)
+  const totalSessionHours = useMemo(
+    () => durationHours(session?.startTime, session?.endTime) ?? 2,
+    [session?.startTime, session?.endTime]
+  )
 
   // Sub-slot time windows (e.g. 13:00 - 15:00 vs 14:00 - 16:00)
   const subSlotWindows = useMemo(() => {
     if (!session?.startTime || !session?.endTime || totalSessionHours <= 2) return []
-    try {
-      const s = new Date(session.startTime)
-      const e = new Date(session.endTime)
-      const pad = (n: number) => String(n).padStart(2, '0')
-      const formatTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    const s = parseServerDateTime(session.startTime)
+    const e = parseServerDateTime(session.endTime)
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return []
 
-      const windows: { key: string; label: string; duration: number; timeRange: string }[] = []
+    const windows: { key: string; label: string; duration: number; timeRange: string }[] = []
 
-      // Option 1: Full session
+    // Option 1: Full session
+    windows.push({
+      key: 'FULL',
+      label: `Toàn bộ ca (${totalSessionHours} tiếng)`,
+      duration: totalSessionHours,
+      timeRange: `${formatVnTime(s)} - ${formatVnTime(e)}`,
+    })
+
+    // Option 2: 2h Early (Ca đầu)
+    const earlyEnd = new Date(s.getTime() + 2 * HOUR_MS)
+    windows.push({
+      key: 'EARLY_2H',
+      label: 'Ca đầu 2 Tiếng (Về sớm)',
+      duration: 2.0,
+      timeRange: `${formatVnTime(s)} - ${formatVnTime(earlyEnd)}`,
+    })
+
+    // Option 3: 2h Late (Ca sau)
+    const lateStart = new Date(e.getTime() - 2 * HOUR_MS)
+    if (lateStart.getTime() > s.getTime()) {
       windows.push({
-        key: 'FULL',
-        label: `Toàn bộ ca (${totalSessionHours} tiếng)`,
-        duration: totalSessionHours,
-        timeRange: `${formatTime(s)} - ${formatTime(e)}`,
-      })
-
-      // Option 2: 2h Early (Ca đầu)
-      const earlyEnd = new Date(s)
-      earlyEnd.setHours(earlyEnd.getHours() + 2)
-      windows.push({
-        key: 'EARLY_2H',
-        label: 'Ca đầu 2 Tiếng (Về sớm)',
+        key: 'LATE_2H',
+        label: 'Ca sau 2 Tiếng (Đến muộn)',
         duration: 2.0,
-        timeRange: `${formatTime(s)} - ${formatTime(earlyEnd)}`,
+        timeRange: `${formatVnTime(lateStart)} - ${formatVnTime(e)}`,
       })
-
-      // Option 3: 2h Late (Ca sau)
-      const lateStart = new Date(e)
-      lateStart.setHours(lateStart.getHours() - 2)
-      if (lateStart.getTime() > s.getTime()) {
-        windows.push({
-          key: 'LATE_2H',
-          label: 'Ca sau 2 Tiếng (Đến muộn)',
-          duration: 2.0,
-          timeRange: `${formatTime(lateStart)} - ${formatTime(e)}`,
-        })
-      }
-
-      return windows
-    } catch (_) {
-      return []
     }
+
+    return windows
   }, [session?.startTime, session?.endTime, totalSessionHours])
 
   // Member join mutation
@@ -276,6 +265,7 @@ export const SessionDetailView: React.FC = () => {
         showToast('Đăng ký tham gia ca thành công!', 'success')
       }
       queryClient.invalidateQueries({ queryKey: ['session', id] })
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
     },
     onError: (err: any) => {
       const msg = err.response?.data?.message || err.message || 'Không thể tham gia ca!'
@@ -286,6 +276,16 @@ export const SessionDetailView: React.FC = () => {
       }
     },
   })
+
+  // Điểm danh xong: số buổi, phần thưởng chuyên cần, lịch điểm danh và danh sách ca đều thay đổi
+  const invalidateAfterCheckin = () => {
+    queryClient.invalidateQueries({ queryKey: ['session', id] })
+    queryClient.invalidateQueries({ queryKey: ['sessions'] })
+    queryClient.invalidateQueries({ queryKey: ['my-profile'] })
+    queryClient.invalidateQueries({ queryKey: ['loyalty-rewards'] })
+    queryClient.invalidateQueries({ queryKey: ['attendance-history'] })
+    queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
+  }
 
   // Instant Token Checkin (No GPS friction). Trả về thông báo lỗi (nếu có) để nơi gọi xử lý tiếp.
   const handleCheckinSubmit = async (tokenToUse?: string): Promise<{ ok: boolean; error?: string }> => {
@@ -305,7 +305,7 @@ export const SessionDetailView: React.FC = () => {
       })
       setCheckinSuccess(true)
       showToast('Điểm danh thành công! Chúc bạn chơi vui vẻ 🏸', 'success')
-      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      invalidateAfterCheckin()
       return { ok: true }
     } catch (err: any) {
       const msg = getErrorMessage(err, 'Điểm danh thất bại!')
@@ -317,27 +317,37 @@ export const SessionDetailView: React.FC = () => {
   }
 
   // Auto handle URL token parameter (?token=4ECDACC6 or /sessions/1?token=4ECDACC6)
+  // Xử lý đúng 1 lần (ref) rồi xóa ?token= khỏi URL: tải lại dữ liệu / quay lại app không mở lại popup.
   useEffect(() => {
     const tokenFromUrl = searchParams.get('token')
-    if (tokenFromUrl && session && !autoCheckinTriggered.current) {
-      const cleanToken = tokenFromUrl.trim().toUpperCase()
-      setCheckinTokenInput(cleanToken)
+    if (!tokenFromUrl || !session || tokenHandledRef.current) return
+    const cleanToken = tokenFromUrl.trim().toUpperCase()
 
-      // If user not logged in yet, prompt and redirect to login preserving token
-      if (!user) {
-        showToast('Vui lòng đăng nhập để hoàn tất điểm danh ca đánh này!', 'info')
-        navigate(`/login?redirect=${encodeURIComponent(`/sessions/${id}?token=${cleanToken}`)}`)
-        return
-      }
+    // If user not logged in yet, prompt and redirect to login preserving token
+    if (!user) {
+      tokenHandledRef.current = true
+      showToast('Vui lòng đăng nhập để hoàn tất điểm danh ca đánh này!', 'info')
+      navigate(`/login?redirect=${encodeURIComponent(`/sessions/${id}?token=${cleanToken}`)}`)
+      return
+    }
 
-      setShowCheckinModal(true)
+    tokenHandledRef.current = true
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('token')
+    setSearchParams(nextParams, { replace: true })
 
-      // If user is already registered in this session and hasn't checked in yet, auto-trigger checkin
-      const currentUserParticipant = findMyParticipant(session)
-      if (currentUserParticipant && currentUserParticipant.checkinStatus !== 'CHECKED_IN') {
-        autoCheckinTriggered.current = true
-        handleCheckinSubmit(cleanToken)
-      }
+    const currentUserParticipant = findMyParticipant(session)
+    if (currentUserParticipant?.checkinStatus === 'CHECKED_IN') {
+      showToast('Bạn đã điểm danh ca này rồi!', 'info')
+      return
+    }
+
+    setCheckinTokenInput(cleanToken)
+    setShowCheckinModal(true)
+
+    // If user is already registered in this session and hasn't checked in yet, auto-trigger checkin
+    if (currentUserParticipant) {
+      handleCheckinSubmit(cleanToken)
     }
   }, [searchParams, session, user])
 
@@ -424,6 +434,47 @@ export const SessionDetailView: React.FC = () => {
     }
   }
 
+  if (isError && !session) {
+    const notFound = (sessionError as any)?.response?.status === 404
+    return (
+      <div className="max-w-md mx-auto py-16">
+        <div role="alert" className="saas-card rounded-3xl p-6 sm:p-8 text-center space-y-4 border border-slate-200">
+          <DuckMascot size={56} rounded="2xl" className="mx-auto opacity-80" />
+          <div className="space-y-1">
+            <h2 className="text-lg font-black text-slate-950">
+              {notFound ? 'Không tìm thấy ca đánh' : 'Không tải được thông tin ca đánh'}
+            </h2>
+            <p className="text-sm text-slate-600">
+              {notFound
+                ? 'Ca đánh này không tồn tại hoặc đã bị xóa.'
+                : getErrorMessage(sessionError, 'Vui lòng kiểm tra kết nối mạng và thử lại.')}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            {!notFound && (
+              <button
+                type="button"
+                onClick={() => refetchSession()}
+                disabled={sessionFetching}
+                className="min-h-11 px-5 rounded-xl bg-slate-950 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-bold inline-flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={15} className={sessionFetching ? 'animate-spin' : ''} aria-hidden="true" />
+                <span>{sessionFetching ? 'Đang thử lại...' : 'Thử lại'}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="min-h-11 px-5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold"
+            >
+              Quay lại danh sách ca
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (isLoading || !session) {
     return (
       <div className="text-center py-24 text-slate-600 text-sm animate-pulse space-y-3">
@@ -447,10 +498,26 @@ export const SessionDetailView: React.FC = () => {
     !!isUserParticipant && isUserParticipant.depositStatus === 'PAID' && Number(isUserParticipant.depositAmount) > 0
   const isFull = session.bookedSlots >= session.maxSlots
   const effectiveStatus = getEffectiveSessionStatus(session)
+  const sessionClosed = isSessionClosed(effectiveStatus)
   const viewerIsHost = user?.role === 'HOST'
-  const checkinTimeLabel = isUserParticipant?.checkinAt
-    ? parseServerDate(isUserParticipant.checkinAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-    : ''
+  const checkinTimeLabel = isUserParticipant?.checkinAt ? formatVnTime(isUserParticipant.checkinAt) : ''
+  // Giá dự kiến cho người xem: ưu tiên server trả về (viewerPricing), thiếu thì tính cùng công thức PricingCalculator
+  const viewerPricing = resolveViewerPricing(session, user)
+  const requiresDeposit = resolveRequiresDeposit(session, user)
+  const depositLabel = formatMoney(session.depositAmount)
+  // Ca không có giá 2h cho người xem → chỉ còn lựa chọn full ca
+  const joinWindows = subSlotWindows.filter((w) => w.key === 'FULL' || viewerPricing.twoHourPrice !== null)
+  const sessionHoursLabel = durationHours(session.startTime, session.endTime)
+  const twoHourRows = (memberTier: boolean) => {
+    const male2h = memberTier ? session.memberMalePrice2h : session.guestMalePrice2h
+    if (male2h === null || male2h === undefined) return null
+    return {
+      male: baseFee(session, memberTier, 'MALE', true),
+      female: baseFee(session, memberTier, 'FEMALE', true),
+    }
+  }
+  const member2h = twoHourRows(true)
+  const guest2h = twoHourRows(false)
   const spinner = <Loader2 size={15} className="animate-spin" aria-hidden="true" />
 
   return (
@@ -577,9 +644,9 @@ export const SessionDetailView: React.FC = () => {
                   <DollarSign size={15} className="text-slate-900" />
                   <span>Bảng giá slot tham gia</span>
                 </h3>
-                {session.startTime && session.endTime && (
+                {sessionHoursLabel !== null && (
                   <span className="text-[10px] font-black px-2.5 py-0.5 rounded-lg bg-slate-900 text-white shadow-xs">
-                    ⏱️ Ca {Math.round(((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60)) * 10) / 10} Giờ
+                    ⏱️ Ca {sessionHoursLabel} Giờ
                   </span>
                 )}
               </div>
@@ -599,16 +666,16 @@ export const SessionDetailView: React.FC = () => {
                       <span className="font-black text-slate-900 text-sm">{Number(session.memberFemalePrice).toLocaleString()}đ</span>
                     </div>
                   </div>
-                  {session.memberMalePrice2h && (
+                  {member2h && (
                     <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
                       <span className="text-slate-800 font-black block text-[11px]">Tùy chọn 2 tiếng:</span>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-700 font-bold">Nam:</span>
-                        <span className="font-black text-slate-900">{Number(session.memberMalePrice2h).toLocaleString()}đ</span>
+                        <span className="font-black text-slate-900">{formatMoney(member2h.male)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-700 font-bold">Nữ (Trợ giá):</span>
-                        <span className="font-black text-slate-900">{Number(session.memberFemalePrice2h).toLocaleString()}đ</span>
+                        <span className="font-black text-slate-900">{formatMoney(member2h.female)}</span>
                       </div>
                     </div>
                   )}
@@ -617,7 +684,11 @@ export const SessionDetailView: React.FC = () => {
                 <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <span className="text-[11px] text-slate-800 font-black uppercase tracking-wide">Khách Vãng Lai</span>
-                    <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">Cọc {Number(session.depositAmount).toLocaleString()}đ</span>
+                    {Number(session.depositAmount) > 0 ? (
+                      <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">Cọc {depositLabel} (lần đầu)</span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">Miễn cọc</span>
+                    )}
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex items-center justify-between">
@@ -629,16 +700,16 @@ export const SessionDetailView: React.FC = () => {
                       <span className="font-black text-slate-900 text-sm">{Number(session.guestFemalePrice).toLocaleString()}đ</span>
                     </div>
                   </div>
-                  {session.guestMalePrice2h && (
+                  {guest2h && (
                     <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
                       <span className="text-slate-800 font-black block text-[11px]">Tùy chọn 2 tiếng:</span>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-700 font-bold">Nam:</span>
-                        <span className="font-black text-slate-900">{Number(session.guestMalePrice2h).toLocaleString()}đ</span>
+                        <span className="font-black text-slate-900">{formatMoney(guest2h.male)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-700 font-bold">Nữ (Trợ giá):</span>
-                        <span className="font-black text-slate-900">{Number(session.guestFemalePrice2h).toLocaleString()}đ</span>
+                        <span className="font-black text-slate-900">{formatMoney(guest2h.female)}</span>
                       </div>
                     </div>
                   )}
@@ -658,13 +729,17 @@ export const SessionDetailView: React.FC = () => {
                 </button>
               )}
 
-              {effectiveStatus === 'COMPLETED' || effectiveStatus === 'CANCELLED' ? (
-                <div className="w-full py-3.5 bg-slate-100 border border-slate-200 text-slate-600 font-bold rounded-xl text-center flex items-center justify-center gap-2 text-xs shadow-sm">
-                  <span>
-                    {effectiveStatus === 'CANCELLED'
-                      ? 'Ca đánh này đã bị hủy (Đã đóng đăng ký)'
-                      : 'Ca đánh này đã kết thúc (Đã đóng đăng ký)'}
-                  </span>
+              {sessionClosed ? (
+                <div
+                  data-testid="session-closed-notice"
+                  className={`w-full py-3.5 px-3 border font-bold rounded-xl text-center flex flex-col items-center justify-center gap-0.5 text-sm sm:text-xs shadow-sm ${
+                    effectiveStatus === 'CANCELLED'
+                      ? 'bg-rose-50 border-rose-200 text-rose-700'
+                      : 'bg-slate-100 border-slate-200 text-slate-600'
+                  }`}
+                >
+                  <span className="font-black">{effectiveStatus === 'CANCELLED' ? 'Ca đã bị hủy' : 'Ca đã kết thúc'}</span>
+                  <span className="font-semibold text-[11px]">Đã đóng đăng ký tham gia</span>
                 </div>
               ) : isPendingDeposit ? (
                 /* Thành viên vãng lai lần đầu: Bắt buộc chuyển khoản cọc và chờ Host duyệt mới mở giao diện tham gia */
@@ -821,7 +896,9 @@ export const SessionDetailView: React.FC = () => {
                 <button
                   disabled={isFull || memberJoinMutation.isPending}
                   onClick={() => {
-                    if (totalSessionHours > 2 && subSlotWindows.length > 0) {
+                    if (totalSessionHours > 2 && joinWindows.length > 1) {
+                      setSelectedSlotWindow('FULL')
+                      setSelectedDurationHours(undefined)
                       setShowJoinOptionModal(true)
                     } else {
                       memberJoinMutation.mutate({})
@@ -835,16 +912,16 @@ export const SessionDetailView: React.FC = () => {
                       ? 'Hết Slot Tham Gia'
                       : user.role === 'HOST'
                       ? 'Đăng ký tham gia vào sân đánh (Host tham gia)'
+                      : requiresDeposit
+                      ? `Đăng ký tham gia (Khách vãng lai - Cọc ${depositLabel})`
                       : user.membershipType === 'FIXED'
                       ? 'Đăng ký tham gia (Thành viên cố định CLB)'
-                      : (user.sessionsAttended ?? 0) > 0
-                      ? 'Đăng ký tham gia (Thành viên CLB - Miễn cọc)'
-                      : 'Đăng ký tham gia (Khách vãng lai - Cọc 20.000đ)'}
+                      : 'Đăng ký tham gia (Thành viên CLB - Miễn cọc)'}
                   </span>
                 </button>
               ) : (
                 <button
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate(`/login?redirect=${encodeURIComponent(`/sessions/${session.id}`)}`)}
                   className="w-full py-4 bg-slate-900 hover:bg-slate-800 font-bold text-white rounded-xl flex items-center justify-center gap-2 text-sm transition active:scale-95 shadow-sm"
                 >
                   <ShieldCheck size={18} className="text-rose-400" />
@@ -997,7 +1074,7 @@ export const SessionDetailView: React.FC = () => {
             <div>
               <h3 id="deposit-qr-title" className="font-black text-base text-slate-900">Quét VietQR cọc giữ chỗ (Lần đầu)</h3>
               <p className="text-xs text-slate-600 mt-1">
-                Số tiền cọc: <b className="text-rose-600 text-sm font-black">{Number(depositQrData.participant.depositAmount || session?.depositAmount || 20000).toLocaleString()}đ</b>
+                Số tiền cọc: <b className="text-rose-600 text-sm font-black">{formatMoney(depositQrData.participant.depositAmount ?? session.depositAmount)}</b>
               </p>
             </div>
 
@@ -1013,8 +1090,8 @@ export const SessionDetailView: React.FC = () => {
                 </span>
               </div>
               <p className="text-[11px] text-amber-900 leading-relaxed font-medium pt-1 border-t border-amber-200/80">
-                ✨ <b>Host xin cọc 20k cho lần đầu khách iu tham gia nè!</b> 🥰 <br />
-                (Số tiền 20k này sẽ được trừ thẳng vào tiền sân khi bạn đến đánh và từ lần thứ 2 trở đi bạn sẽ được <b>MIỄN CỌC 100%</b> nha!)
+                ✨ <b>Host xin cọc {formatMoney(depositQrData.participant.depositAmount ?? session.depositAmount)} cho lần đầu khách iu tham gia nè!</b> 🥰 <br />
+                (Số tiền cọc này sẽ được trừ thẳng vào tiền sân khi bạn đến đánh và từ lần thứ 2 trở đi bạn sẽ được <b>MIỄN CỌC 100%</b> nha!)
               </p>
             </div>
           </>
@@ -1201,17 +1278,12 @@ export const SessionDetailView: React.FC = () => {
               </label>
 
               <div className="space-y-2.5" role="radiogroup" aria-labelledby="join-option-title">
-                {subSlotWindows.map((win) => {
+                {joinWindows.map((win) => {
                   const isSelected = selectedSlotWindow === win.key
-                  const is2h = win.duration === 2.0
-                  const isMember = user?.role === 'HOST' || user?.membershipType === 'FIXED'
-                  const price = isMember
-                    ? (is2h
-                        ? (user?.gender === 'FEMALE' ? session.memberFemalePrice2h : session.memberMalePrice2h) || session.memberMalePrice
-                        : (user?.gender === 'FEMALE' ? session.memberFemalePrice : session.memberMalePrice))
-                    : (is2h
-                        ? (user?.gender === 'FEMALE' ? session.guestFemalePrice2h : session.guestMalePrice2h) || session.guestMalePrice
-                        : (user?.gender === 'FEMALE' ? session.guestFemalePrice : session.guestMalePrice))
+                  const is2h = win.key !== 'FULL'
+                  // Giá do server tính cho người xem (fallback: cùng công thức PricingCalculator)
+                  const price = is2h ? viewerPricing.twoHourPrice : viewerPricing.fullPrice
+                  const isMember = viewerPricing.memberTier
 
                   return (
                     <button
@@ -1248,7 +1320,7 @@ export const SessionDetailView: React.FC = () => {
 
                       <div className="text-right pl-3">
                         <span className={`text-base font-black block tracking-tight ${isSelected ? 'text-rose-400' : 'text-rose-600'}`}>
-                          {Number(price).toLocaleString()}đ
+                          {formatMoney(price)}
                         </span>
                         <span className={`text-[11px] font-bold ${isSelected ? 'text-slate-400' : 'text-slate-500'}`}>
                           {isMember ? 'Giá Thành viên' : 'Giá Vãng lai'}
@@ -1263,11 +1335,19 @@ export const SessionDetailView: React.FC = () => {
 
       {/* Camera Scanner */}
       {showCameraScanner && (
-        <QrCameraScanner
-          onScanSuccess={handleScanSuccess}
-          onClose={() => setShowCameraScanner(false)}
-          onManualEntry={() => openManualCheckin()}
-        />
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[70] bg-slate-950/80 flex items-center justify-center text-white">
+              <PageLoader label="Đang mở camera..." compact />
+            </div>
+          }
+        >
+          <QrCameraScanner
+            onScanSuccess={handleScanSuccess}
+            onClose={() => setShowCameraScanner(false)}
+            onManualEntry={() => openManualCheckin()}
+          />
+        </Suspense>
       )}
 
       {/* Final Bill QR Modal */}
