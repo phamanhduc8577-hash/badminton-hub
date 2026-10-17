@@ -6,6 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -47,17 +50,36 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        // Mã QR chuyển khoản: bắt buộc đăng nhập (chủ lượt đăng ký hoặc Host, kiểm tra trong service).
+                        // Phải đặt TRƯỚC permitAll GET /api/sessions/**
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/sessions/participants/*/deposit-qr",
+                                "/api/sessions/participants/*/payment-qr").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/sessions/**").permitAll()
                         .requestMatchers("/api/sessions/public/**").permitAll()
                         .requestMatchers("/api/leaderboards/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/matches/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                .exceptionHandling(ex -> ex
+                        // Chưa đăng nhập / token hết hạn / token bị thu hồi gọi API cần đăng nhập → 401 JSON
+                        .authenticationEntryPoint((request, response, e) ->
+                                writeJsonError(response, HttpStatus.UNAUTHORIZED, GlobalExceptionHandler.UNAUTHORIZED_MESSAGE))
+                        .accessDeniedHandler((request, response, e) ->
+                                writeJsonError(response, HttpStatus.FORBIDDEN, GlobalExceptionHandler.FORBIDDEN_MESSAGE))
+                )
                 .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    static void writeJsonError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+        response.setStatus(status.value());
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"status\":" + status.value() + ",\"message\":\"" + message + "\"}");
     }
 
     @Bean

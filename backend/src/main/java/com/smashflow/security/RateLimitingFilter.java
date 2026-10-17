@@ -72,14 +72,27 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String getClientIp(HttpServletRequest request) {
+    /**
+     * IP client:
+     *  1. CF-Connecting-IP — Render đưa mọi traffic qua Cloudflare; Cloudflare tự ghi đè header này bằng IP thật
+     *     của người dùng nên client không giả được, và không bị gộp nhiều người vào chung IP proxy.
+     *  2. Phần tử CUỐI của X-Forwarded-For (do proxy gần nhất thêm vào); các phần tử phía trước client tự gửi được.
+     *  3. Địa chỉ kết nối trực tiếp.
+     */
+    static String getClientIp(HttpServletRequest request) {
+        String cfIp = request.getHeader("CF-Connecting-IP");
+        if (cfIp != null && !cfIp.isBlank()) {
+            return cfIp.trim();
+        }
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isBlank()) {
-            return xRealIp.trim();
+            String[] parts = xForwardedFor.split(",");
+            for (int i = parts.length - 1; i >= 0; i--) {
+                String candidate = parts[i].trim();
+                if (!candidate.isEmpty()) {
+                    return candidate;
+                }
+            }
         }
         return request.getRemoteAddr();
     }

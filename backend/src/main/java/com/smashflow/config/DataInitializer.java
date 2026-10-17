@@ -24,6 +24,9 @@ public class DataInitializer {
     @org.springframework.beans.factory.annotation.Value("${host.initial-password:}")
     private String hostInitialPassword;
 
+    @org.springframework.beans.factory.annotation.Value("${host.phone:0325872682}")
+    private String hostPhone;
+
     private final UserRepository userRepository;
     private final VenueRepository venueRepository;
     private final PasswordEncoder passwordEncoder;
@@ -48,6 +51,10 @@ public class DataInitializer {
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS shield_matches INT DEFAULT 0;");
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_password_reset_count INT DEFAULT 0;");
                 jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_password_reset_date DATE;");
+                // token_version: tăng khi đổi mật khẩu / xóa / Host reset → JWT cũ hết hiệu lực
+                jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 0;");
+                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN token_version SET DEFAULT 0;");
+                jdbcTemplate.execute("UPDATE users SET token_version = 0 WHERE token_version IS NULL;");
                 jdbcTemplate.execute("UPDATE users SET membership_type = 'FIXED' WHERE role = 'HOST';");
                 // Đồng bộ chính xác số buổi tham gia theo đúng số ca người đó đã điểm danh (CHECKED_IN)
                 jdbcTemplate.execute("""
@@ -60,8 +67,8 @@ public class DataInitializer {
             } catch (Exception ignored) {
             }
 
-            // Ensure host account exists and has proper role & membership
-            userRepository.findByPhone("0325872682").ifPresentOrElse(
+            // Ensure host account exists and has proper role & membership (SĐT Host cấu hình qua HOST_PHONE)
+            userRepository.findByPhone(hostPhone).ifPresentOrElse(
                     host -> {
                         host.setRole(Role.HOST);
                         host.setMembershipType(MembershipType.FIXED);
@@ -80,10 +87,12 @@ public class DataInitializer {
                                 ? hostInitialPassword
                                 : java.util.UUID.randomUUID().toString().substring(0, 12);
                         if (hostInitialPassword == null || hostInitialPassword.isBlank()) {
-                            log.warn("HOST_INITIAL_PASSWORD chưa được đặt. Đã tạo Host với mật khẩu tạm: {} - hãy đăng nhập và đổi ngay!", initialPassword);
+                            // Không ghi mật khẩu ra log. Host đặt HOST_INITIAL_PASSWORD rồi khởi động lại DB mới,
+                            // hoặc dùng "Quên mật khẩu" (mật khẩu tạm gửi qua Telegram).
+                            log.warn("HOST_INITIAL_PASSWORD chưa được đặt. Đã tạo Host với mật khẩu ngẫu nhiên (không ghi log) - hãy dùng chức năng Quên mật khẩu hoặc đặt HOST_INITIAL_PASSWORD.");
                         }
                         User host = User.builder()
-                                .phone("0325872682")
+                                .phone(hostPhone)
                                 .fullName("Phạm Anh Đức")
                                 .password(passwordEncoder.encode(initialPassword))
                                 .gender(Gender.MALE)

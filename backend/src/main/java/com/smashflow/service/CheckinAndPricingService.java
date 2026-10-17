@@ -67,7 +67,7 @@ public class CheckinAndPricingService {
 
         checkAndGrantLoyaltyRewards(user);
 
-        return toParticipantResponse(participant);
+        return PhoneMasking.maskForViewer(toParticipantResponse(participant), user);
     }
 
     @Transactional
@@ -200,8 +200,11 @@ public class CheckinAndPricingService {
         SessionParticipant participant = participantRepository.findById(participantId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
 
-        // Bảo mật: Nếu có user đăng nhập và không phải HOST, chỉ được chọn phương thức thanh toán cho chính mình
-        if (user != null && user.getRole() != Role.HOST) {
+        // Bảo mật: Nếu không phải HOST, chỉ được chọn phương thức thanh toán cho chính mình
+        if (user == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Bạn cần đăng nhập!");
+        }
+        if (user.getRole() != Role.HOST) {
             if (participant.getUser() == null || !participant.getUser().getId().equals(user.getId())) {
                 throw new RuntimeException("Bạn không có quyền thay đổi thông tin thanh toán của người khác!");
             }
@@ -209,13 +212,17 @@ public class CheckinAndPricingService {
 
         participant.setPaymentMethod(method);
         participantRepository.save(participant);
-        return toParticipantResponse(participant);
+        return PhoneMasking.maskForViewer(toParticipantResponse(participant), user);
     }
 
     private void checkAndGrantLoyaltyRewards(User user) {
         loyaltyRewardService.grantEligibleRewards(user, user.getSessionsAttended());
     }
 
+    /**
+     * Trả SĐT đầy đủ. Chỉ trả thẳng cho API của Host; với người xem khác phải đi qua
+     * {@link PhoneMasking#maskForViewer(ParticipantResponse, User)}.
+     */
     private ParticipantResponse toParticipantResponse(SessionParticipant p) {
         String name = (p.getUser() != null && p.getUser().getFullName() != null && !p.getUser().getFullName().isBlank())
                 ? p.getUser().getFullName()

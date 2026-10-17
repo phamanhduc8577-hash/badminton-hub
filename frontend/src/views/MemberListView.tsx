@@ -263,23 +263,6 @@ export const MemberListView: React.FC = () => {
     },
   })
 
-  // Host Clear Database Mutation
-  const resetDbMutation = useMutation({
-    mutationFn: async () => {
-      const res = await api.post('/members/reset-database-clean')
-      return res.data
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['members'] })
-      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
-      queryClient.invalidateQueries({ queryKey: ['leaderboard-sessions'] })
-      showToast(data?.message || 'Đã dọn sạch ca sân, bảo lưu toàn bộ thành viên thật!')
-    },
-    onError: (err: any) => {
-      showToast(err.response?.data?.message || 'Không thể dọn dẹp database!', 'error')
-    },
-  })
-
   // Filter lists
   const fixedMembers = members.filter((m) => m.membershipType === 'FIXED' || m.role === 'HOST')
   const pendingMembers = members.filter((m) => m.membershipType === 'PENDING_FIXED')

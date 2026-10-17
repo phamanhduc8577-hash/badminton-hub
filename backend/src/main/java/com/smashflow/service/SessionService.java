@@ -9,6 +9,7 @@ import com.smashflow.dto.UpdateSessionRequest;
 import com.smashflow.model.*;
 import com.smashflow.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,7 +27,6 @@ public class SessionService {
     private final SessionParticipantRepository participantRepository;
     private final VenueRepository venueRepository;
     private final UserRepository userRepository;
-    private final MatchRepository matchRepository;
     private final VietQrService vietQrService;
     private final TelegramNotificationService telegramNotificationService;
     private final LoyaltyRewardRepository loyaltyRewardRepository;
@@ -86,34 +86,18 @@ public class SessionService {
         }
 
         hideCheckinTokenIfNotHost(response, currentUser);
-        maskOtherParticipantsPhones(participants, currentUser);
+        PhoneMasking.maskForViewer(participants, currentUser);
         return response;
     }
 
     private static boolean isHost(User user) {
-        return user != null && user.getRole() == Role.HOST;
+        return PhoneMasking.isHost(user);
     }
 
     /** Mã check-in chỉ dành cho Host (hiển thị QR/token). Người khác phải quét QR hoặc nhập mã do Host cung cấp. */
     private void hideCheckinTokenIfNotHost(SessionResponse response, User currentUser) {
         if (!isHost(currentUser)) {
             response.setCheckinToken(null);
-        }
-    }
-
-    /** Che SĐT của người khác với người xem không phải Host; SĐT của chính mình vẫn giữ nguyên. */
-    private void maskOtherParticipantsPhones(List<ParticipantResponse> participants, User currentUser) {
-        if (isHost(currentUser)) {
-            return;
-        }
-        for (ParticipantResponse p : participants) {
-            boolean isMe = currentUser != null
-                    && ((p.getUserId() != null && p.getUserId().equals(currentUser.getId()))
-                    || (p.getPhone() != null && p.getPhone().equals(currentUser.getPhone())));
-            String phone = p.getPhone();
-            if (!isMe && phone != null && phone.length() >= 7) {
-                p.setPhone(phone.substring(0, 4) + "***" + phone.substring(phone.length() - 3));
-            }
         }
     }
 
@@ -438,23 +422,44 @@ public class SessionService {
         return toParticipantResponse(participant);
     }
 
-    public String getDepositQrUrl(Long participantId) {
-        SessionParticipant participant = participantRepository.findById(participantId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
-
-        String phone = participant.getIsGuest() ? participant.getGuestPhone() : participant.getUser().getPhone();
-        String memo = "COC " + participant.getSession().getId() + " " + phone;
-        return vietQrService.generateQrUrl(participant.getDepositAmount(), memo);
+    /** Mã đối soát chuyển khoản theo lượt đăng ký (ASCII, ngắn, không chứa SĐT). */
+    public static String paymentCode(Long participantId) {
+        return "SF" + participantId;
     }
 
-    public String getFinalPaymentQrUrl(Long participantId) {
+    public static String depositMemo(Long participantId) {
+        return "COC " + paymentCode(participantId);
+    }
+
+    public static String finalPaymentMemo(Long participantId) {
+        return paymentCode(participantId);
+    }
+
+    public String getDepositQrUrl(Long participantId, User viewer) {
+        SessionParticipant participant = findParticipantForQr(participantId, viewer);
+        return vietQrService.generateQrUrl(participant.getDepositAmount(), depositMemo(participant.getId()));
+    }
+
+    public String getFinalPaymentQrUrl(Long participantId, User viewer) {
+        SessionParticipant participant = findParticipantForQr(participantId, viewer);
+        BigDecimal remaining = participant.getRemainingPaymentAmount();
+        return vietQrService.generateQrUrl(remaining, finalPaymentMemo(participant.getId()));
+    }
+
+    /** Chỉ Host hoặc chính chủ lượt đăng ký mới được xem mã QR chuyển khoản. */
+    private SessionParticipant findParticipantForQr(Long participantId, User viewer) {
+        if (viewer == null) {
+            throw new AccessDeniedException("Bạn cần đăng nhập để xem mã QR thanh toán!");
+        }
         SessionParticipant participant = participantRepository.findById(participantId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
-
-        BigDecimal remaining = participant.getRemainingPaymentAmount();
-        String phone = participant.getIsGuest() ? participant.getGuestPhone() : participant.getUser().getPhone();
-        String memo = "PAY " + participant.getSession().getId() + " " + phone;
-        return vietQrService.generateQrUrl(remaining, memo);
+        boolean isOwner = participant.getUser() != null
+                && participant.getUser().getId() != null
+                && participant.getUser().getId().equals(viewer.getId());
+        if (!isHost(viewer) && !isOwner) {
+            throw new AccessDeniedException("Bạn không có quyền xem mã QR thanh toán của người khác!");
+        }
+        return participant;
     }
 
     @Transactional
@@ -626,97 +631,6 @@ public class SessionService {
                 telegramNotificationService.notifySlotCancelled(sTitle, pName, pPhone, false);
             } catch (Exception ignored) {}
         }
-    }
-
-    @Transactional
-    public java.util.Map<String, Object> autoSeedFullSimulation(Long sessionId) {
-        Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
-
-        long currentCount = participantRepository.countBySessionId(sessionId);
-        int remainingSlots = session.getMaxSlots() - (int) currentCount;
-        if (remainingSlots <= 0) {
-            throw new RuntimeException("Ca đánh đã đầy quân số (" + currentCount + "/" + session.getMaxSlots() + ")!");
-        }
-
-        // 1. Fetch available members to join without exceeding maxSlots
-        List<User> users = userRepository.findAll().stream()
-                .filter(u -> u.getRole() != Role.HOST)
-                .limit(Math.min(remainingSlots, 8))
-                .collect(Collectors.toList());
-
-        for (User u : users) {
-            if (participantRepository.countBySessionId(sessionId) >= session.getMaxSlots()) {
-                break;
-            }
-            if (participantRepository.findBySessionIdAndUserId(sessionId, u.getId()).isEmpty()) {
-                SessionParticipant sp = SessionParticipant.builder()
-                        .session(session)
-                        .user(u)
-                        .isGuest(false)
-                        .gender(u.getGender())
-                        .checkinStatus(CheckinStatus.CHECKED_IN)
-                        .checkinAt(LocalDateTime.now())
-                        .depositStatus(DepositStatus.NONE)
-                        .depositAmount(BigDecimal.ZERO)
-                        .baseFee(u.getGender() == Gender.FEMALE ? session.getMemberFemalePrice() : session.getMemberMalePrice())
-                        .adjustmentAmount(BigDecimal.ZERO)
-                        .finalFee(u.getGender() == Gender.FEMALE ? session.getMemberFemalePrice() : session.getMemberMalePrice())
-                        .paymentStatus(PaymentStatus.PAID)
-                        .paymentMethod(PaymentMethod.CASH)
-                        .build();
-                participantRepository.save(sp);
-            }
-        }
-
-        // 2. Generate 6 fair match sets for comprehensive simulation
-        if (users.size() >= 4 && matchRepository.findBySessionIdOrderByCreatedAtDesc(sessionId).isEmpty()) {
-            for (int i = 0; i < 6; i++) {
-                User pA1 = users.get(i % users.size());
-                User pA2 = users.get((i + 1) % users.size());
-                User pB1 = users.get((i + 2) % users.size());
-                User pB2 = users.get((i + 3) % users.size());
-
-                WinningTeam win = (i % 2 == 0) ? WinningTeam.A : WinningTeam.B;
-                Match m = Match.builder()
-                        .session(session)
-                        .teamAPlayer1(pA1)
-                        .teamAPlayer2(pA2)
-                        .teamBPlayer1(pB1)
-                        .teamBPlayer2(pB2)
-                        .winningTeam(win)
-                        .courtName("Sân " + ((i % 2) + 1))
-                        .build();
-                matchRepository.save(m);
-
-                // Update user stats
-                if (win == WinningTeam.A) {
-                    pA1.setWinCount(pA1.getWinCount() + 1);
-                    pA1.setEloScore(pA1.getEloScore() + 1);
-                    pA2.setWinCount(pA2.getWinCount() + 1);
-                    pA2.setEloScore(pA2.getEloScore() + 1);
-                    pB1.setLossCount(pB1.getLossCount() + 1);
-                    pB1.setEloScore(Math.max(0, pB1.getEloScore() - 1));
-                    pB2.setLossCount(pB2.getLossCount() + 1);
-                    pB2.setEloScore(Math.max(0, pB2.getEloScore() - 1));
-                } else {
-                    pB1.setWinCount(pB1.getWinCount() + 1);
-                    pB1.setEloScore(pB1.getEloScore() + 1);
-                    pB2.setWinCount(pB2.getWinCount() + 1);
-                    pB2.setEloScore(pB2.getEloScore() + 1);
-                    pA1.setLossCount(pA1.getLossCount() + 1);
-                    pA1.setEloScore(Math.max(0, pA1.getEloScore() - 1));
-                    pA2.setLossCount(pA2.getLossCount() + 1);
-                    pA2.setEloScore(Math.max(0, pA2.getEloScore() - 1));
-                }
-                userRepository.saveAll(List.of(pA1, pA2, pB1, pB2));
-            }
-        }
-
-        java.util.Map<String, Object> res = new java.util.HashMap<>();
-        res.put("success", true);
-        res.put("message", "Đã nạp 8 thành viên ảo, điểm danh GPS và mô phỏng 6 set đấu công bằng!");
-        return res;
     }
 
     private SessionResponse toSessionResponseSummary(Session session) {

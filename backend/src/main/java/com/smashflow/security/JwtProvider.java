@@ -30,7 +30,14 @@ public class JwtProvider {
         this.expiration = expiration;
     }
 
-    public String generateToken(String phone, String role, Long userId) {
+    /** Tên claim chứa token_version của user. Token cũ không có claim này được coi là version 0. */
+    public static final String TOKEN_VERSION_CLAIM = "tv";
+
+    public String generateToken(com.smashflow.model.User user) {
+        return generateToken(user.getPhone(), user.getRole().name(), user.getId(), user.currentTokenVersion());
+    }
+
+    public String generateToken(String phone, String role, Long userId, int tokenVersion) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
@@ -38,10 +45,40 @@ public class JwtProvider {
                 .subject(phone)
                 .claim("role", role)
                 .claim("userId", userId)
+                .claim(TOKEN_VERSION_CLAIM, tokenVersion)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
                 .compact();
+    }
+
+    /** Parse + verify chữ ký/hạn dùng. Trả về empty nếu token không hợp lệ. */
+    public java.util.Optional<Claims> parseClaims(String token) {
+        try {
+            return java.util.Optional.of(Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload());
+        } catch (Exception e) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    /** Lấy claim "tv"; thiếu claim (token phát hành trước khi có token_version) → 0. */
+    public static int getTokenVersion(Claims claims) {
+        Object tv = claims.get(TOKEN_VERSION_CLAIM);
+        if (tv instanceof Number n) {
+            return n.intValue();
+        }
+        if (tv instanceof String s) {
+            try {
+                return Integer.parseInt(s.trim());
+            } catch (NumberFormatException ignored) {
+                return -1; // giá trị lạ → không khớp với bất kỳ version hợp lệ nào
+            }
+        }
+        return 0;
     }
 
     public String getPhoneFromToken(String token) {

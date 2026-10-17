@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@lombok.Getter
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -22,6 +21,9 @@ public class AuthService {
     private final JwtProvider jwtProvider;
     private final TelegramNotificationService telegramNotificationService;
     private final GenderChangeService genderChangeService;
+    private final com.smashflow.security.LoginAttemptService loginAttemptService;
+
+    public static final String LOGIN_LOCKED_MESSAGE = "Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút!";
 
     @Transactional
     public com.smashflow.dto.ForgotPasswordResponse requestForgotPassword(String rawPhone) {
@@ -98,24 +100,36 @@ public class AuthService {
             );
         } catch (Exception ignored) {}
 
-        String token = jwtProvider.generateToken(user.getPhone(), user.getRole().name(), user.getId());
+        String token = jwtProvider.generateToken(user);
 
         return toAuthResponse(user, token);
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByPhone(request.getPhone())
-                .orElseThrow(() -> new RuntimeException("Số điện thoại hoặc mật khẩu không chính xác!"));
+        String phone = request.getPhone() != null ? request.getPhone().trim() : "";
+
+        // Khóa tạm theo SĐT sau quá nhiều lần sai (kể cả khi lần này nhập đúng mật khẩu)
+        if (loginAttemptService.isLocked(phone)) {
+            throw new RuntimeException(LOGIN_LOCKED_MESSAGE);
+        }
+
+        User user = userRepository.findByPhone(phone).orElse(null);
+        if (user == null) {
+            loginAttemptService.recordFailure(phone);
+            throw new RuntimeException("Số điện thoại hoặc mật khẩu không chính xác!");
+        }
 
         if (Boolean.TRUE.equals(user.getDeleted())) {
             throw new RuntimeException("Tài khoản này đã bị xóa hoặc tạm khóa. Vui lòng liên hệ Host để được khôi phục!");
         }
 
         if (user.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            loginAttemptService.recordFailure(phone);
             throw new RuntimeException("Số điện thoại hoặc mật khẩu không chính xác!");
         }
 
-        String token = jwtProvider.generateToken(user.getPhone(), user.getRole().name(), user.getId());
+        loginAttemptService.recordSuccess(phone);
+        String token = jwtProvider.generateToken(user);
 
         return toAuthResponse(user, token);
     }
@@ -139,6 +153,7 @@ public class AuthService {
         }
 
         // Logic đổi mật khẩu nếu user nhập mật khẩu mới
+        boolean passwordChanged = false;
         if (request.getNewPassword() != null && !request.getNewPassword().isBlank()) {
             if (request.getNewPassword().trim().length() < 6) {
                 throw new RuntimeException("Mật khẩu mới phải có ít nhất 6 ký tự!");
@@ -153,10 +168,15 @@ public class AuthService {
                 throw new RuntimeException("Mật khẩu mới không được trùng với mật khẩu hiện tại!");
             }
             user.setPassword(passwordEncoder.encode(request.getNewPassword().trim()));
+            // Đổi mật khẩu → mọi token cũ (máy khác) hết hiệu lực
+            user.bumpTokenVersion();
+            passwordChanged = true;
         }
 
         userRepository.save(user);
-        return toAuthResponse(user, null);
+        // Cấp token mới cho phiên hiện tại để người đang đổi mật khẩu không bị đăng xuất
+        String newToken = passwordChanged ? jwtProvider.generateToken(user) : null;
+        return toAuthResponse(user, newToken);
     }
 
     private AuthResponse toAuthResponse(User user, String token) {

@@ -59,14 +59,16 @@ public class SessionController {
     }
 
     @GetMapping("/participants/{participantId}/deposit-qr")
-    public ResponseEntity<Map<String, String>> getDepositQr(@PathVariable Long participantId) {
-        String qrUrl = sessionService.getDepositQrUrl(participantId);
+    public ResponseEntity<Map<String, String>> getDepositQr(@PathVariable Long participantId,
+                                                            @AuthenticationPrincipal User currentUser) {
+        String qrUrl = sessionService.getDepositQrUrl(participantId, currentUser);
         return ResponseEntity.ok(Collections.singletonMap("qrUrl", qrUrl));
     }
 
     @GetMapping("/participants/{participantId}/payment-qr")
-    public ResponseEntity<Map<String, String>> getPaymentQr(@PathVariable Long participantId) {
-        String qrUrl = sessionService.getFinalPaymentQrUrl(participantId);
+    public ResponseEntity<Map<String, String>> getPaymentQr(@PathVariable Long participantId,
+                                                            @AuthenticationPrincipal User currentUser) {
+        String qrUrl = sessionService.getFinalPaymentQrUrl(participantId, currentUser);
         return ResponseEntity.ok(Collections.singletonMap("qrUrl", qrUrl));
     }
 
@@ -141,11 +143,5 @@ public class SessionController {
                         ? "Đã hủy slot và giữ lại tiền cọc vào doanh thu ca!"
                         : "Đã hủy đăng ký và hoàn trả slot thành công!"
         ));
-    }
-
-    @PostMapping("/{sessionId}/auto-seed-matches")
-    @PreAuthorize("hasRole('HOST')")
-    public ResponseEntity<Map<String, Object>> autoSeedSimulation(@PathVariable Long sessionId) {
-        return ResponseEntity.ok(sessionService.autoSeedFullSimulation(sessionId));
     }
 }

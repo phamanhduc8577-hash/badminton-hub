@@ -75,6 +75,11 @@ public class User {
 
     private java.time.LocalDate lastPasswordResetDate;
 
+    /** Tăng mỗi khi đổi mật khẩu / bị xóa / Host reset mật khẩu → mọi JWT cũ (claim "tv") hết hiệu lực. */
+    @Column(name = "token_version")
+    @Builder.Default
+    private Integer tokenVersion = 0;
+
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -91,5 +96,15 @@ public class User {
 
     public int getEloScore() {
         return eloScore != null ? Math.max(0, eloScore) : 0;
+    }
+
+    /** Phiên bản token hiện tại (null với dữ liệu cũ được coi là 0). */
+    public int currentTokenVersion() {
+        return tokenVersion != null ? tokenVersion : 0;
+    }
+
+    /** Vô hiệu hóa toàn bộ token đã cấp trước đó. */
+    public void bumpTokenVersion() {
+        this.tokenVersion = currentTokenVersion() + 1;
     }
 }

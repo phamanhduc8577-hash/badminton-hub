@@ -100,9 +100,18 @@ public class MemberController {
         return ResponseEntity.ok(avatarOptimizationService.optimizeAvatars(apply));
     }
 
+    /**
+     * Dọn database (chỉ dùng khi phát triển). Tắt mặc định: chỉ hoạt động khi ALLOW_DB_RESET=true,
+     * ngược lại trả 404. Khi bật phải gửi body {"confirm":"XOA TAT CA"}.
+     */
     @PostMapping("/reset-database-clean")
     @PreAuthorize("hasRole('HOST')")
-    public ResponseEntity<java.util.Map<String, Object>> resetDatabaseClean() {
-        return ResponseEntity.ok(memberManagementService.resetDatabaseClean());
+    public ResponseEntity<java.util.Map<String, Object>> resetDatabaseClean(
+            @RequestBody(required = false) java.util.Map<String, Object> body) {
+        if (!memberManagementService.isDatabaseResetEnabled()) {
+            return ResponseEntity.notFound().build();
+        }
+        Object confirm = body != null ? body.get("confirm") : null;
+        return ResponseEntity.ok(memberManagementService.resetDatabaseClean(confirm instanceof String s ? s : null));
     }
 }

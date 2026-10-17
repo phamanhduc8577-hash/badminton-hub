@@ -411,23 +411,6 @@ export const HostDashboardView: React.FC = () => {
     },
   })
 
-  // Auto-seed Full Simulation Mutation (8 players, GPS check-ins, 6 balanced matches)
-  const autoSeedMutation = useMutation({
-    mutationFn: async () => {
-      const res = await api.post(`/sessions/${id}/auto-seed-matches`)
-      return res.data
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['session', id] })
-      queryClient.invalidateQueries({ queryKey: ['matches', id] })
-      queryClient.invalidateQueries({ queryKey: ['report', id] })
-      showToast(data.message || 'Mô phỏng 8 người & 6 trận đấu thành công!')
-    },
-    onError: (err: any) => {
-      showToast(err.response?.data?.message || 'Không thể chạy mô phỏng!', 'error')
-    },
-  })
-
   const handleAddCourt = (customName?: string) => {
     let newCourt = (customName || newCourtNameInput).trim()
     if (!newCourt) {

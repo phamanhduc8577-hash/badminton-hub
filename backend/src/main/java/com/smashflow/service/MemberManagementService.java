@@ -183,6 +183,8 @@ public class MemberManagementService {
 
         String defaultPass = "123456";
         user.setPassword(passwordEncoder.encode(defaultPass));
+        // Host reset mật khẩu → token cũ của thành viên hết hiệu lực
+        user.bumpTokenVersion();
         userRepository.save(user);
 
         try {
@@ -202,6 +204,8 @@ public class MemberManagementService {
         }
 
         user.setDeleted(true);
+        // Xóa tài khoản → token đang dùng bị thu hồi ngay (khôi phục thì đăng nhập lại)
+        user.bumpTokenVersion();
         userRepository.save(user);
 
         return "Đã xóa tài khoản " + user.getFullName() + ". Bạn có thể khôi phục lại bất kỳ lúc nào!";
@@ -217,36 +221,35 @@ public class MemberManagementService {
         return toResponse(user, true);
     }
 
+    /** Chuỗi Host phải gửi kèm để xác nhận dọn database. */
+    public static final String DB_RESET_CONFIRMATION = "XOA TAT CA";
+
+    /** Chỉ bật khi đặt biến môi trường ALLOW_DB_RESET=true (production không đặt → endpoint trả 404). */
+    @org.springframework.beans.factory.annotation.Value("${app.allow-db-reset:false}")
+    private boolean allowDbReset;
+
+    public boolean isDatabaseResetEnabled() {
+        return allowDbReset;
+    }
+
     @Transactional
-    public java.util.Map<String, Object> resetDatabaseClean() {
-        try {
-            jdbcTemplate.execute("DELETE FROM matches;");
-            jdbcTemplate.execute("DELETE FROM session_participants;");
-            jdbcTemplate.execute("DELETE FROM loyalty_rewards;");
-            jdbcTemplate.execute("DELETE FROM sessions;");
-            jdbcTemplate.execute("DELETE FROM venues;");
-            jdbcTemplate.execute("UPDATE users SET win_count = 0, loss_count = 0, elo_score = 0, sessions_attended = 0, placement_matches = 0, current_streak = 0, shield_matches = 0 WHERE phone = '0325872682';");
-
-            userRepository.findByPhone("0325872682").ifPresent(host -> {
-                host.setRole(Role.HOST);
-                host.setMembershipType(MembershipType.FIXED);
-                host.setPassword(passwordEncoder.encode("040304"));
-                host.setFullName("Phạm Anh Đức");
-                host.setAvatarUrl("/duck-host-sassy.png");
-                host.setWinCount(0);
-                host.setLossCount(0);
-                host.setEloScore(0);
-                host.setSessionsAttended(0);
-                host.setPlacementMatches(0);
-                host.setCurrentStreak(0);
-                host.setShieldMatches(0);
-                userRepository.save(host);
-            });
-
-            return java.util.Map.of("success", true, "message", "Đã dọn sạch ca sân, trận đấu và lịch sử, bảo lưu toàn bộ tài khoản thành viên thật!");
-        } catch (Exception e) {
-            throw new RuntimeException("Lỗi dọn dẹp database: " + e.getMessage());
+    public java.util.Map<String, Object> resetDatabaseClean(String confirmation) {
+        if (!allowDbReset) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);
         }
+        if (!DB_RESET_CONFIRMATION.equals(confirmation)) {
+            throw new RuntimeException("Vui lòng gửi chuỗi xác nhận \"" + DB_RESET_CONFIRMATION + "\" để dọn database!");
+        }
+
+        jdbcTemplate.execute("DELETE FROM matches;");
+        jdbcTemplate.execute("DELETE FROM session_participants;");
+        jdbcTemplate.execute("DELETE FROM loyalty_rewards;");
+        jdbcTemplate.execute("DELETE FROM sessions;");
+        jdbcTemplate.execute("DELETE FROM venues;");
+        // Chỉ reset chỉ số thi đấu của Host (tìm theo role), không đụng mật khẩu / tên / SĐT
+        jdbcTemplate.execute("UPDATE users SET win_count = 0, loss_count = 0, elo_score = 0, sessions_attended = 0, placement_matches = 0, current_streak = 0, shield_matches = 0 WHERE role = 'HOST';");
+
+        return java.util.Map.of("success", true, "message", "Đã dọn sạch ca sân, trận đấu và lịch sử, bảo lưu toàn bộ tài khoản thành viên thật!");
     }
 
     private MemberProfileResponse toResponse(User u, boolean isHost) {
