@@ -59,6 +59,14 @@ export const MemberListView: React.FC = () => {
 
   const [showRestoreModal, setShowRestoreModal] = useState(false)
   const [confirmDeleteMember, setConfirmDeleteMember] = useState<MemberProfile | null>(null)
+  // Xóa vĩnh viễn (ẩn danh hóa) từ popup Khôi phục: phải gõ đúng tên mới bật nút xác nhận
+  const [purgeMember, setPurgeMember] = useState<MemberProfile | null>(null)
+  const [purgeConfirmInput, setPurgeConfirmInput] = useState('')
+  const purgeNameMatches = !!purgeMember && purgeConfirmInput.trim() === purgeMember.fullName.trim()
+  const openPurge = (m: MemberProfile) => {
+    setPurgeConfirmInput('')
+    setPurgeMember(m)
+  }
   const [confirmResetPassMember, setConfirmResetPassMember] = useState<MemberProfile | null>(null)
   const [confirmDowngradeMember, setConfirmDowngradeMember] = useState<MemberProfile | null>(null)
   const [confirmUpgradeMember, setConfirmUpgradeMember] = useState<MemberProfile | null>(null)
@@ -278,6 +286,23 @@ export const MemberListView: React.FC = () => {
     },
     onError: (err: any) => {
       showToast(err.response?.data?.message || 'Không thể đặt lại mật khẩu!', 'error')
+    },
+  })
+
+  // Host Permanent Delete (anonymize) Mutation
+  const purgeMemberMutation = useMutation({
+    mutationFn: async ({ userId, confirmName }: { userId: number; confirmName: string }) => {
+      const res = await api.delete(`/members/${userId}/permanent`, { data: { confirmName } })
+      return res.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['deleted-members'] })
+      queryClient.invalidateQueries({ queryKey: ['members'] })
+      queryClient.invalidateQueries({ queryKey: ['leaderboards'] })
+      showToast(data?.message || 'Đã xóa vĩnh viễn thành viên!', 'success')
+    },
+    onError: (err: any) => {
+      showToast(err.response?.data?.message || 'Không thể xóa vĩnh viễn thành viên!', 'error')
     },
   })
 
@@ -1112,7 +1137,7 @@ export const MemberListView: React.FC = () => {
               {deletedMembers.map((dm) => {
                 const restoring = restoreMemberMutation.isPending && restoreMemberMutation.variables === dm.id
                 return (
-                  <li key={dm.id} className="py-2.5 flex items-center justify-between gap-3">
+                  <li key={dm.id} className="py-2.5 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img
                         src={dm.avatarUrl || '/duck-mascot.png'}
@@ -1127,20 +1152,101 @@ export const MemberListView: React.FC = () => {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => restoreMemberMutation.mutate(dm.id)}
-                      disabled={restoring}
-                      className="min-h-11 sm:min-h-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-[11px] font-bold rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1 shrink-0 disabled:opacity-60"
-                    >
-                      <RotateCcw size={12} />
-                      <span>{restoring ? 'Đang...' : 'Khôi phục'}</span>
-                    </button>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => restoreMemberMutation.mutate(dm.id)}
+                        disabled={restoring}
+                        className="min-h-11 sm:min-h-0 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-[11px] font-bold rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1 shrink-0 disabled:opacity-60"
+                      >
+                        <RotateCcw size={12} />
+                        <span>{restoring ? 'Đang...' : 'Khôi phục'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openPurge(dm)}
+                        disabled={restoring}
+                        aria-label={`Xóa vĩnh viễn ${dm.fullName}`}
+                        className="min-h-11 px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs sm:text-[11px] font-bold rounded-xl transition active:scale-95 flex items-center gap-1 shrink-0 disabled:opacity-60"
+                      >
+                        <Trash2 size={12} />
+                        <span>Xóa vĩnh viễn</span>
+                      </button>
+                    </div>
                   </li>
                 )
               })}
             </ul>
           )}
         </div>
+      </BottomSheet>
+
+      {/* Xác nhận xóa thành viên */}
+      <BottomSheet
+        open={!!purgeMember}
+        onClose={() => !purgeMemberMutation.isPending && setPurgeMember(null)}
+        closeOnBackdrop={!purgeMemberMutation.isPending}
+        title="Xóa vĩnh viễn thành viên"
+        footer={
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPurgeMember(null)}
+              disabled={purgeMemberMutation.isPending}
+              className="min-h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm sm:text-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!purgeMember || !purgeNameMatches) return
+                purgeMemberMutation.mutate(
+                  { userId: purgeMember.id, confirmName: purgeConfirmInput.trim() },
+                  {
+                    onSettled: (_d, err) => {
+                      if (!err) setPurgeMember(null)
+                    },
+                  }
+                )
+              }}
+              disabled={!purgeNameMatches || purgeMemberMutation.isPending}
+              className="min-h-11 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-sm sm:text-xs shadow-md transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+            >
+              {purgeMemberMutation.isPending ? 'Đang xóa...' : 'Xóa vĩnh viễn'}
+            </button>
+          </div>
+        }
+      >
+        {purgeMember && (
+          <div className="space-y-3 text-sm sm:text-xs text-slate-700 leading-relaxed">
+            <div role="alert" className="p-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-800 space-y-1.5">
+              <p className="font-black">⚠️ Thao tác này KHÔNG THỂ hoàn tác!</p>
+              <ul className="list-disc pl-4 space-y-1 font-medium">
+                <li>
+                  Xóa toàn bộ thông tin cá nhân của <b>"{purgeMember.fullName}"</b>: tên, SĐT, mật khẩu, ảnh đại diện.
+                </li>
+                <li>Không thể khôi phục lại tài khoản này.</li>
+                <li>Các lượt đăng ký chưa thanh toán ở ca sắp tới bị hủy; phần thưởng chưa nhận bị xóa.</li>
+                <li>Lịch sử thanh toán và các trận đấu được giữ lại (hiển thị "Thành viên đã xóa").</li>
+                <li>Số điện thoại được giải phóng, người này có thể đăng ký tài khoản mới.</li>
+              </ul>
+            </div>
+            <div>
+              <label htmlFor="purge-confirm-input" className="block font-bold text-slate-800 mb-1.5">
+                Gõ lại tên '{purgeMember.fullName}' để xác nhận
+              </label>
+              <input
+                id="purge-confirm-input"
+                type="text"
+                autoComplete="off"
+                value={purgeConfirmInput}
+                onChange={(e) => setPurgeConfirmInput(e.target.value)}
+                disabled={purgeMemberMutation.isPending}
+                className="w-full min-h-11 border border-slate-300 rounded-xl px-3 text-base text-slate-900 font-bold focus:outline-none focus:border-rose-600"
+              />
+            </div>
+          </div>
+        )}
       </BottomSheet>
 
       {/* Xác nhận xóa thành viên */}

@@ -93,6 +93,15 @@ public class MemberController {
         return ResponseEntity.ok(java.util.Map.of("message", msg));
     }
 
+    @DeleteMapping("/{userId}/permanent")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<java.util.Map<String, String>> permanentlyDeleteMember(
+            @PathVariable Long userId,
+            @Valid @RequestBody com.smashflow.dto.PermanentDeleteRequest request) {
+        String msg = memberManagementService.permanentlyDeleteMember(userId, request.getConfirmName());
+        return ResponseEntity.ok(java.util.Map.of("message", msg));
+    }
+
     @PostMapping("/optimize-avatars")
     @PreAuthorize("hasRole('HOST')")
     public ResponseEntity<java.util.Map<String, Object>> optimizeAvatars(

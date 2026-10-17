@@ -70,6 +70,10 @@ public class User {
     @Builder.Default
     private Boolean deleted = false;
 
+    /** Đã xóa vĩnh viễn (ẩn danh hóa) — không thể khôi phục, ẩn khỏi mọi danh sách. */
+    @Builder.Default
+    private Boolean purged = false;
+
     @Builder.Default
     private Integer dailyPasswordResetCount = 0;
 

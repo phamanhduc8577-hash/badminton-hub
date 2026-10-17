@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,6 +39,7 @@ public class MemberManagementService {
         return userRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
                 .filter(u -> Boolean.TRUE.equals(u.getDeleted()))
+                .filter(u -> !Boolean.TRUE.equals(u.getPurged()))
                 .map(u -> toResponse(u, isHost))
                 .collect(Collectors.toList());
     }
@@ -192,9 +194,107 @@ public class MemberManagementService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thành viên!"));
 
+        if (Boolean.TRUE.equals(user.getPurged())) {
+            throw new RuntimeException("Tài khoản đã bị xóa vĩnh viễn, không thể khôi phục!");
+        }
+
         user.setDeleted(false);
         userRepository.save(user);
         return toResponse(user, true);
+    }
+
+    private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
+    private static final String PLACEHOLDER_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    public static final String PURGED_AVATAR = "/duck-mascot.png";
+
+    /** Không nằm trong constructor để giữ tương thích các nơi đang khởi tạo service thủ công (test). */
+    private com.smashflow.repository.LoyaltyRewardRepository loyaltyRewardRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setLoyaltyRewardRepository(com.smashflow.repository.LoyaltyRewardRepository loyaltyRewardRepository) {
+        this.loyaltyRewardRepository = loyaltyRewardRepository;
+    }
+
+    /**
+     * Xóa vĩnh viễn = ẩn danh hóa không hoàn tác. Chỉ áp cho tài khoản đã xóa mềm, không phải Host.
+     * Giữ lịch sử tiền (lượt đã thu / ca đã qua) và trận đấu; giải phóng SĐT để đăng ký lại.
+     */
+    @Transactional
+    public String permanentlyDeleteMember(Long userId, String confirmName) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thành viên!"));
+
+        if (user.getRole() == Role.HOST) {
+            throw new RuntimeException("Không thể xóa vĩnh viễn tài khoản Host!");
+        }
+        if (Boolean.TRUE.equals(user.getPurged())) {
+            throw new RuntimeException("Tài khoản này đã được xóa vĩnh viễn!");
+        }
+        if (!Boolean.TRUE.equals(user.getDeleted())) {
+            throw new RuntimeException("Vui lòng xóa tài khoản (đưa vào danh sách khôi phục) trước khi xóa vĩnh viễn!");
+        }
+        String expected = user.getFullName() != null ? user.getFullName().trim() : "";
+        if (confirmName == null || !confirmName.trim().equals(expected)) {
+            throw new RuntimeException("Tên xác nhận không khớp!");
+        }
+
+        String oldName = user.getFullName();
+        String anonymizedName = "Thành viên đã xóa #" + user.getId();
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Lượt đăng ký: chưa thu ở ca chưa diễn ra (không có cọc đã nhận/đã phạt) → xóa trả slot; còn lại giữ tiền, xóa thông tin cá nhân
+        for (com.smashflow.model.SessionParticipant p : participantRepository.findByUserId(user.getId())) {
+            com.smashflow.model.Session s = p.getSession();
+            boolean upcoming = s != null && s.getStartTime() != null && s.getStartTime().isAfter(now);
+            boolean depositSettled = p.getDepositStatus() == com.smashflow.model.DepositStatus.PAID
+                    || p.getDepositStatus() == com.smashflow.model.DepositStatus.FORFEITED;
+            if (upcoming && p.getPaymentStatus() == com.smashflow.model.PaymentStatus.UNPAID && !depositSettled) {
+                participantRepository.delete(p);
+            } else {
+                p.setGuestName(anonymizedName);
+                p.setGuestPhone(null);
+                participantRepository.save(p);
+            }
+        }
+
+        // 2. Phần thưởng chưa nhận → xóa; đã trao giữ để đối soát quà
+        if (loyaltyRewardRepository != null) {
+            List<com.smashflow.model.LoyaltyReward> unclaimed =
+                    loyaltyRewardRepository.findByUserIdAndIsClaimedFalseOrderByMilestoneSessionsAsc(user.getId());
+            if (!unclaimed.isEmpty()) {
+                loyaltyRewardRepository.deleteAll(unclaimed);
+            }
+        }
+
+        // 3. Ẩn danh hóa tài khoản (giữ chỉ số thi đấu để lịch sử trận của người khác nhất quán)
+        user.setFullName(anonymizedName);
+        user.setPhone(generatePurgedPhonePlaceholder(user.getId()));
+        user.setPassword(null);
+        user.setAvatarUrl(PURGED_AVATAR);
+        user.setDeleted(true);
+        user.setPurged(true);
+        user.setDailyPasswordResetCount(0);
+        user.bumpTokenVersion();
+        userRepository.save(user);
+
+        return "Đã xóa vĩnh viễn tài khoản " + oldName + ". Số điện thoại đã được giải phóng để đăng ký lại.";
+    }
+
+    /** SĐT giả không bao giờ trùng SĐT thật (có chữ), độ dài ≤ 20. */
+    private String generatePurgedPhonePlaceholder(Long userId) {
+        String prefix = "DEL" + userId + "-";
+        if (prefix.length() + 6 > 20) {
+            prefix = "DEL-";
+        }
+        String placeholder;
+        do {
+            StringBuilder sb = new StringBuilder(prefix);
+            for (int i = 0; i < 6; i++) {
+                sb.append(PLACEHOLDER_ALPHABET.charAt(SECURE_RANDOM.nextInt(PLACEHOLDER_ALPHABET.length())));
+            }
+            placeholder = sb.toString();
+        } while (userRepository.existsByPhone(placeholder));
+        return placeholder;
     }
 
     /** Chuỗi Host phải gửi kèm để xác nhận dọn database. */
