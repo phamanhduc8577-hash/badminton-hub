@@ -99,6 +99,10 @@ export interface Participant {
   remainingAmount: number
   paymentStatus: 'UNPAID' | 'PAID'
   paymentMethod?: 'VIETQR' | 'CASH'
+  /** Thời điểm Host thu tiền (null với lượt thu trước bản sửa lỗi) */
+  paidAt?: string | null
+  /** Host còn được hoàn tác thu tiền (PAID, ≤ 7 ngày sau khi ca kết thúc) */
+  canUndoPayment?: boolean
   winCount?: number
   lossCount?: number
   eloScore?: number
@@ -241,4 +245,18 @@ export interface MonthlyReport {
     winCount: number
     lossCount: number
   }[]
+}
+
+/** Dòng đối soát cọc: lượt đã thu tiền + có cọc, thu trước bản sửa lỗi trừ cọc (GET /reports/reconciliation) */
+export interface ReconciliationEntry {
+  participantId: number
+  sessionId: number
+  sessionTitle: string
+  sessionStartTime: string
+  name: string
+  phone: string
+  finalFee: number
+  depositAmount: number
+  depositStatus: 'NONE' | 'PENDING' | 'PAID' | 'FORFEITED' | 'REFUNDED'
+  paymentMethod?: 'VIETQR' | 'CASH' | null
 }

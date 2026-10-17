@@ -141,6 +141,28 @@ public class TelegramNotificationService {
     }
 
     /**
+     * Template: Host hoàn tác thu tiền (bấm nhầm "Đã thu")
+     */
+    public void notifyPaymentUndone(String sessionTitle, String playerName, String phone, String amount, String reason, String hostName) {
+        String msg = String.format(
+                "↩️ <b>[SmashFlow] HOÀN TÁC THU TIỀN!</b>\n\n" +
+                "👤 <b>Người chơi:</b> %s (%s)\n" +
+                "💵 <b>Số tiền hoàn tác:</b> %s VNĐ\n" +
+                "🏸 <b>Ca đánh:</b> %s\n" +
+                "📝 <b>Lý do:</b> %s\n" +
+                "🛡️ <b>Thực hiện bởi:</b> %s\n" +
+                "<i>Lượt này đã trở về trạng thái Chưa thanh toán.</i>",
+                escapeHtml(playerName),
+                escapeHtml(phone),
+                escapeHtml(amount),
+                escapeHtml(sessionTitle),
+                escapeHtml(reason),
+                escapeHtml(hostName)
+        );
+        sendNotification(msg);
+    }
+
+    /**
      * Template: Slot cancellation / no-show notice
      */
     public void notifySlotCancelled(String sessionTitle, String playerName, String phone, boolean forfeitDeposit) {

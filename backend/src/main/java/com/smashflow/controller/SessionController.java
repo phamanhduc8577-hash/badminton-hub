@@ -105,8 +105,18 @@ public class SessionController {
 
     @PostMapping("/participants/settle")
     @PreAuthorize("hasRole('HOST')")
-    public ResponseEntity<ParticipantResponse> settlePayment(@Valid @RequestBody SettlePaymentRequest request) {
-        return ResponseEntity.ok(checkinAndPricingService.settlePayment(request));
+    public ResponseEntity<ParticipantResponse> settlePayment(@AuthenticationPrincipal User host,
+                                                             @Valid @RequestBody SettlePaymentRequest request) {
+        return ResponseEntity.ok(checkinAndPricingService.settlePayment(request, host));
+    }
+
+    @PostMapping("/participants/{participantId}/undo-payment")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<ParticipantResponse> undoPayment(@PathVariable Long participantId,
+                                                           @AuthenticationPrincipal User host,
+                                                           @RequestBody(required = false) UndoPaymentRequest request) {
+        String reason = request != null ? request.getReason() : null;
+        return ResponseEntity.ok(checkinAndPricingService.undoPayment(participantId, reason, host));
     }
 
     @PostMapping("/participants/{participantId}/select-payment-method")

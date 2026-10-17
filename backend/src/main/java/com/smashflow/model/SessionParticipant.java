@@ -89,6 +89,18 @@ public class SessionParticipant {
     @Column(length = 20)
     private PaymentMethod paymentMethod;
 
+    /** Thời điểm Host bấm "Đã thu" (null = chưa thu, hoặc lượt thu trước khi có cột này). */
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
+    /** ID Host đã thu tiền lượt này. */
+    @Column(name = "paid_by")
+    private Long paidBy;
+
+    /** Phần thưởng voucher đã tự áp khi đăng ký (để hoàn đúng mốc khi hủy slot). */
+    @Column(name = "voucher_reward_id")
+    private Long voucherRewardId;
+
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -97,11 +109,8 @@ public class SessionParticipant {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
+    /** Tiền còn phải thu: chỉ trừ cọc khi cọc đã được Host xác nhận (PAID). */
     public BigDecimal getRemainingPaymentAmount() {
-        if (paymentStatus == PaymentStatus.PAID) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal remaining = finalFee.subtract(depositAmount != null ? depositAmount : BigDecimal.ZERO);
-        return remaining.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : remaining;
+        return com.smashflow.service.PricingCalculator.remainingAmount(this);
     }
 }

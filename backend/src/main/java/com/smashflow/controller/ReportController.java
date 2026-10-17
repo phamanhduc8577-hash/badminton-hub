@@ -34,4 +34,11 @@ public class ReportController {
         int targetMonth = (month != null && month >= 1 && month <= 12) ? month : now.getMonthValue();
         return ResponseEntity.ok(reportService.getMonthlyFinancialReport(targetYear, targetMonth));
     }
+
+    /** Đối soát cọc trước bản sửa lỗi (chỉ đọc). */
+    @GetMapping("/reconciliation")
+    @PreAuthorize("hasRole('HOST')")
+    public ResponseEntity<java.util.List<com.smashflow.dto.ReconciliationEntry>> getDepositReconciliation() {
+        return ResponseEntity.ok(reportService.getDepositReconciliation());
+    }
 }

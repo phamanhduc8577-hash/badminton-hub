@@ -67,6 +67,15 @@ public class DataInitializer {
             } catch (Exception ignored) {
             }
 
+            // Đợt 2: lưu người/giờ thu tiền (hoàn tác thu, đối soát) và voucher đã áp trên lượt đăng ký
+            try {
+                jdbcTemplate.execute("ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS voucher_reward_id BIGINT;");
+                jdbcTemplate.execute("ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;");
+                jdbcTemplate.execute("ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS paid_by BIGINT;");
+            } catch (Exception e) {
+                log.warn("Không thêm được cột mới cho session_participants: {}", e.getMessage());
+            }
+
             // Ensure host account exists and has proper role & membership (SĐT Host cấu hình qua HOST_PHONE)
             userRepository.findByPhone(hostPhone).ifPresentOrElse(
                     host -> {

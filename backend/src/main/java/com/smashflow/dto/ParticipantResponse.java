@@ -34,6 +34,10 @@ public class ParticipantResponse {
     private BigDecimal remainingAmount;
     private PaymentStatus paymentStatus;
     private PaymentMethod paymentMethod;
+    /** Thời điểm Host thu tiền (null với lượt thu trước khi có cột paid_at). */
+    private LocalDateTime paidAt;
+    /** Host còn được hoàn tác thu tiền lượt này (PAID và chưa quá 7 ngày sau khi ca kết thúc). */
+    private Boolean canUndoPayment;
     private Integer winCount;
     private Integer lossCount;
     private Integer eloScore;

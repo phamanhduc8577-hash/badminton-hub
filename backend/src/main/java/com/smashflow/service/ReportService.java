@@ -1,12 +1,14 @@
 package com.smashflow.service;
 
 import com.smashflow.dto.HostSessionReport;
+import com.smashflow.dto.ReconciliationEntry;
 import com.smashflow.model.*;
 import com.smashflow.repository.MatchRepository;
 import com.smashflow.repository.SessionParticipantRepository;
 import com.smashflow.repository.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -21,6 +23,7 @@ public class ReportService {
     private final SessionParticipantRepository participantRepository;
     private final MatchRepository matchRepository;
 
+    @Transactional(readOnly = true)
     public HostSessionReport getSessionFinancialReport(Long sessionId) {
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
@@ -127,28 +130,54 @@ public class ReportService {
         }
     }
 
-    public com.smashflow.dto.MonthlyFinancialReport getMonthlyFinancialReport(int year, int month) {
-        List<Session> allSessions = sessionRepository.findAllByOrderByStartTimeDesc();
+    private void recordMonthMatch(Map<Long, int[]> stats, Map<Long, User> users, User player, boolean won) {
+        if (player == null) return;
+        users.putIfAbsent(player.getId(), player);
+        int[] st = stats.computeIfAbsent(player.getId(), k -> new int[3]);
+        if (won) {
+            st[1]++;
+        } else {
+            st[2]++;
+        }
+    }
 
-        // Filter sessions by matching year and month flexibly
-        List<Session> sessions = allSessions.stream()
-                .filter(s -> {
-                    if (s.getStartTime() == null) return false;
-                    return s.getStartTime().getYear() == year && s.getStartTime().getMonthValue() == month;
+    /**
+     * Đối soát cọc (Q5, chỉ đọc): lượt đã thu tiền có cọc, thu trước bản sửa lỗi (paid_at trống).
+     * Các lượt này có thể đã bị thu thiếu đúng bằng tiền cọc nếu cọc thực tế chưa nhận.
+     */
+    @Transactional(readOnly = true)
+    public List<ReconciliationEntry> getDepositReconciliation() {
+        return participantRepository.findLegacyPaidWithDeposit().stream()
+                .map(p -> {
+                    User u = p.getUser();
+                    String name = (u != null && u.getFullName() != null && !u.getFullName().isBlank())
+                            ? u.getFullName()
+                            : (p.getGuestName() != null && !p.getGuestName().isBlank() ? p.getGuestName() : "N/A");
+                    String phone = (u != null && u.getPhone() != null && !u.getPhone().isBlank())
+                            ? u.getPhone()
+                            : (p.getGuestPhone() != null && !p.getGuestPhone().isBlank() ? p.getGuestPhone() : "N/A");
+                    return ReconciliationEntry.builder()
+                            .participantId(p.getId())
+                            .sessionId(p.getSession().getId())
+                            .sessionTitle(p.getSession().getTitle())
+                            .sessionStartTime(p.getSession().getStartTime())
+                            .name(name)
+                            .phone(phone)
+                            .finalFee(p.getFinalFee())
+                            .depositAmount(p.getDepositAmount())
+                            .depositStatus(p.getDepositStatus())
+                            .paymentMethod(p.getPaymentMethod())
+                            .build();
                 })
                 .toList();
+    }
 
-        // If no sessions found in strict year+month, fallback to matching month across sessions or return all if single month
-        if (sessions.isEmpty() && !allSessions.isEmpty()) {
-            sessions = allSessions.stream()
-                    .filter(s -> s.getStartTime() != null && s.getStartTime().getMonthValue() == month)
-                    .toList();
-        }
-
-        // If still empty and all sessions exist in DB, show recent sessions
-        if (sessions.isEmpty() && !allSessions.isEmpty()) {
-            sessions = allSessions;
-        }
+    @Transactional(readOnly = true)
+    public com.smashflow.dto.MonthlyFinancialReport getMonthlyFinancialReport(int year, int month) {
+        // Chỉ các ca có giờ bắt đầu nằm trong tháng; tháng không có ca → báo cáo rỗng (không lấy tháng khác)
+        java.time.LocalDateTime monthStart = java.time.LocalDate.of(year, month, 1).atStartOfDay();
+        java.time.LocalDateTime monthEnd = monthStart.plusMonths(1).minusNanos(1);
+        List<Session> sessions = sessionRepository.findByStartTimeBetweenOrderByStartTimeDesc(monthStart, monthEnd);
 
         BigDecimal totalRevenue = BigDecimal.ZERO;
         BigDecimal totalExpenses = BigDecimal.ZERO;
@@ -168,7 +197,9 @@ public class ReportService {
         int unpaidCount = 0;
 
         List<com.smashflow.dto.MonthlyFinancialReport.SessionFinancialSummary> summaries = new java.util.ArrayList<>();
-        Map<Long, com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.TopActivePlayerBuilder> userActiveMap = new HashMap<>();
+        // Thống kê theo tháng: userId -> [số ca điểm danh, thắng, thua] (chỉ tính trong các ca của tháng)
+        Map<Long, int[]> monthStats = new HashMap<>();
+        Map<Long, User> monthUsers = new HashMap<>();
 
         for (Session session : sessions) {
             HostSessionReport sRep = getSessionFinancialReport(session.getId());
@@ -210,21 +241,22 @@ public class ReportService {
 
                     if (p.getUser() != null) {
                         User u = p.getUser();
-                        userActiveMap.computeIfAbsent(u.getId(), k -> com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.builder()
-                                .userId(u.getId())
-                                .fullName(u.getFullName())
-                                .avatarUrl(u.getAvatarUrl())
-                                .membershipType(u.getMembershipType() != null ? u.getMembershipType().name() : "CASUAL")
-                                .sessionsAttended(0)
-                                .winCount(u.getWinCount() != null ? u.getWinCount() : 0)
-                                .lossCount(u.getLossCount() != null ? u.getLossCount() : 0)
-                        );
+                        monthUsers.putIfAbsent(u.getId(), u);
+                        int[] st = monthStats.computeIfAbsent(u.getId(), k -> new int[3]);
                         if (p.getCheckinStatus() == CheckinStatus.CHECKED_IN) {
-                            com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.TopActivePlayerBuilder b = userActiveMap.get(u.getId());
-                            // increment attended in month
+                            st[0]++;
                         }
                     }
                 }
+            }
+
+            // Thắng/thua trong các trận của ca này
+            for (Match m : matchRepository.findBySessionIdOrderByCreatedAtDesc(session.getId())) {
+                boolean teamAWon = m.getWinningTeam() == WinningTeam.A;
+                recordMonthMatch(monthStats, monthUsers, m.getTeamAPlayer1(), teamAWon);
+                recordMonthMatch(monthStats, monthUsers, m.getTeamAPlayer2(), teamAWon);
+                recordMonthMatch(monthStats, monthUsers, m.getTeamBPlayer1(), !teamAWon);
+                recordMonthMatch(monthStats, monthUsers, m.getTeamBPlayer2(), !teamAWon);
             }
 
             // Determine dynamic real-time status based on current time
@@ -259,9 +291,26 @@ public class ReportService {
         BigDecimal netProfit = totalRevenue.subtract(totalExpenses);
         double attRate = totalPlayerTurnout > 0 ? (double) totalCheckedIn / totalPlayerTurnout * 100.0 : 0.0;
 
-        List<com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer> topPlayers = userActiveMap.values().stream()
-                .map(com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.TopActivePlayerBuilder::build)
-                .sorted((a, b) -> Integer.compare(b.getWinCount(), a.getWinCount()))
+        // Top người chơi: theo số trận thắng trong tháng, rồi số ca đi trong tháng
+        List<com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer> topPlayers = monthStats.entrySet().stream()
+                .filter(e -> e.getValue()[0] > 0 || e.getValue()[1] + e.getValue()[2] > 0)
+                .map(e -> {
+                    User u = monthUsers.get(e.getKey());
+                    int[] st = e.getValue();
+                    return com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer.builder()
+                            .userId(u.getId())
+                            .fullName(u.getFullName())
+                            .avatarUrl(u.getAvatarUrl())
+                            .membershipType(u.getMembershipType() != null ? u.getMembershipType().name() : "CASUAL")
+                            .sessionsAttended(st[0])
+                            .winCount(st[1])
+                            .lossCount(st[2])
+                            .build();
+                })
+                .sorted(java.util.Comparator
+                        .comparing(com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer::getWinCount).reversed()
+                        .thenComparing(com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer::getSessionsAttended, java.util.Comparator.reverseOrder())
+                        .thenComparing(com.smashflow.dto.MonthlyFinancialReport.TopActivePlayer::getLossCount))
                 .limit(8)
                 .toList();
 

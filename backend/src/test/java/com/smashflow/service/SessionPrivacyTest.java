@@ -127,7 +127,8 @@ class SessionPrivacyTest {
             assertTrue(m.matches("[A-Z0-9 ]{1,25}"), "Memo ASCII ngắn: " + m);
         }
         assertEquals(0, new BigDecimal("20000").compareTo(amount.getAllValues().get(0)));
-        assertEquals(0, new BigDecimal("40000").compareTo(amount.getAllValues().get(1)));
+        // Cọc còn PENDING (Host chưa nhận) → không được trừ vào tiền thanh toán (2.2)
+        assertEquals(0, new BigDecimal("60000").compareTo(amount.getAllValues().get(1)));
     }
 
     // ---------- 1.5 Che SĐT ----------

@@ -95,54 +95,30 @@ public class MemberManagementService {
         return toResponse(user, true);
     }
 
+    /**
+     * Đổi hạng thành viên chỉ áp cho các lượt CHƯA THANH TOÁN, chưa vắng, ở ca chưa hủy.
+     * Lượt đã thu tiền / đã chốt giữ nguyên làm lịch sử đối soát.
+     */
     private void syncMemberPricingForActiveSessions(User user, MembershipType newType) {
-        try {
-            List<com.smashflow.model.SessionParticipant> participations = participantRepository.findByUserId(user.getId());
-            for (com.smashflow.model.SessionParticipant p : participations) {
-                com.smashflow.model.Session s = p.getSession();
-                if (s == null) continue;
+        boolean isFixed = (newType == MembershipType.FIXED);
+        List<com.smashflow.model.SessionParticipant> participations = participantRepository.findByUserId(user.getId());
+        for (com.smashflow.model.SessionParticipant p : participations) {
+            com.smashflow.model.Session s = p.getSession();
+            if (s == null || s.getStatus() == com.smashflow.model.SessionStatus.CANCELLED) continue;
+            if (p.getPaymentStatus() != com.smashflow.model.PaymentStatus.UNPAID) continue;
+            if (p.getCheckinStatus() == com.smashflow.model.CheckinStatus.ABSENT) continue;
 
-                boolean is2h = p.getDurationHours() != null && p.getDurationHours().compareTo(new java.math.BigDecimal("2.0")) == 0;
-                boolean isFixed = (newType == MembershipType.FIXED);
-
-                java.math.BigDecimal newBaseFee;
-                if (isFixed) {
-                    p.setIsGuest(false);
-                    // Cố định được miễn cọc
-                    if (p.getDepositStatus() == com.smashflow.model.DepositStatus.PENDING) {
-                        p.setDepositStatus(com.smashflow.model.DepositStatus.NONE);
-                        p.setDepositAmount(java.math.BigDecimal.ZERO);
-                    }
-                    if (is2h && s.getMemberMalePrice2h() != null) {
-                        newBaseFee = user.getGender() == com.smashflow.model.Gender.FEMALE
-                                ? (s.getMemberFemalePrice2h() != null ? s.getMemberFemalePrice2h() : s.getMemberFemalePrice())
-                                : (s.getMemberMalePrice2h() != null ? s.getMemberMalePrice2h() : s.getMemberMalePrice());
-                    } else {
-                        newBaseFee = user.getGender() == com.smashflow.model.Gender.FEMALE
-                                ? s.getMemberFemalePrice()
-                                : s.getMemberMalePrice();
-                    }
-                } else {
-                    p.setIsGuest(true);
-                    if (is2h && s.getGuestMalePrice2h() != null) {
-                        newBaseFee = user.getGender() == com.smashflow.model.Gender.FEMALE
-                                ? (s.getGuestFemalePrice2h() != null ? s.getGuestFemalePrice2h() : s.getGuestFemalePrice())
-                                : (s.getGuestMalePrice2h() != null ? s.getGuestMalePrice2h() : s.getGuestMalePrice());
-                    } else {
-                        newBaseFee = user.getGender() == com.smashflow.model.Gender.FEMALE
-                                ? s.getGuestFemalePrice()
-                                : s.getGuestMalePrice();
-                    }
-                }
-
-                if (newBaseFee != null) {
-                    p.setBaseFee(newBaseFee);
-                    java.math.BigDecimal adj = p.getAdjustmentAmount() != null ? p.getAdjustmentAmount() : java.math.BigDecimal.ZERO;
-                    p.setFinalFee(newBaseFee.add(adj).max(java.math.BigDecimal.ZERO));
-                    participantRepository.save(p);
-                }
+            p.setIsGuest(!isFixed);
+            // Cố định được miễn cọc (cọc chưa nhận thì bỏ yêu cầu cọc)
+            if (isFixed && p.getDepositStatus() == com.smashflow.model.DepositStatus.PENDING) {
+                p.setDepositStatus(com.smashflow.model.DepositStatus.NONE);
+                p.setDepositAmount(java.math.BigDecimal.ZERO);
             }
-        } catch (Exception ignored) {}
+
+            com.smashflow.model.Gender gender = user.getGender() != null ? user.getGender() : p.getGender();
+            PricingCalculator.reprice(p, s, isFixed, gender, p.getDurationHours());
+            participantRepository.save(p);
+        }
     }
 
     @Transactional

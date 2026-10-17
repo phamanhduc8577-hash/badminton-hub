@@ -19,10 +19,121 @@ import {
   CheckCircle2,
   Clock,
   Zap,
+  AlertTriangle,
+  ChevronDown,
 } from 'lucide-react'
 import { api } from '../lib/api'
-import { MonthlyReport } from '../types'
+import { MonthlyReport, ReconciliationEntry } from '../types'
 import { DuckMascot } from '../components/DuckMascot'
+import { parseServerDate } from '../lib/dateUtils'
+
+/**
+ * Thẻ chỉ-đọc cho Host: các lượt đã thu tiền + có cọc, thu trước bản sửa lỗi trừ cọc.
+ * Khi đó tiền cọc bị trừ dù có thể chưa nhận → có thể đã thu thiếu đúng bằng tiền cọc. Không tự sửa dữ liệu.
+ */
+export const ReconciliationCard: React.FC<{ formatVnd: (n?: number) => string }> = ({ formatVnd }) => {
+  const [open, setOpen] = useState(false)
+  const { data: rows } = useQuery<ReconciliationEntry[]>({
+    queryKey: ['deposit-reconciliation'],
+    queryFn: async () => {
+      const res = await api.get('/reports/reconciliation')
+      return res.data
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  if (!rows || rows.length === 0) return null
+
+  const totalDeposit = rows.reduce((sum, r) => sum + Number(r.depositAmount || 0), 0)
+
+  return (
+    <section
+      aria-labelledby="reconciliation-title"
+      className="bg-white rounded-3xl border border-amber-200 shadow-xs overflow-hidden"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls="reconciliation-body"
+        className="w-full min-h-11 flex items-center justify-between gap-3 p-4 sm:p-5 text-left hover:bg-amber-50/60 transition"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0">
+            <AlertTriangle size={16} aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <h2 id="reconciliation-title" className="text-sm font-black text-slate-950">
+              Đối soát cọc trước đây
+            </h2>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
+              {rows.length} lượt • tổng cọc {formatVnd(totalDeposit)}
+            </p>
+          </div>
+        </div>
+        <ChevronDown
+          size={18}
+          aria-hidden="true"
+          className={`text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div id="reconciliation-body" className="px-4 pb-4 sm:px-5 sm:pb-5 space-y-3">
+          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+            Các lượt dưới đây đã được thu tiền <b>trước bản sửa lỗi tính cọc</b>. Khi đó tiền cọc luôn bị trừ vào số
+            tiền thu (kể cả khi chưa thực nhận cọc), nên có thể đã <b>thu thiếu đúng bằng tiền cọc</b>. Hệ thống không tự
+            sửa dữ liệu cũ — bạn có thể đối chiếu sao kê/ghi chép và xử lý tay nếu cần.
+          </p>
+          <ul className="space-y-2">
+            {rows.map((r) => (
+              <li
+                key={r.participantId}
+                className="p-3 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-1.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="text-sm font-black text-slate-900 block truncate">{r.name}</span>
+                    <span className="text-xs text-slate-500 font-medium">{r.phone}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[11px] text-slate-500 block">Cọc</span>
+                    <span className="text-sm font-black text-amber-700">{formatVnd(Number(r.depositAmount))}</span>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-600 font-medium truncate">
+                  {r.sessionTitle}
+                  {r.sessionStartTime && (
+                    <> • {parseServerDate(r.sessionStartTime).toLocaleDateString('vi-VN')}</>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                  <span>
+                    Giá ca: <b className="text-slate-800">{formatVnd(Number(r.finalFee))}</b>
+                  </span>
+                  <span>
+                    Trạng thái cọc: <b className="text-slate-800">{DEPOSIT_LABEL[r.depositStatus] || r.depositStatus}</b>
+                  </span>
+                  <span>
+                    Hình thức: <b className="text-slate-800">{r.paymentMethod === 'CASH' ? 'Tiền mặt' : r.paymentMethod === 'VIETQR' ? 'VietQR' : '—'}</b>
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  )
+}
+
+const DEPOSIT_LABEL: Record<ReconciliationEntry['depositStatus'], string> = {
+  NONE: 'Không cọc',
+  PENDING: 'Chưa xác nhận',
+  PAID: 'Đã xác nhận',
+  FORFEITED: 'Giữ cọc',
+  REFUNDED: 'Đã hoàn',
+}
 
 export const HostOverviewView: React.FC = () => {
   const navigate = useNavigate()
@@ -126,6 +237,9 @@ export const HostOverviewView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Đối soát cọc trước bản sửa lỗi (Q5) — chỉ hiện khi có dữ liệu */}
+      <ReconciliationCard formatVnd={formatVnd} />
 
       {isLoading ? (
         <div className="py-20 text-center">

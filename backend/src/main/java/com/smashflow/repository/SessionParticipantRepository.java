@@ -49,5 +49,16 @@ public interface SessionParticipantRepository extends JpaRepository<SessionParti
 
     @Query("SELECT DISTINCT sp.session.id FROM SessionParticipant sp WHERE sp.user.id = :userId AND sp.checkinStatus != com.smashflow.model.CheckinStatus.ABSENT")
     List<Long> findBookedSessionIdsByUserId(Long userId);
+
+    /**
+     * Đối soát cọc (Q5): lượt đã thu tiền, có cọc, thu trước khi có cột paid_at (tức trước bản sửa lỗi trừ cọc).
+     * Bỏ qua lượt giữ cọc do vắng (FORFEITED) vì doanh thu lượt đó chính là tiền cọc.
+     */
+    @Query("SELECT sp FROM SessionParticipant sp JOIN FETCH sp.session s LEFT JOIN FETCH sp.user u " +
+           "WHERE sp.paymentStatus = com.smashflow.model.PaymentStatus.PAID " +
+           "AND sp.depositAmount > 0 AND sp.paidAt IS NULL " +
+           "AND sp.depositStatus <> com.smashflow.model.DepositStatus.FORFEITED " +
+           "ORDER BY s.startTime DESC, sp.id DESC")
+    List<SessionParticipant> findLegacyPaidWithDeposit();
 }
 

@@ -40,6 +40,17 @@ const formatParticipantPhone = (phone: string | undefined | null, viewerIsHost: 
   return `${value.slice(0, 4)}***${value.slice(-3)}`
 }
 
+/**
+ * Ca có giá 2 tiếng áp được cho hạng + giới tính này không (cùng quy tắc PricingCalculator ở server):
+ * cần giá 2h nam của hạng; nữ cần thêm giá 2h nữ (thiếu thì server tính giá nữ full ca).
+ */
+const hasTwoHourPrice = (session: SessionItem, memberTier: boolean, gender: Participant['gender']): boolean => {
+  const male2h = memberTier ? session.memberMalePrice2h : session.guestMalePrice2h
+  const female2h = memberTier ? session.memberFemalePrice2h : session.guestFemalePrice2h
+  if (male2h === undefined || male2h === null) return false
+  return gender !== 'FEMALE' || (female2h !== undefined && female2h !== null)
+}
+
 export const SessionDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -426,6 +437,14 @@ export const SessionDetailView: React.FC = () => {
   const isUserParticipant = findMyParticipant(session)
   const isPendingDeposit = isUserParticipant && Number(isUserParticipant.depositAmount) > 0 && isUserParticipant.depositStatus !== 'PAID'
   const isCheckedIn = isUserParticipant?.checkinStatus === 'CHECKED_IN'
+  // "Chỉ đánh 2 tiếng" lúc điểm danh chỉ có tác dụng khi ca có giá 2h cho hạng + giới tính của lượt này và chưa thanh toán
+  const canChooseTwoHoursAtCheckin =
+    !!isUserParticipant &&
+    isUserParticipant.paymentStatus !== 'PAID' &&
+    hasTwoHourPrice(session, !isUserParticipant.isGuest, isUserParticipant.gender)
+  // Chỉ trừ cọc khi Host đã xác nhận nhận cọc (khớp remainingAmount do server tính)
+  const depositDeducted =
+    !!isUserParticipant && isUserParticipant.depositStatus === 'PAID' && Number(isUserParticipant.depositAmount) > 0
   const isFull = session.bookedSlots >= session.maxSlots
   const effectiveStatus = getEffectiveSessionStatus(session)
   const viewerIsHost = user?.role === 'HOST'
@@ -744,7 +763,7 @@ export const SessionDetailView: React.FC = () => {
                             <span>{Number(isUserParticipant.adjustmentAmount) > 0 ? '+' : ''}{Number(isUserParticipant.adjustmentAmount).toLocaleString('vi-VN')}đ</span>
                           </div>
                         )}
-                        {Number(isUserParticipant.depositAmount) > 0 && (
+                        {depositDeducted && (
                           <div className="flex justify-between text-emerald-700 font-medium">
                             <span>• Đã cọc giữ chỗ (Khấu trừ):</span>
                             <span>- {Number(isUserParticipant.depositAmount).toLocaleString('vi-VN')}đ</span>
@@ -1087,7 +1106,7 @@ export const SessionDetailView: React.FC = () => {
               />
             </div>
 
-            {session.memberMalePrice2h && (
+            {canChooseTwoHoursAtCheckin && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Thời lượng bạn chơi hôm nay

@@ -8,10 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Nghiệp vụ đổi giới tính (ảnh hưởng trực tiếp tới giá ca & ghép trận cân bằng nam/nữ).
@@ -25,8 +22,6 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class GenderChangeService {
-
-    private static final Pattern VOUCHER_PERCENT = Pattern.compile("Voucher\\s+(\\d+)%");
 
     private final UserRepository userRepository;
     private final SessionParticipantRepository participantRepository;
@@ -103,36 +98,14 @@ public class GenderChangeService {
         return repriced;
     }
 
-    /** Cùng công thức với SessionService.memberJoinSession / bookPublicSlot. */
+    /** Cùng công thức với SessionService.memberJoinSession / bookPublicSlot (dùng chung {@link PricingCalculator}). */
     static BigDecimal resolveBaseFee(Session s, boolean memberTier, Gender gender, BigDecimal durationHours) {
-        boolean female = gender == Gender.FEMALE;
-        boolean is2h = durationHours != null && durationHours.compareTo(new BigDecimal("2.0")) == 0;
-        if (memberTier) {
-            if (is2h && s.getMemberMalePrice2h() != null) {
-                return female
-                        ? (s.getMemberFemalePrice2h() != null ? s.getMemberFemalePrice2h() : s.getMemberFemalePrice())
-                        : s.getMemberMalePrice2h();
-            }
-            return female ? s.getMemberFemalePrice() : s.getMemberMalePrice();
-        }
-        if (is2h && s.getGuestMalePrice2h() != null) {
-            return female
-                    ? (s.getGuestFemalePrice2h() != null ? s.getGuestFemalePrice2h() : s.getGuestFemalePrice())
-                    : s.getGuestMalePrice2h();
-        }
-        return female ? s.getGuestFemalePrice() : s.getGuestMalePrice();
+        return PricingCalculator.baseFee(s, memberTier, gender, durationHours);
     }
 
     /** Voucher % tính theo giá gốc nên phải tính lại; điều chỉnh tay của Host (số tiền cố định) giữ nguyên. */
     static BigDecimal recomputeVoucherAdjustment(String reason, BigDecimal newBase, BigDecimal currentAdj) {
-        BigDecimal adj = currentAdj != null ? currentAdj : BigDecimal.ZERO;
-        if (reason == null) return adj;
-        Matcher m = VOUCHER_PERCENT.matcher(reason);
-        if (!m.find()) return adj;
-        int percent = Integer.parseInt(m.group(1));
-        return newBase.multiply(BigDecimal.valueOf(percent))
-                .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP)
-                .negate();
+        return PricingCalculator.recomputeVoucherAdjustment(reason, newBase, currentAdj);
     }
 
     private static void validateGender(Gender g) {

@@ -22,6 +22,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CheckinAndPricingService {
 
+    /** Mở tự điểm danh trước giờ bắt đầu ca bao nhiêu phút (Q4). */
+    static final long SELF_CHECKIN_OPEN_BEFORE_MINUTES = 30;
+
     private final SessionRepository sessionRepository;
     private final SessionParticipantRepository participantRepository;
     private final UserRepository userRepository;
@@ -35,18 +38,29 @@ public class CheckinAndPricingService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ca đánh!"));
 
         // 1. Verify Dynamic QR Token
-        if (!session.getCheckinToken().equalsIgnoreCase(request.getToken())) {
+        if (session.getCheckinToken() == null || !session.getCheckinToken().equalsIgnoreCase(request.getToken())) {
             throw new RuntimeException("Mã QR điểm danh không chính xác!");
         }
 
-        // Check token expiration (15 mins)
-        if (session.getTokenExpiresAt() != null && LocalDateTime.now().isAfter(session.getTokenExpiresAt())) {
-            throw new RuntimeException("Mã QR điểm danh đã hết hạn (quá 15 phút)! Vui lòng gặp Host để điểm danh.");
+        // 2. Cửa sổ tự điểm danh theo giờ ca (Q4): từ 30 phút trước giờ bắt đầu tới hết ca
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(session.getStartTime().minusMinutes(SELF_CHECKIN_OPEN_BEFORE_MINUTES))) {
+            throw new RuntimeException("Chưa tới giờ điểm danh (mở trước giờ bắt đầu 30 phút)!");
+        }
+        if (now.isAfter(session.getEndTime())) {
+            throw new RuntimeException("Ca đã kết thúc, vui lòng gặp Host để điểm danh!");
         }
 
-        // 2. Find participant (Strictly check user registration in this session)
-        SessionParticipant participant = participantRepository.findBySessionIdAndUserId(sessionId, user.getId())
+        // 3. Tìm lượt đăng ký rồi khóa dòng: bấm đúp / request song song phải chờ nhau
+        Long participantId = participantRepository.findBySessionIdAndUserId(sessionId, user.getId())
+                .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký tham gia ca đánh này!"))
+                .getId();
+        SessionParticipant participant = participantRepository.findByIdForUpdate(participantId)
                 .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký tham gia ca đánh này!"));
+
+        if (participant.getCheckinStatus() == CheckinStatus.ABSENT) {
+            throw new RuntimeException("Lượt đăng ký này đã bị đánh vắng, vui lòng gặp Host!");
+        }
 
         // Check if first-time guest still has pending deposit
         if (participant.getDepositStatus() == DepositStatus.PENDING) {
@@ -57,17 +71,30 @@ public class CheckinAndPricingService {
             throw new RuntimeException("Bạn đã điểm danh ca này rồi!");
         }
 
+        // Khóa dòng user và nạp lại trong transaction (không ghi đè dữ liệu bằng principal cũ trong token)
+        userRepository.lockRowById(user.getId());
+        User managedUser = userRepository.findById(user.getId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản!"));
+
+        // 4. "Chỉ đánh 2 tiếng" lúc điểm danh: áp giá 2h nếu ca có giá 2h cho hạng này và lượt chưa thanh toán
+        if (request != null && PricingCalculator.isTwoHours(request.getDurationHours())
+                && participant.getPaymentStatus() != PaymentStatus.PAID) {
+            boolean memberTier = !Boolean.TRUE.equals(participant.getIsGuest());
+            if (PricingCalculator.hasTwoHourPrice(session, memberTier, participant.getGender())) {
+                participant.setDurationHours(PricingCalculator.TWO_HOURS);
+                PricingCalculator.reprice(participant, session, memberTier, participant.getGender(), PricingCalculator.TWO_HOURS);
+            }
+        }
+
         participant.setCheckinStatus(CheckinStatus.CHECKED_IN);
-        participant.setCheckinAt(LocalDateTime.now());
-        participantRepository.save(participant);
+        participant.setCheckinAt(now);
+        participantRepository.saveAndFlush(participant);
 
-        // 3. Update user session attendance & trigger Loyalty
-        user.setSessionsAttended(user.getSessionsAttended() + 1);
-        userRepository.save(user);
+        // 5. Số buổi tính lại từ dữ liệu điểm danh (giống luồng Host), rồi xét quà chuyên cần
+        int attended = recalculateAttendance(managedUser);
+        loyaltyRewardService.grantEligibleRewards(managedUser, attended);
 
-        checkAndGrantLoyaltyRewards(user);
-
-        return PhoneMasking.maskForViewer(toParticipantResponse(participant), user);
+        return PhoneMasking.maskForViewer(toParticipantResponse(participant), managedUser);
     }
 
     @Transactional
@@ -139,22 +166,38 @@ public class CheckinAndPricingService {
 
     @Transactional
     public ParticipantResponse hostOverrideBill(HostOverrideRequest request) {
-        SessionParticipant participant = participantRepository.findById(request.getParticipantId())
+        SessionParticipant participant = participantRepository.findByIdForUpdate(request.getParticipantId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
 
-        if (request.getOverrideBaseFee() != null) {
-            participant.setBaseFee(request.getOverrideBaseFee());
+        if (participant.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new RuntimeException("Lượt đã thanh toán, vui lòng hoàn tác thu tiền trước khi sửa!");
         }
 
-        if (request.getOverrideFinalFee() != null) {
-            participant.setFinalFee(request.getOverrideFinalFee());
-        } else if (request.getAdjustmentAmount() != null) {
-            participant.setAdjustmentAmount(request.getAdjustmentAmount());
-            participant.setFinalFee(participant.getBaseFee().add(request.getAdjustmentAmount()).max(BigDecimal.ZERO));
-        } else if (request.getOverrideBaseFee() != null) {
-            BigDecimal adj = participant.getAdjustmentAmount() != null ? participant.getAdjustmentAmount() : BigDecimal.ZERO;
-            participant.setFinalFee(participant.getBaseFee().add(adj).max(BigDecimal.ZERO));
+        BigDecimal newBase = request.getOverrideBaseFee() != null ? request.getOverrideBaseFee() : participant.getBaseFee();
+        if (newBase == null || newBase.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Giá gốc không được âm!");
         }
+        BigDecimal newAdj = participant.getAdjustmentAmount() != null ? participant.getAdjustmentAmount() : BigDecimal.ZERO;
+
+        BigDecimal newFinal;
+        if (request.getOverrideFinalFee() != null) {
+            newFinal = request.getOverrideFinalFee();
+        } else if (request.getAdjustmentAmount() != null) {
+            newAdj = request.getAdjustmentAmount();
+            newFinal = newBase.add(newAdj);
+        } else if (request.getOverrideBaseFee() != null) {
+            newFinal = newBase.add(newAdj);
+        } else {
+            newFinal = participant.getFinalFee();
+        }
+
+        if (newFinal == null || newFinal.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Số tiền phải thu sau điều chỉnh không được âm!");
+        }
+
+        participant.setBaseFee(newBase);
+        participant.setAdjustmentAmount(newAdj);
+        participant.setFinalFee(newFinal);
 
         if (request.getAdjustmentReason() != null) {
             participant.setAdjustmentReason(request.getAdjustmentReason());
@@ -165,34 +208,86 @@ public class CheckinAndPricingService {
     }
 
     @Transactional
-    public ParticipantResponse settlePayment(SettlePaymentRequest request) {
-        SessionParticipant participant = participantRepository.findById(request.getParticipantId())
+    public ParticipantResponse settlePayment(SettlePaymentRequest request, User host) {
+        // Khóa dòng: bấm "Đã thu" 2 lần / 2 máy cùng bấm không được ghi nhận 2 lần
+        SessionParticipant participant = participantRepository.findByIdForUpdate(request.getParticipantId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
+
+        if (participant.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new RuntimeException("Lượt này đã thanh toán rồi!");
+        }
+
+        // Số tiền thu = tiền còn lại theo cọc THỰC NHẬN (tính trước khi đổi trạng thái).
+        // Không tự đổi trạng thái cọc: cọc PENDING vẫn là PENDING (chưa nhận) nên không được trừ.
+        BigDecimal collected = participant.getRemainingPaymentAmount();
 
         participant.setPaymentStatus(PaymentStatus.PAID);
         participant.setPaymentMethod(request.getPaymentMethod());
-
-        // Tự động chuyển trạng thái cọc sang PAID nếu trước đó đang chờ duyệt cọc
-        if (participant.getDepositStatus() == DepositStatus.PENDING) {
-            participant.setDepositStatus(DepositStatus.PAID);
-        }
+        participant.setPaidAt(LocalDateTime.now());
+        participant.setPaidBy(host != null ? host.getId() : null);
 
         participantRepository.save(participant);
 
         try {
-            String pName = participant.getUser() != null ? participant.getUser().getFullName() : participant.getGuestName();
-            String pPhone = participant.getUser() != null ? participant.getUser().getPhone() : participant.getGuestPhone();
             String methodStr = request.getPaymentMethod() == PaymentMethod.CASH ? "Tiền mặt tại sân" : "VietQR Chuyển khoản";
             telegramNotificationService.notifyPaymentSettled(
                     participant.getSession().getTitle(),
-                    pName,
-                    pPhone,
-                    participant.getFinalFee().toString(),
+                    participantName(participant),
+                    participantPhone(participant),
+                    collected.toPlainString(),
                     methodStr
             );
         } catch (Exception ignored) {}
 
         return toParticipantResponse(participant);
+    }
+
+    /** Host hoàn tác "Đã thu" (bấm nhầm) — chỉ trong 7 ngày sau khi ca kết thúc, bắt buộc lý do (Q3). */
+    @Transactional
+    public ParticipantResponse undoPayment(Long participantId, String reason, User host) {
+        if (reason == null || reason.isBlank()) {
+            throw new RuntimeException("Vui lòng nhập lý do hoàn tác!");
+        }
+
+        SessionParticipant participant = participantRepository.findByIdForUpdate(participantId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
+
+        if (participant.getPaymentStatus() != PaymentStatus.PAID) {
+            throw new RuntimeException("Lượt này chưa thanh toán!");
+        }
+        if (participant.getDepositStatus() == DepositStatus.FORFEITED) {
+            throw new RuntimeException("Lượt này đã bị giữ cọc do vắng mặt, không thể hoàn tác thu tiền!");
+        }
+        if (!PricingCalculator.withinUndoWindow(participant.getSession(), LocalDateTime.now())) {
+            throw new RuntimeException("Chỉ hoàn tác được trong 7 ngày sau khi ca kết thúc!");
+        }
+
+        participant.setPaymentStatus(PaymentStatus.UNPAID);
+        participant.setPaymentMethod(null);
+        participant.setPaidAt(null);
+        participant.setPaidBy(null);
+        participantRepository.save(participant);
+
+        try {
+            telegramNotificationService.notifyPaymentUndone(
+                    participant.getSession().getTitle(),
+                    participantName(participant),
+                    participantPhone(participant),
+                    participant.getFinalFee().toPlainString(),
+                    reason.trim(),
+                    host != null ? host.getFullName() : "Host"
+            );
+        } catch (Exception ignored) {}
+
+        return toParticipantResponse(participant);
+    }
+
+    private static String participantName(SessionParticipant p) {
+        return p.getUser() != null ? p.getUser().getFullName() : p.getGuestName();
+    }
+
+    private static String participantPhone(SessionParticipant p) {
+        return p.getUser() != null ? p.getUser().getPhone() : p.getGuestPhone();
     }
 
     @Transactional
@@ -213,10 +308,6 @@ public class CheckinAndPricingService {
         participant.setPaymentMethod(method);
         participantRepository.save(participant);
         return PhoneMasking.maskForViewer(toParticipantResponse(participant), user);
-    }
-
-    private void checkAndGrantLoyaltyRewards(User user) {
-        loyaltyRewardService.grantEligibleRewards(user, user.getSessionsAttended());
     }
 
     /**
@@ -253,6 +344,8 @@ public class CheckinAndPricingService {
                 .remainingAmount(p.getRemainingPaymentAmount())
                 .paymentStatus(p.getPaymentStatus())
                 .paymentMethod(p.getPaymentMethod())
+                .paidAt(p.getPaidAt())
+                .canUndoPayment(PricingCalculator.canUndoPayment(p, LocalDateTime.now()))
                 .winCount(p.getUser() != null ? p.getUser().getWinCount() : 0)
                 .lossCount(p.getUser() != null ? p.getUser().getLossCount() : 0)
                 .eloScore(p.getUser() != null ? p.getUser().getEloScore() : 0)

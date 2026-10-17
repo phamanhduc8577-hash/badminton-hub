@@ -119,6 +119,12 @@ public class SessionService {
             throw new RuntimeException("Thời lượng ca đánh phải tối thiểu 2 tiếng (120 phút)!");
         }
 
+        PricingCalculator.validateSessionPrices(
+                request.getMemberMalePrice(), request.getMemberFemalePrice(),
+                request.getGuestMalePrice(), request.getGuestFemalePrice(),
+                request.getMemberMalePrice2h(), request.getMemberFemalePrice2h(),
+                request.getGuestMalePrice2h(), request.getGuestFemalePrice2h());
+
         Venue venue = null;
 
         // 1. If explicit venueName/venueAddress provided, find or create custom Venue
@@ -224,16 +230,7 @@ public class SessionService {
             return userRepository.save(newUser);
         });
 
-        BigDecimal baseFee;
-        if (request.getDurationHours() != null && request.getDurationHours().compareTo(new BigDecimal("2.0")) == 0 && session.getGuestMalePrice2h() != null) {
-            baseFee = request.getGender() == Gender.FEMALE
-                    ? (session.getGuestFemalePrice2h() != null ? session.getGuestFemalePrice2h() : session.getGuestFemalePrice())
-                    : (session.getGuestMalePrice2h() != null ? session.getGuestMalePrice2h() : session.getGuestMalePrice());
-        } else {
-            baseFee = request.getGender() == Gender.FEMALE
-                    ? session.getGuestFemalePrice()
-                    : session.getGuestMalePrice();
-        }
+        BigDecimal baseFee = PricingCalculator.baseFee(session, false, request.getGender(), request.getDurationHours());
 
         // Logic cọc 20k/30%: Chỉ bắt buộc cọc với khách lần đầu đăng ký tham gia CLB SmashHub (past active bookings = 0)
         // Nếu đã từng tham gia từ lần 2 trở đi thì miễn cọc (depositAmount = 0, depositStatus = NONE)
@@ -305,30 +302,7 @@ public class SessionService {
 
         BigDecimal durationHours = (request != null && request.getDurationHours() != null) ? request.getDurationHours() : null;
 
-        BigDecimal baseFee;
-        boolean is2hOption = durationHours != null && durationHours.compareTo(new BigDecimal("2.0")) == 0;
-
-        if (isOfficialFixedMember) {
-            if (is2hOption && session.getMemberMalePrice2h() != null) {
-                baseFee = user.getGender() == Gender.FEMALE
-                        ? (session.getMemberFemalePrice2h() != null ? session.getMemberFemalePrice2h() : session.getMemberFemalePrice())
-                        : (session.getMemberMalePrice2h() != null ? session.getMemberMalePrice2h() : session.getMemberMalePrice());
-            } else {
-                baseFee = user.getGender() == Gender.FEMALE
-                        ? session.getMemberFemalePrice()
-                        : session.getMemberMalePrice();
-            }
-        } else {
-            if (is2hOption && session.getGuestMalePrice2h() != null) {
-                baseFee = user.getGender() == Gender.FEMALE
-                        ? (session.getGuestFemalePrice2h() != null ? session.getGuestFemalePrice2h() : session.getGuestFemalePrice())
-                        : (session.getGuestMalePrice2h() != null ? session.getGuestMalePrice2h() : session.getGuestMalePrice());
-            } else {
-                baseFee = user.getGender() == Gender.FEMALE
-                        ? session.getGuestFemalePrice()
-                        : session.getGuestMalePrice();
-            }
-        }
+        BigDecimal baseFee = PricingCalculator.baseFee(session, isOfficialFixedMember, user.getGender(), durationHours);
 
         // Logic cọc 20k: Nếu là thành viên vãng lai (hoặc chưa duyệt cố định) và là LẦN ĐẦU tham gia CLB (pastBookings == 0) -> Bắt buộc cọc
         long pastBookings = participantRepository.countPastBookingsByPhone(user.getPhone());
@@ -341,14 +315,14 @@ public class SessionService {
         // Auto apply voucher if user has unclaimed voucher reward
         BigDecimal adjustmentAmount = BigDecimal.ZERO;
         String adjustmentReason = null;
+        Long voucherRewardId = null;
         List<LoyaltyReward> pendingRewards = loyaltyRewardRepository.findByUserIdAndIsClaimedFalseOrderByMilestoneSessionsAsc(user.getId());
         for (LoyaltyReward r : pendingRewards) {
             Integer discountPercent = LoyaltyRewardService.getVoucherDiscountPercent(r.getMilestoneSessions());
             if (discountPercent != null && discountPercent > 0) {
-                BigDecimal discount = baseFee.multiply(BigDecimal.valueOf(discountPercent))
-                        .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.HALF_UP);
-                adjustmentAmount = discount.negate();
+                adjustmentAmount = PricingCalculator.voucherDiscount(baseFee, discountPercent);
                 adjustmentReason = "Áp dụng Voucher " + discountPercent + "% (Mốc " + r.getMilestoneSessions() + " buổi)";
+                voucherRewardId = r.getId();
                 r.setIsClaimed(true);
                 r.setClaimedAt(LocalDateTime.now());
                 loyaltyRewardRepository.save(r);
@@ -356,7 +330,7 @@ public class SessionService {
             }
         }
 
-        BigDecimal finalFee = baseFee.add(adjustmentAmount).max(BigDecimal.ZERO);
+        BigDecimal finalFee = PricingCalculator.finalFee(baseFee, adjustmentAmount);
 
         SessionParticipant participant = SessionParticipant.builder()
                 .session(session)
@@ -371,6 +345,7 @@ public class SessionService {
                 .baseFee(baseFee)
                 .adjustmentAmount(adjustmentAmount)
                 .adjustmentReason(adjustmentReason)
+                .voucherRewardId(voucherRewardId)
                 .finalFee(finalFee)
                 .paymentStatus(PaymentStatus.UNPAID)
                 .build();
@@ -402,8 +377,21 @@ public class SessionService {
 
     @Transactional
     public ParticipantResponse confirmDeposit(Long participantId) {
-        SessionParticipant participant = participantRepository.findById(participantId)
+        SessionParticipant participant = participantRepository.findByIdForUpdate(participantId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
+
+        // Chỉ xác nhận được từ trạng thái đang chờ cọc (không "hồi sinh" cọc đã giữ / đã hoàn)
+        if (participant.getDepositStatus() != DepositStatus.PENDING) {
+            throw new RuntimeException(switch (participant.getDepositStatus()) {
+                case PAID -> "Lượt này đã được xác nhận cọc rồi!";
+                case FORFEITED -> "Cọc của lượt này đã bị giữ do vắng mặt, không thể xác nhận lại!";
+                case REFUNDED -> "Cọc của lượt này đã được hoàn trả, không thể xác nhận lại!";
+                default -> "Lượt này không có cọc đang chờ xác nhận!";
+            });
+        }
+        if (participant.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new RuntimeException("Lượt này đã thanh toán đủ tiền (chưa trừ cọc), không cần xác nhận cọc nữa!");
+        }
 
         participant.setDepositStatus(DepositStatus.PAID);
         participantRepository.save(participant);
@@ -502,6 +490,24 @@ public class SessionService {
                 venueRepository.save(venue);
             }
         }
+        PricingCalculator.validateSessionPrices(
+                request.getMemberMalePrice() != null ? request.getMemberMalePrice() : session.getMemberMalePrice(),
+                request.getMemberFemalePrice() != null ? request.getMemberFemalePrice() : session.getMemberFemalePrice(),
+                request.getGuestMalePrice() != null ? request.getGuestMalePrice() : session.getGuestMalePrice(),
+                request.getGuestFemalePrice() != null ? request.getGuestFemalePrice() : session.getGuestFemalePrice(),
+                request.getMemberMalePrice2h(), request.getMemberFemalePrice2h(),
+                request.getGuestMalePrice2h(), request.getGuestFemalePrice2h());
+
+        // Chỉ tính lại giá người tham gia khi có trường giá thực sự thay đổi (sửa tiêu đề/giờ/sân thì không)
+        boolean pricesChanged = priceChanged(session.getMemberMalePrice(), request.getMemberMalePrice())
+                | priceChanged(session.getMemberFemalePrice(), request.getMemberFemalePrice())
+                | priceChanged(session.getGuestMalePrice(), request.getGuestMalePrice())
+                | priceChanged(session.getGuestFemalePrice(), request.getGuestFemalePrice())
+                | priceChanged(session.getMemberMalePrice2h(), request.getMemberMalePrice2h())
+                | priceChanged(session.getMemberFemalePrice2h(), request.getMemberFemalePrice2h())
+                | priceChanged(session.getGuestMalePrice2h(), request.getGuestMalePrice2h())
+                | priceChanged(session.getGuestFemalePrice2h(), request.getGuestFemalePrice2h());
+
         if (request.getMemberMalePrice() != null) session.setMemberMalePrice(request.getMemberMalePrice());
         if (request.getMemberFemalePrice() != null) session.setMemberFemalePrice(request.getMemberFemalePrice());
         if (request.getGuestMalePrice() != null) session.setGuestMalePrice(request.getGuestMalePrice());
@@ -517,46 +523,27 @@ public class SessionService {
 
         sessionRepository.save(session);
 
-        // Tự động đồng bộ và tính toán lại giá vé cho tất cả người tham gia trong ca
-        List<SessionParticipant> participants = participantRepository.findBySessionId(sessionId);
-        for (SessionParticipant p : participants) {
-            boolean isOfficialFixed = !p.getIsGuest();
-            boolean is2hOption = p.getDurationHours() != null && p.getDurationHours().compareTo(new BigDecimal("2.0")) == 0;
-            BigDecimal newBaseFee;
-            if (isOfficialFixed) {
-                if (is2hOption && session.getMemberMalePrice2h() != null) {
-                    newBaseFee = p.getGender() == Gender.FEMALE
-                            ? (session.getMemberFemalePrice2h() != null ? session.getMemberFemalePrice2h() : session.getMemberFemalePrice())
-                            : (session.getMemberMalePrice2h() != null ? session.getMemberMalePrice2h() : session.getMemberMalePrice());
-                } else {
-                    newBaseFee = p.getGender() == Gender.FEMALE ? session.getMemberFemalePrice() : session.getMemberMalePrice();
-                }
-            } else {
-                if (is2hOption && session.getGuestMalePrice2h() != null) {
-                    newBaseFee = p.getGender() == Gender.FEMALE
-                            ? (session.getGuestFemalePrice2h() != null ? session.getGuestFemalePrice2h() : session.getGuestFemalePrice())
-                            : (session.getGuestMalePrice2h() != null ? session.getGuestMalePrice2h() : session.getGuestMalePrice());
-                } else {
-                    newBaseFee = p.getGender() == Gender.FEMALE ? session.getGuestFemalePrice() : session.getGuestMalePrice();
+        if (pricesChanged) {
+            // Tính lại giá vé theo bảng giá mới, bỏ qua lượt đã chốt (đã thanh toán / vắng / bị giữ cọc).
+            // Điều chỉnh tay của Host giữ nguyên, voucher % tính lại theo giá gốc mới.
+            for (SessionParticipant p : participantRepository.findBySessionId(sessionId)) {
+                if (p.getPaymentStatus() == PaymentStatus.PAID) continue;
+                if (p.getCheckinStatus() == CheckinStatus.ABSENT) continue;
+                if (p.getDepositStatus() == DepositStatus.FORFEITED) continue;
+                boolean memberTier = !Boolean.TRUE.equals(p.getIsGuest());
+                if (PricingCalculator.reprice(p, session, memberTier, p.getGender(), p.getDurationHours())) {
+                    participantRepository.save(p);
                 }
             }
-            p.setBaseFee(newBaseFee);
-            BigDecimal adj = p.getAdjustmentAmount() != null ? p.getAdjustmentAmount() : BigDecimal.ZERO;
-            if (p.getAdjustmentReason() != null && p.getAdjustmentReason().contains("Voucher")) {
-                java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("Voucher\\s+(\\d+)%").matcher(p.getAdjustmentReason());
-                if (matcher.find()) {
-                    int percent = Integer.parseInt(matcher.group(1));
-                    BigDecimal discount = newBaseFee.multiply(BigDecimal.valueOf(percent))
-                            .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.HALF_UP);
-                    adj = discount.negate();
-                    p.setAdjustmentAmount(adj);
-                }
-            }
-            p.setFinalFee(newBaseFee.add(adj).max(BigDecimal.ZERO));
-            participantRepository.save(p);
         }
 
         return toSessionResponseSummary(session);
+    }
+
+    /** Trường giá trong request có làm đổi giá hiện tại không (null = không gửi = không đổi). */
+    private static boolean priceChanged(BigDecimal current, BigDecimal requested) {
+        if (requested == null) return false;
+        return current == null || current.compareTo(requested) != 0;
     }
 
     @Transactional
@@ -581,38 +568,30 @@ public class SessionService {
 
     @Transactional
     public void removeParticipant(Long participantId, boolean forfeitDeposit) {
-        SessionParticipant participant = participantRepository.findById(participantId)
+        SessionParticipant participant = participantRepository.findByIdForUpdate(participantId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người tham gia!"));
+
+        // Lượt đã thu tiền: xóa sẽ làm mất tiền khỏi báo cáo → phải hoàn tác thu trước
+        if (participant.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new RuntimeException("Lượt đã thanh toán, vui lòng hoàn tác thu tiền trước khi xóa!");
+        }
 
         // If user already checked in at venue, prevent deleting to preserve match logs & accounting
         if (participant.getCheckinStatus() == CheckinStatus.CHECKED_IN) {
             throw new RuntimeException("Người này đã tới sân và điểm danh, không thể xóa!");
         }
 
-        // Nếu hủy slot và trước đó đã tự động áp voucher, hoàn lại voucher cho member
-        if (participant.getUser() != null && participant.getAdjustmentAmount() != null && participant.getAdjustmentAmount().compareTo(BigDecimal.ZERO) < 0) {
-            if (participant.getAdjustmentReason() != null && participant.getAdjustmentReason().contains("Voucher")) {
-                List<LoyaltyReward> claimedRewards = loyaltyRewardRepository.findByUserIdOrderByMilestoneSessionsAsc(participant.getUser().getId());
-                for (LoyaltyReward r : claimedRewards) {
-                    if (Boolean.TRUE.equals(r.getIsClaimed())) {
-                        Integer percent = LoyaltyRewardService.getVoucherDiscountPercent(r.getMilestoneSessions());
-                        if (percent != null && participant.getAdjustmentReason().contains(percent + "%")) {
-                            r.setIsClaimed(false);
-                            r.setClaimedAt(null);
-                            loyaltyRewardRepository.save(r);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        // Nếu hủy slot và trước đó đã tự động áp voucher, hoàn lại đúng voucher đó cho member
+        refundAppliedVoucher(participant);
 
         if (forfeitDeposit && participant.getDepositStatus() == DepositStatus.PAID) {
             // Mark as ABSENT / FORFEITED to keep deposit in session revenue while releasing the slot count
             participant.setDepositStatus(DepositStatus.FORFEITED);
             participant.setCheckinStatus(CheckinStatus.ABSENT);
             participant.setPaymentStatus(PaymentStatus.PAID);
+            participant.setPaidAt(LocalDateTime.now());
             participant.setFinalFee(participant.getDepositAmount()); // Revenue recognizes deposit
+            participant.setVoucherRewardId(null); // voucher đã hoàn ở trên
             participantRepository.save(participant);
 
             try {
@@ -630,6 +609,42 @@ public class SessionService {
             try {
                 telegramNotificationService.notifySlotCancelled(sTitle, pName, pPhone, false);
             } catch (Exception ignored) {}
+        }
+    }
+
+    /**
+     * Hoàn voucher đã tự áp khi đăng ký. Lượt mới lưu voucher_reward_id → hoàn đúng phần thưởng đó;
+     * lượt cũ (chưa có cột) mới dò theo nội dung "Voucher N%" như trước.
+     */
+    private void refundAppliedVoucher(SessionParticipant participant) {
+        if (participant.getUser() == null) return;
+
+        if (participant.getVoucherRewardId() != null) {
+            loyaltyRewardRepository.findById(participant.getVoucherRewardId()).ifPresent(r -> {
+                if (Boolean.TRUE.equals(r.getIsClaimed())) {
+                    r.setIsClaimed(false);
+                    r.setClaimedAt(null);
+                    loyaltyRewardRepository.save(r);
+                }
+            });
+            return;
+        }
+
+        // Dữ liệu cũ: dò theo % trong lý do điều chỉnh
+        if (participant.getAdjustmentAmount() != null && participant.getAdjustmentAmount().compareTo(BigDecimal.ZERO) < 0
+                && participant.getAdjustmentReason() != null && participant.getAdjustmentReason().contains("Voucher")) {
+            List<LoyaltyReward> claimedRewards = loyaltyRewardRepository.findByUserIdOrderByMilestoneSessionsAsc(participant.getUser().getId());
+            for (LoyaltyReward r : claimedRewards) {
+                if (Boolean.TRUE.equals(r.getIsClaimed())) {
+                    Integer percent = LoyaltyRewardService.getVoucherDiscountPercent(r.getMilestoneSessions());
+                    if (percent != null && participant.getAdjustmentReason().contains(percent + "%")) {
+                        r.setIsClaimed(false);
+                        r.setClaimedAt(null);
+                        loyaltyRewardRepository.save(r);
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -716,6 +731,8 @@ public class SessionService {
                 .remainingAmount(p.getRemainingPaymentAmount())
                 .paymentStatus(p.getPaymentStatus())
                 .paymentMethod(p.getPaymentMethod())
+                .paidAt(p.getPaidAt())
+                .canUndoPayment(PricingCalculator.canUndoPayment(p, LocalDateTime.now()))
                 .winCount(p.getUser() != null ? p.getUser().getWinCount() : 0)
                 .lossCount(p.getUser() != null ? p.getUser().getLossCount() : 0)
                 .eloScore(p.getUser() != null ? p.getUser().getEloScore() : 0)
