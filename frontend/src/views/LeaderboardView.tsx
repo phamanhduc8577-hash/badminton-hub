@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { LeaderboardEntry, LeaderboardPage } from '../types'
@@ -14,11 +14,23 @@ export const LeaderboardView: React.FC = () => {
   const { user } = useAuthStore()
   const [tab, setTab] = useState<'attendance' | 'wins'>('attendance')
   const [showTierSystem, setShowTierSystem] = useState<boolean>(false)
+  const tierPanelRef = useRef<HTMLDivElement>(null)
+
+  // Chạm huy hiệu rank → mở bảng 10 bậc rank và cuộn tới đó
+  const openTierSystem = () => {
+    setShowTierSystem(true)
+    requestAnimationFrame(() => {
+      tierPanelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
   // Chỉ tải bảng của tab đang mở, mỗi lần 30 người; "Xem thêm" mới tải trang kế tiếp
   const {
     data,
     isLoading,
+    isError,
+    refetch,
+    isRefetching,
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
@@ -75,7 +87,7 @@ export const LeaderboardView: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Top Hall of Fame Banner with LOL Emblem Showcase */}
-      <div className="saas-card rounded-3xl p-8 sm:p-10 relative overflow-hidden border border-slate-300 shadow-2xl shadow-slate-900/[0.06]">
+      <div className="saas-card rounded-3xl p-5 sm:p-10 relative overflow-hidden border border-slate-300 shadow-2xl shadow-slate-900/[0.06]">
         {/* Decorative background ambient lighting */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-amber-500/[0.08] via-rose-500/[0.05] to-transparent rounded-full blur-3xl pointer-events-none" />
 
@@ -90,16 +102,19 @@ export const LeaderboardView: React.FC = () => {
               Bảng xếp hạng
             </h1>
 
-            {/* Quick Rank Crest Strip Preview */}
-            <div className="flex items-center gap-2.5 pt-2 overflow-x-auto pb-1">
+            {/* Quick Rank Crest Strip Preview — chạm để mở bảng 10 bậc rank (thay cho tooltip chỉ có khi rê chuột) */}
+            <div className="flex items-center gap-2.5 pt-2 overflow-x-auto no-scrollbar pb-1 touch-pan-x">
               {LOL_RANKS.map((r) => (
-                <div
+                <button
+                  type="button"
                   key={r.tier}
+                  onClick={openTierSystem}
                   title={`${r.name} (${r.minScore} - ${r.maxScore > 9000 ? '+' : r.maxScore} Điểm)`}
+                  aria-label={`${r.name}: xem bảng 10 bậc rank`}
                   className="p-2 rounded-2xl bg-slate-50 hover:bg-white hover:shadow-md border border-slate-200/80 transition duration-200 cursor-pointer shrink-0"
                 >
                   <RankEmblem tier={r} size="md" />
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -107,36 +122,44 @@ export const LeaderboardView: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             <button
               onClick={() => setShowTierSystem(!showTierSystem)}
-              className="px-4 py-2.5 sm:py-3 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs rounded-2xl border border-slate-300 shadow-sm transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+              aria-expanded={showTierSystem}
+              aria-controls="tier-system-panel"
+              className="min-h-11 px-4 py-2.5 sm:py-3 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs rounded-2xl border border-slate-300 shadow-sm transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
             >
               <Info size={16} className="text-rose-600" />
               <span>{showTierSystem ? 'Ẩn khung 10 Bậc Rank' : 'Khung 10 Bậc Rank'}</span>
             </button>
 
             {/* Tab Switcher */}
-            <div className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-300 text-xs font-bold w-full sm:w-auto sm:min-w-[290px] shadow-sm">
+            <div role="tablist" aria-label="Loại bảng xếp hạng" className="grid grid-cols-2 gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-300 text-xs font-bold w-full sm:w-auto sm:min-w-[290px] shadow-sm">
               <button
+                role="tab"
+                aria-selected={tab === 'attendance'}
                 onClick={() => setTab('attendance')}
-                className={`py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
+                className={`min-h-11 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   tab === 'attendance'
                     ? 'bg-slate-950 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
-                <Award size={15} />
-                <span>Rank Chuyên cần</span>
+                <Award size={15} className="hidden sm:block" />
+                <span className="sm:hidden">Chuyên cần</span>
+                <span className="hidden sm:inline">Rank Chuyên cần</span>
               </button>
 
               <button
+                role="tab"
+                aria-selected={tab === 'wins'}
                 onClick={() => setTab('wins')}
-                className={`py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
+                className={`min-h-11 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer whitespace-nowrap ${
                   tab === 'wins'
                     ? 'bg-slate-950 text-white shadow-md'
                     : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
-                <Flame size={15} className="text-rose-500" />
-                <span>Rank Chiến thần</span>
+                <Flame size={15} className="hidden sm:block text-rose-500" />
+                <span className="sm:hidden">Chiến thần</span>
+                <span className="hidden sm:inline">Rank Chiến thần</span>
               </button>
             </div>
           </div>
@@ -144,7 +167,7 @@ export const LeaderboardView: React.FC = () => {
 
         {/* 10 Tier Showcase Grid */}
         {showTierSystem && (
-          <div className="mt-8 pt-6 border-t border-slate-200 space-y-4 animate-in fade-in duration-300">
+          <div ref={tierPanelRef} id="tier-system-panel" className="mt-8 pt-6 border-t border-slate-200 space-y-4 animate-in fade-in duration-300 scroll-mt-24">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-sm text-slate-950 uppercase tracking-wider flex items-center gap-2">
                 <Shield size={16} className="text-amber-500" />
@@ -177,7 +200,7 @@ export const LeaderboardView: React.FC = () => {
       </div>
 
       {/* Leaderboard Table / Feed */}
-      <div className="saas-card rounded-3xl p-6 sm:p-8 space-y-4 border border-slate-300 shadow-xl shadow-slate-900/[0.04]">
+      <div className="saas-card rounded-3xl p-4 sm:p-8 space-y-4 border border-slate-300 shadow-xl shadow-slate-900/[0.04]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-2">
           <div>
             <h2 className="text-xl font-black text-slate-950 flex items-center gap-2.5">
@@ -199,6 +222,18 @@ export const LeaderboardView: React.FC = () => {
           <div className="text-center py-20 text-slate-600 text-sm animate-pulse space-y-3">
             <DuckMascot size={48} rounded="xl" className="mx-auto" />
             <p className="font-bold text-slate-950">Đang tải dữ liệu xếp hạng...</p>
+          </div>
+        ) : isError && entries.length === 0 ? (
+          <div role="alert" className="text-center py-12 px-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-3">
+            <p className="text-sm font-bold text-rose-700">Không thể tải bảng xếp hạng. Vui lòng kiểm tra kết nối mạng.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              className="min-h-11 px-5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-sm font-bold transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isRefetching ? 'Đang tải lại...' : 'Thử lại'}
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -223,7 +258,7 @@ export const LeaderboardView: React.FC = () => {
                   }`}
                 >
                   {/* Left Player Info & 3D Helmet Crest */}
-                  <div className="flex items-center gap-3.5 sm:gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                     {getRankBadge(entry.rank)}
 
                     {tab === 'wins' && (
@@ -242,9 +277,9 @@ export const LeaderboardView: React.FC = () => {
                       />
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2.5 flex-wrap">
-                        <span className="font-black text-base text-slate-950">{entry.fullName}</span>
+                        <span className="font-black text-base text-slate-950 break-words min-w-0">{entry.fullName}</span>
                         {isMe && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-600 text-white font-black">Bạn</span>
                         )}

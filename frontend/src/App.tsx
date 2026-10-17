@@ -19,7 +19,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true, // Quay lại app (vd. sau khi chuyển khoản cọc) thì tải lại dữ liệu cũ
       staleTime: 60 * 1000, // Cache dữ liệu 1 phút, giảm tải gọi API liên tục
     },
   },

@@ -49,25 +49,25 @@ export const Layout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
           {/* Brand & Duck Mascot */}
           <div
-            className="flex items-center gap-3.5 cursor-pointer select-none group"
+            className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group min-w-0"
             onClick={() => navigate('/')}
           >
-            <div className="relative">
+            <div className="relative shrink-0">
               <DuckMascot size={44} rounded="xl" />
               <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-xl tracking-tight text-slate-950 group-hover:text-slate-700 transition">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-black text-lg sm:text-xl tracking-tight text-slate-950 group-hover:text-slate-700 transition truncate">
                   SmashFlow
                 </span>
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white tracking-wider">
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white tracking-wider shrink-0">
                   Pro
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold mt-0.5">
-                <Flame size={12} className="text-rose-600" />
-                <span>CLB Làng Địa Ngục • Host by anhduck</span>
+              <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold mt-0.5 min-w-0">
+                <Flame size={12} className="text-rose-600 shrink-0" />
+                <span className="truncate">CLB Làng Địa Ngục • Host by anhduck</span>
               </div>
             </div>
           </div>
@@ -148,7 +148,7 @@ export const Layout: React.FC = () => {
           </nav>
 
           {/* User Profile & Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0 ml-3">
             {user?.role === 'HOST' && (
               <button
                 onClick={() => navigate('/host/create-session')}
@@ -160,7 +160,7 @@ export const Layout: React.FC = () => {
             )}
 
             {user ? (
-              <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
+              <div className="flex items-center gap-3 sm:pl-3 sm:border-l border-slate-200">
                 <div
                   onClick={() => setShowProfileModal(true)}
                   className="text-right hidden sm:block cursor-pointer group"
@@ -179,10 +179,12 @@ export const Layout: React.FC = () => {
                   </div>
                 </div>
 
-                <div
+                <button
+                  type="button"
                   onClick={() => setShowProfileModal(true)}
-                  className="cursor-pointer transition hover:scale-105"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center cursor-pointer transition hover:scale-105"
                   title="Chỉnh sửa Avatar & Hồ sơ"
+                  aria-label="Mở hồ sơ cá nhân"
                 >
                   <DuckMascot
                     src={user.avatarUrl || (user.role === 'HOST' ? '/duck-host-sassy.png' : '/duck-mascot.png')}
@@ -190,15 +192,18 @@ export const Layout: React.FC = () => {
                     rounded="xl"
                     className="shadow-md border border-slate-200"
                   />
-                </div>
+                </button>
 
+                {/* Trên mobile nút đăng xuất nằm trong popup hồ sơ (có bước xác nhận) để tránh bấm nhầm */}
                 <button
+                  type="button"
                   onClick={() => {
                     logout()
                     navigate('/login')
                   }}
-                  className="p-2.5 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-600 transition shadow-sm"
+                  className="hidden sm:inline-flex p-2.5 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-600 transition shadow-sm"
                   title="Đăng xuất"
+                  aria-label="Đăng xuất"
                 >
                   <LogOut size={15} />
                 </button>
@@ -225,7 +230,7 @@ export const Layout: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 md:pb-14 relative z-10">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:pb-14 relative z-10">
         <Outlet />
       </main>
 
@@ -236,7 +241,7 @@ export const Layout: React.FC = () => {
       />
 
       {/* Clean Minimalist Editorial Footer */}
-      <footer className="relative z-10 border-t border-slate-200/90 bg-white/80 backdrop-blur-md py-8 text-center text-xs text-slate-500">
+      <footer className="hidden md:block relative z-10 border-t border-slate-200/90 bg-white/80 backdrop-blur-md py-8 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <DuckMascot size={32} rounded="xl" />
@@ -253,12 +258,15 @@ export const Layout: React.FC = () => {
         </div>
       </footer>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 flex justify-around py-3 px-2 z-40 shadow-xl">
+      {/* Mobile Bottom Navigation (chừa vùng thanh home iPhone) */}
+      <nav
+        aria-label="Điều hướng chính"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 flex items-stretch justify-around gap-1 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] px-2 z-40 shadow-xl"
+      >
         <NavLink
           to="/"
           className={({ isActive }) =>
-            `flex flex-col items-center gap-1 text-[11px] font-semibold transition ${
+            `flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition ${
               isActive ? 'text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'
             }`
           }
@@ -270,7 +278,7 @@ export const Layout: React.FC = () => {
         <NavLink
           to="/leaderboard"
           className={({ isActive }) =>
-            `flex flex-col items-center gap-1 text-[11px] font-semibold transition ${
+            `flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition ${
               isActive ? 'text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'
             }`
           }
@@ -282,7 +290,7 @@ export const Layout: React.FC = () => {
         <NavLink
           to="/members"
           className={({ isActive }) =>
-            `flex flex-col items-center gap-1 text-[11px] font-semibold transition ${
+            `flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition ${
               isActive ? 'text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'
             }`
           }
@@ -294,7 +302,7 @@ export const Layout: React.FC = () => {
         <NavLink
           to="/loyalty"
           className={({ isActive }) =>
-            `flex flex-col items-center gap-1 text-[11px] font-semibold transition ${
+            `flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition ${
               isActive ? 'text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'
             }`
           }
@@ -307,7 +315,7 @@ export const Layout: React.FC = () => {
           <NavLink
             to="/host"
             className={({ isActive }) =>
-              `flex flex-col items-center gap-1 text-[11px] font-semibold transition ${
+              `flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition ${
                 isActive ? 'text-rose-600 font-bold' : 'text-slate-400 hover:text-slate-600'
               }`
             }
@@ -319,7 +327,7 @@ export const Layout: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowProfileModal(true)}
-            className="flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-950 transition"
+            className="flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-950 transition"
           >
             <DuckMascot
               src={user.avatarUrl || '/duck-mascot.png'}
@@ -335,7 +343,7 @@ export const Layout: React.FC = () => {
           <NavLink
             to="/login"
             className={({ isActive }) =>
-              `flex flex-col items-center gap-1 text-[11px] font-semibold transition ${
+              `flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition ${
                 isActive ? 'text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-600'
               }`
             }

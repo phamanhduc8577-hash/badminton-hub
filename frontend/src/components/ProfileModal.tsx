@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/useAuthStore'
 import { api } from '../lib/api'
 import { DuckMascot } from './DuckMascot'
-import { X, User as UserIcon, Upload, Check, Sparkles, Camera, Lock, KeyRound, Eye, EyeOff } from 'lucide-react'
+import { BottomSheet } from './BottomSheet'
+import { User as UserIcon, Upload, Check, Sparkles, Camera, Lock, KeyRound, Eye, EyeOff, LogOut } from 'lucide-react'
 
 interface ProfileModalProps {
   isOpen: boolean
@@ -11,7 +13,8 @@ interface ProfileModalProps {
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
-  const { user, setAuth, token } = useAuthStore()
+  const { user, setAuth, token, logout } = useAuthStore()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -24,22 +27,34 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showOldPass, setShowOldPass] = useState(false)
   const [showNewPass, setShowNewPass] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
-  // Sync state with fresh user props whenever modal opens
+  // Chỉ nạp lại form ở thời điểm popup vừa mở. Không reset khi `user` trong store đổi
+  // (vd. /auth/me trả về giữa chừng) để không xóa chữ người dùng đang gõ.
+  const wasOpenRef = useRef(false)
   useEffect(() => {
-    if (user) {
-      setFullName(user.fullName || '')
-      setAvatarUrl(user.avatarUrl || '/duck-mascot.png')
-      setGender(user.gender === 'FEMALE' ? 'FEMALE' : 'MALE')
-      setShowPasswordSection(false)
-      setOldPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
+    if (!isOpen) {
+      wasOpenRef.current = false
+      return
     }
+    if (wasOpenRef.current || !user) return
+    wasOpenRef.current = true
+    setFullName(user.fullName || '')
+    setAvatarUrl(user.avatarUrl || '/duck-mascot.png')
+    setGender(user.gender === 'FEMALE' ? 'FEMALE' : 'MALE')
+    setShowPasswordSection(false)
+    setOldPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setShowOldPass(false)
+    setShowNewPass(false)
+    setConfirmLogout(false)
+    setError('')
+    setSuccess(false)
   }, [isOpen, user])
 
   // Lấy trạng thái mới nhất (genderLocked có thể đổi sau khi Host điểm danh / thu tiền)
@@ -51,8 +66,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     api
       .get('/auth/me')
       .then((res) => {
-        const latest = useAuthStore.getState().user
-        if (!cancelled && res.data && latest) setAuth({ ...latest, ...res.data }, authToken)
+        const { user: latest, token: latestToken } = useAuthStore.getState()
+        if (!cancelled && res.data && latest) setAuth({ ...latest, ...res.data }, latestToken || authToken)
       })
       .catch(() => {})
     return () => {
@@ -160,7 +175,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
         },
       })
       if (res.data) {
-        setAuth({ ...user, ...res.data }, authToken || '')
+        // Đổi mật khẩu → server cấp token mới (token cũ bị vô hiệu); không lưu token vào object user
+        const { token: newToken, ...profileData } = res.data as { token?: string } & Record<string, unknown>
+        setAuth({ ...user, ...profileData }, newToken || authToken || '')
       }
       queryClient.invalidateQueries({ queryKey: ['my-profile'] })
       queryClient.invalidateQueries({ queryKey: ['members'] })
@@ -183,34 +200,42 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
   }
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profile-modal-title"
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white border border-slate-200 rounded-t-3xl sm:rounded-3xl px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-8 max-w-md w-full shadow-2xl relative space-y-5 max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto overscroll-contain"
-      >
-        {/* Grab handle (mobile bottom sheet) */}
-        <div className="sm:hidden mx-auto -mt-1 h-1.5 w-10 rounded-full bg-slate-200" aria-hidden="true" />
-        <button
-          onClick={onClose}
-          aria-label="Đóng"
-          className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-        >
-          <X size={18} />
-        </button>
+  const handleLogout = () => {
+    setConfirmLogout(false)
+    onClose()
+    logout()
+    navigate('/login')
+  }
 
-        <div className="text-center space-y-1">
+  const footer = (
+    <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2.5">
+      <button
+        type="button"
+        onClick={onClose}
+        className="min-h-11 px-4 py-2.5 rounded-xl border border-slate-200 text-sm sm:text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+      >
+        Hủy
+      </button>
+      <button
+        type="submit"
+        form="profile-modal-form"
+        disabled={loading}
+        className="min-h-11 px-6 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-sm sm:text-xs font-black rounded-xl shadow-md transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        <Sparkles size={14} />
+        <span>{loading ? 'Đang lưu...' : 'Lưu hồ sơ'}</span>
+      </button>
+    </div>
+  )
+
+  return (
+    <BottomSheet open={isOpen} onClose={onClose} labelledBy="profile-modal-title" footer={footer} bodyClassName="space-y-5">
+        <div className="text-center space-y-1 px-8">
           <h3 id="profile-modal-title" className="text-xl font-black text-slate-950">Chỉnh sửa hồ sơ & Avatar</h3>
           <p className="text-xs text-slate-500 font-medium">Thay đổi thông tin, ảnh đại diện và mật khẩu</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form id="profile-modal-form" onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-bold text-center">
               {error}
@@ -238,6 +263,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute -bottom-2 -right-2 p-2 bg-slate-950 hover:bg-slate-800 text-white rounded-2xl shadow-lg border-2 border-white transition active:scale-90"
                 title="Tải ảnh mới từ điện thoại / máy tính"
+                aria-label="Tải ảnh đại diện mới"
               >
                 <Camera size={15} />
               </button>
@@ -282,6 +308,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <UserIcon className="absolute left-3.5 top-3 text-slate-400" size={15} />
               <input
                 type="text"
+                name="name"
+                autoComplete="name"
+                aria-label="Họ và tên của bạn"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -348,83 +377,109 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             {showPasswordSection && (
               <div className="space-y-3 pt-2 pb-1 animate-in fade-in duration-200">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Mật khẩu hiện tại</label>
+                  <label htmlFor="profile-old-password" className="block text-[11px] font-bold text-slate-600 mb-1">Mật khẩu hiện tại</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 text-slate-400" size={14} />
+                    <Lock className="absolute left-3 top-3.5 text-slate-400" size={14} />
                     <input
+                      id="profile-old-password"
+                      name="current-password"
                       type={showOldPass ? 'text' : 'password'}
+                      autoComplete="current-password"
                       value={oldPassword}
                       onChange={(e) => setOldPassword(e.target.value)}
                       placeholder="Nhập mật khẩu đang dùng"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-9 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
+                      className="w-full min-h-11 bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-12 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
                     />
                     <button
                       type="button"
                       onClick={() => setShowOldPass(!showOldPass)}
-                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                      aria-label={showOldPass ? 'Ẩn mật khẩu hiện tại' : 'Hiện mật khẩu hiện tại'}
+                      className="absolute right-0 top-0 h-full min-h-11 min-w-11 inline-flex items-center justify-center rounded-r-xl text-slate-400 hover:text-slate-600"
                     >
-                      {showOldPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                      {showOldPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Mật khẩu mới</label>
+                  <label htmlFor="profile-new-password" className="block text-[11px] font-bold text-slate-600 mb-1">Mật khẩu mới</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 text-slate-400" size={14} />
+                    <Lock className="absolute left-3 top-3.5 text-slate-400" size={14} />
                     <input
+                      id="profile-new-password"
+                      name="new-password"
                       type={showNewPass ? 'text' : 'password'}
+                      autoComplete="new-password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Tối thiểu 6 ký tự"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-9 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
+                      className="w-full min-h-11 bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-12 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewPass(!showNewPass)}
-                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                      aria-label={showNewPass ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}
+                      className="absolute right-0 top-0 h-full min-h-11 min-w-11 inline-flex items-center justify-center rounded-r-xl text-slate-400 hover:text-slate-600"
                     >
-                      {showNewPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                      {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Xác nhận mật khẩu mới</label>
+                  <label htmlFor="profile-confirm-password" className="block text-[11px] font-bold text-slate-600 mb-1">Xác nhận mật khẩu mới</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-2.5 text-slate-400" size={14} />
+                    <Lock className="absolute left-3 top-3.5 text-slate-400" size={14} />
                     <input
+                      id="profile-confirm-password"
+                      name="confirm-new-password"
                       type="password"
+                      autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Nhập lại mật khẩu mới"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-4 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
+                      className="w-full min-h-11 bg-slate-50 border border-slate-200 rounded-xl py-2.5 sm:py-2 pl-9 pr-4 text-base sm:text-xs text-slate-950 font-medium focus:outline-none focus:border-slate-950 focus:bg-white"
                     />
                   </div>
                 </div>
               </div>
             )}
           </div>
+        </form>
 
-          <div className="sticky bottom-0 -mx-5 sm:mx-0 px-5 sm:px-0 pt-3 pb-1 bg-white/95 backdrop-blur-sm border-t border-slate-100 sm:border-0 grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2.5">
+        {/* Đăng xuất (trên mobile chỉ có ở đây) — có bước xác nhận để tránh bấm nhầm */}
+        <div className="pt-3 border-t border-slate-100">
+          {confirmLogout ? (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl space-y-2.5">
+              <p className="text-xs font-bold text-rose-800 text-center">Bạn chắc chắn muốn đăng xuất khỏi tài khoản này?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmLogout(false)}
+                  className="min-h-11 px-3 rounded-xl border border-slate-200 bg-white text-sm sm:text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Ở lại
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="min-h-11 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm sm:text-xs font-black transition active:scale-95"
+                >
+                  Xác nhận đăng xuất
+                </button>
+              </div>
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={onClose}
-              className="min-h-11 sm:min-h-0 px-4 py-2.5 rounded-xl border border-slate-200 text-sm sm:text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+              onClick={() => setConfirmLogout(true)}
+              className="w-full min-h-11 px-4 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 text-sm sm:text-xs font-bold flex items-center justify-center gap-2 transition"
             >
-              Hủy
+              <LogOut size={15} />
+              <span>Đăng xuất</span>
             </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="min-h-11 sm:min-h-0 px-6 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-sm sm:text-xs font-black rounded-xl shadow-md transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              <Sparkles size={14} />
-              <span>{loading ? 'Đang lưu...' : 'Lưu hồ sơ'}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          )}
+        </div>
+    </BottomSheet>
   )
 }

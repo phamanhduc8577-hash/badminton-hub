@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import React from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -84,5 +84,31 @@ describe('Layout - Mobile Navigation & Profile Behavior', () => {
     expect(hostLinks.length).toBeGreaterThan(0)
     const mobileHostLink = hostLinks.find((l) => l.getAttribute('href') === '/host')
     expect(mobileHostLink).toBeDefined()
+  })
+
+  it('menu dưới (mobile) vẫn render đủ mục, mỗi mục min-h-11 và chừa safe-area iPhone', () => {
+    const Wrapper = createWrapper()
+    render(<Layout />, { wrapper: Wrapper })
+
+    const bottomNav = screen.getByRole('navigation', { name: 'Điều hướng chính' })
+    expect(bottomNav.className).toContain('pb-[calc(0.75rem+env(safe-area-inset-bottom))]')
+    const items = within(bottomNav).getAllByRole('link')
+    expect(items.map((l) => l.getAttribute('href'))).toEqual(['/', '/leaderboard', '/members', '/loyalty', '/login'])
+    items.forEach((l) => expect(l.className).toMatch(/flex-1.*min-h-11/))
+  })
+
+  it('đăng xuất có trong popup hồ sơ (dùng được trên mobile)', () => {
+    useAuthStore.getState().setAuth(
+      { id: 5, fullName: 'Nguyễn Văn Member', phone: '0912345678', role: 'MEMBER', gender: 'MALE', membershipType: 'CASUAL' } as any,
+      'fake-token'
+    )
+    const Wrapper = createWrapper()
+    render(<Layout />, { wrapper: Wrapper })
+
+    fireEvent.click(screen.getByRole('button', { name: /Member/i }))
+    const dialog = screen.getByRole('dialog', { name: /Chỉnh sửa hồ sơ & Avatar/i })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Đăng xuất' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận đăng xuất' }))
+    expect(useAuthStore.getState().user).toBeNull()
   })
 })

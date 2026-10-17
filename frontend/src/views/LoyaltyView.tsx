@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { LoyaltyReward, AttendanceRecord } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { GiftGraphic } from '../components/GiftGraphic'
+import { BottomSheet } from '../components/BottomSheet'
 import {
   Gift,
   CheckCircle2,
@@ -19,11 +21,12 @@ import {
   Activity,
   Award,
   PackageOpen,
-  X,
+  MapPin,
 } from 'lucide-react'
 
 export const LoyaltyView: React.FC = () => {
   const { user, setAuth, token } = useAuthStore()
+  const navigate = useNavigate()
 
   // Always fetch latest User profile (sessionsAttended, winCount, lossCount)
   const { data: profile } = useQuery({
@@ -52,6 +55,9 @@ export const LoyaltyView: React.FC = () => {
   } | null>(null)
 
   const [isRevealed, setIsRevealed] = useState(false)
+
+  // Ngày đang xem chi tiết trên lịch (chạm vào ô ngày đã ra sân)
+  const [selectedDay, setSelectedDay] = useState<{ label: string; records: AttendanceRecord[] } | null>(null)
 
   // 1. Fetch user claimed / available rewards
   const { data: rewards } = useQuery<LoyaltyReward[]>({
@@ -205,14 +211,14 @@ export const LoyaltyView: React.FC = () => {
   const firstDayIndex = new Date(year, month, 1).getDay() // 0 (Sun) to 6 (Sat)
   const totalDaysInMonth = new Date(year, month + 1, 0).getDate()
 
-  // Convert checkinAt dates to Map for fast lookup + session info
-  const attendanceMap = new Map<string, AttendanceRecord>()
+  // Convert checkinAt dates to Map for fast lookup + session info (1 ngày có thể có nhiều ca)
+  const attendanceMap = new Map<string, AttendanceRecord[]>()
   ;(history || []).forEach((h) => {
     const d = new Date(h.checkinAt)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
       d.getDate()
     ).padStart(2, '0')}`
-    attendanceMap.set(key, h)
+    attendanceMap.set(key, [...(attendanceMap.get(key) || []), h])
   })
 
   const thisMonthAttendedCount = (history || []).filter((h) => {
@@ -336,15 +342,15 @@ export const LoyaltyView: React.FC = () => {
       </div>
 
       {/* 2. Ultra Luxurious & Bright Editorial Sports Calendar */}
-      <div className="saas-card rounded-3xl p-6 sm:p-10 space-y-8 border border-slate-300/90 shadow-2xl shadow-slate-900/[0.05] relative overflow-hidden bg-white">
+      <div className="saas-card rounded-3xl p-4 sm:p-10 space-y-6 sm:space-y-8 border border-slate-300/90 shadow-2xl shadow-slate-900/[0.05] relative overflow-hidden bg-white">
         {/* Subtle decorative glow */}
         <div className="absolute -top-12 -left-12 w-64 h-64 bg-emerald-500/[0.05] rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-rose-500/[0.05] rounded-full blur-3xl pointer-events-none" />
 
         {/* Calendar Header Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-200/90 pb-7 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6 border-b border-slate-200/90 pb-5 sm:pb-7 relative z-10">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight flex items-center gap-3">
+            <h2 className="text-xl sm:text-3xl font-black text-slate-950 tracking-tight flex items-center gap-3">
               <span>Lịch Điểm Danh & Nhật Ký Ra Sân</span>
             </h2>
           </div>
@@ -352,30 +358,31 @@ export const LoyaltyView: React.FC = () => {
           {/* Month Navigator & KPI Widgets */}
           <div className="flex flex-wrap items-center gap-3">
             {/* KPI Mini Badges */}
-            <div className="hidden sm:flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 text-xs">
-              <div className="px-3.5 py-1.5 bg-white rounded-xl shadow-xs border border-slate-200/80">
+            <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 text-xs">
+              <div className="px-3 sm:px-3.5 py-1.5 bg-white rounded-xl shadow-xs border border-slate-200/80">
                 <span className="text-[10px] text-slate-400 font-bold block">Tổng ca tháng:</span>
                 <b className="text-slate-950 font-black text-sm">{thisMonthAttendedCount} buổi</b>
               </div>
-              <div className="px-3.5 py-1.5 bg-white rounded-xl shadow-xs border border-slate-200/80">
+              <div className="px-3 sm:px-3.5 py-1.5 bg-white rounded-xl shadow-xs border border-slate-200/80">
                 <span className="text-[10px] text-slate-400 font-bold block">Tỷ lệ chuyên cần:</span>
                 <b className="text-emerald-700 font-black text-sm">{attendanceRate}%</b>
               </div>
             </div>
 
             {/* Navigator Control Capsule */}
-            <div className="flex items-center bg-slate-950 p-1.5 rounded-2xl shadow-lg shadow-slate-950/15 border border-slate-900">
+            <div className="flex items-center bg-slate-950 p-1 sm:p-1.5 rounded-2xl shadow-lg shadow-slate-950/15 border border-slate-900">
               <button
                 onClick={prevMonth}
-                className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition active:scale-90"
+                className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition active:scale-90"
                 title="Tháng trước"
+                aria-label="Tháng trước"
               >
                 <ChevronLeft size={18} />
               </button>
 
               <button
                 onClick={setMonthToday}
-                className="px-4 py-1.5 text-xs font-black text-white hover:text-amber-300 transition"
+                className="min-h-11 px-3 sm:px-4 text-xs font-black text-white hover:text-amber-300 transition"
                 title="Về tháng hiện tại"
               >
                 {monthNamesVi[month]} {year}
@@ -383,8 +390,9 @@ export const LoyaltyView: React.FC = () => {
 
               <button
                 onClick={nextMonth}
-                className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition active:scale-90"
+                className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition active:scale-90"
                 title="Tháng sau"
+                aria-label="Tháng sau"
               >
                 <ChevronRight size={18} />
               </button>
@@ -393,13 +401,13 @@ export const LoyaltyView: React.FC = () => {
         </div>
 
         {/* Interactive Calendar Board */}
-        <div className="space-y-3 relative z-10">
+        <div className="space-y-2 sm:space-y-3 relative z-10">
           {/* Day of Week Headers */}
-          <div className="grid grid-cols-7 gap-2 sm:gap-3 text-center">
+          <div className="grid grid-cols-7 gap-1 sm:gap-3 text-center">
             {['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'].map((dayName, idx) => (
               <div
                 key={dayName}
-                className={`py-2.5 rounded-xl text-xs font-black tracking-wider uppercase ${
+                className={`py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black tracking-wider uppercase ${
                   idx === 0 || idx === 6
                     ? 'bg-rose-50/70 text-rose-700 border border-rose-200/60'
                     : 'bg-slate-100/80 text-slate-600 border border-slate-200/60'
@@ -412,12 +420,12 @@ export const LoyaltyView: React.FC = () => {
           </div>
 
           {/* Grid Cells */}
-          <div className="grid grid-cols-7 gap-2 sm:gap-3.5">
+          <div className="grid grid-cols-7 gap-1 sm:gap-3.5">
             {/* Empty Offset Days */}
             {Array.from({ length: firstDayIndex }).map((_, idx) => (
               <div
                 key={`empty-${idx}`}
-                className="min-h-[85px] sm:min-h-[105px] rounded-2xl bg-slate-50/40 border border-dashed border-slate-200/80 flex items-center justify-center"
+                className="h-12 sm:h-auto sm:min-h-[105px] rounded-xl sm:rounded-2xl bg-slate-50/40 border border-dashed border-slate-200/80 flex items-center justify-center"
               >
                 <span className="text-slate-200 text-xs font-bold">•</span>
               </div>
@@ -427,37 +435,50 @@ export const LoyaltyView: React.FC = () => {
             {Array.from({ length: totalDaysInMonth }).map((_, idx) => {
               const dayNum = idx + 1
               const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
-              const attendInfo = attendanceMap.get(dateKey)
-              const isAttended = !!attendInfo
+              const dayRecords = attendanceMap.get(dateKey) || []
+              const attendInfo = dayRecords[dayRecords.length - 1]
+              const isAttended = dayRecords.length > 0
               const isToday =
                 new Date().getDate() === dayNum &&
                 new Date().getMonth() === month &&
                 new Date().getFullYear() === year
+              const dayLabel = `${String(dayNum).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}/${year}`
+              const CellTag = isAttended ? 'button' : 'div'
 
               return (
-                <div
+                <CellTag
                   key={dateKey}
-                  className={`min-h-[72px] sm:min-h-[105px] rounded-2xl p-1.5 sm:p-3 flex flex-col justify-between transition-all duration-200 border relative group ${
+                  {...(isAttended
+                    ? {
+                        type: 'button' as const,
+                        onClick: () => setSelectedDay({ label: dayLabel, records: dayRecords }),
+                        'aria-label': `Ngày ${dayLabel}: đã ra sân ${dayRecords.length} ca, xem chi tiết`,
+                      }
+                    : {})}
+                  className={`h-12 sm:h-auto sm:min-h-[105px] rounded-xl sm:rounded-2xl p-1 sm:p-3 flex flex-col items-center sm:items-stretch justify-center sm:justify-between transition-all duration-200 border relative group text-left ${
                     isAttended
-                      ? 'bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-600 text-white border-emerald-400 shadow-lg shadow-emerald-600/20 hover:scale-[1.03] hover:shadow-xl hover:z-20'
+                      ? 'cursor-pointer bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-600 text-white border-emerald-400 shadow-lg shadow-emerald-600/20 hover:scale-[1.03] hover:shadow-xl hover:z-20'
                       : isToday
                       ? 'bg-white border-2 border-slate-950 shadow-md ring-4 ring-slate-950/5 hover:border-slate-800'
                       : 'bg-white border border-slate-200 hover:border-slate-400 hover:shadow-md'
                   }`}
                 >
                   {/* Top Bar of Cell */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 items-start">
+                  <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-0.5 sm:gap-1 sm:w-full">
                     <span
-                      className={`text-xs sm:text-base font-black tracking-tight leading-none ${
+                      className={`text-sm sm:text-base font-black tracking-tight leading-none ${
                         isAttended ? 'text-white' : isToday ? 'text-slate-950' : 'text-slate-700 group-hover:text-slate-950'
                       }`}
                     >
                       {dayNum}
                     </span>
 
+                    {/* Mobile: chỉ hiện dấu tích nhỏ */}
+                    {isAttended && <Check size={12} strokeWidth={3.5} className="sm:hidden text-white" aria-hidden="true" />}
+
                     {isToday && (
                       <span
-                        className={`text-[8px] sm:text-[9px] font-black uppercase px-1.5 sm:px-2 py-0.5 rounded-md tracking-tight leading-none whitespace-nowrap shadow-xs ${
+                        className={`hidden sm:inline text-[9px] font-black uppercase px-2 py-0.5 rounded-md tracking-tight leading-none whitespace-nowrap shadow-xs ${
                           isAttended ? 'bg-white text-emerald-900' : 'bg-slate-950 text-white'
                         }`}
                       >
@@ -466,18 +487,18 @@ export const LoyaltyView: React.FC = () => {
                     )}
 
                     {isAttended && !isToday && (
-                      <span className="text-[10px] sm:text-xs animate-pulse hidden sm:inline">✨</span>
+                      <span className="text-xs animate-pulse hidden sm:inline">✨</span>
                     )}
                   </div>
 
                   {/* Cell Center Content / Attendance Stamp */}
-                  <div className="my-auto flex flex-col items-center justify-center">
+                  <div className="hidden sm:flex my-auto flex-col items-center justify-center">
                     {isAttended ? (
                       <div className="flex flex-col items-center gap-0.5 animate-in zoom-in-75 duration-300">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-inner">
+                        <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-inner">
                           <Check size={16} strokeWidth={3.5} />
                         </div>
-                        <span className="text-[10px] sm:text-[11px] font-black tracking-wide uppercase mt-0.5 drop-shadow-xs">
+                        <span className="text-[11px] font-black tracking-wide uppercase mt-0.5 drop-shadow-xs">
                           Đã ra sân 🏸
                         </span>
                       </div>
@@ -491,7 +512,7 @@ export const LoyaltyView: React.FC = () => {
                   </div>
 
                   {/* Bottom Meta */}
-                  <div className="text-[9px] font-semibold truncate text-right">
+                  <div className="hidden sm:block text-[9px] font-semibold truncate text-right">
                     {isAttended ? (
                       <span className="text-emerald-100 font-bold block truncate">
                         {attendInfo?.venueName || 'Tại sân đấu'}
@@ -502,7 +523,7 @@ export const LoyaltyView: React.FC = () => {
                       </span>
                     )}
                   </div>
-                </div>
+                </CellTag>
               )
             })}
           </div>
@@ -646,18 +667,16 @@ export const LoyaltyView: React.FC = () => {
       </div>
 
       {/* 4. Interactive 3D Unboxing & Claim Modal */}
-      {unboxingMilestone && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-6 text-center animate-in zoom-in-95 duration-200 relative overflow-hidden">
+      <BottomSheet
+        open={!!unboxingMilestone}
+        onClose={() => setUnboxingMilestone(null)}
+        ariaLabel={unboxingMilestone ? `Hộp Quà Mốc ${unboxingMilestone.target} Buổi` : 'Hộp quà'}
+        bodyClassName="relative space-y-6 text-center"
+      >
+        {unboxingMilestone && (
+          <>
             {/* Ambient Background Burst */}
             <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-amber-400/20 via-rose-400/10 to-transparent pointer-events-none" />
-
-            <button
-              onClick={() => setUnboxingMilestone(null)}
-              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-950 hover:bg-slate-100 transition z-10"
-            >
-              <X size={20} />
-            </button>
 
             {!isRevealed ? (
               /* State 1: Mystery Box Ready to be Tapped */
@@ -745,7 +764,7 @@ export const LoyaltyView: React.FC = () => {
                     </p>
                     <button
                       onClick={() => setUnboxingMilestone(null)}
-                      className="w-full mt-2 py-3 bg-slate-950 text-white font-black text-xs rounded-xl hover:bg-slate-800 transition"
+                      className="w-full min-h-11 mt-2 py-3 bg-slate-950 text-white font-black text-sm sm:text-xs rounded-xl hover:bg-slate-800 transition"
                     >
                       Đã hiểu, đóng
                     </button>
@@ -753,9 +772,51 @@ export const LoyaltyView: React.FC = () => {
                 )}
               </div>
             )}
+          </>
+        )}
+      </BottomSheet>
+
+      {/* 5. Chi tiết ngày ra sân (chạm vào ô lịch) */}
+      <BottomSheet
+        open={!!selectedDay}
+        onClose={() => setSelectedDay(null)}
+        title={selectedDay ? `Ngày ${selectedDay.label}` : ''}
+        bodyClassName="space-y-2.5"
+      >
+        {selectedDay?.records.map((r, i) => (
+          <div
+            key={`${r.sessionId}-${i}`}
+            className="p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/70 flex items-start justify-between gap-3"
+          >
+            <div className="min-w-0 space-y-1">
+              <p className="font-black text-sm text-slate-950 leading-snug">{r.sessionTitle || 'Ca đánh CLB'}</p>
+              <p className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+                <MapPin size={13} className="shrink-0 text-slate-500" />
+                <span className="truncate">{r.venueName || 'Tại sân đấu'}</span>
+              </p>
+              <p className="text-[11px] text-emerald-800 font-bold flex items-center gap-1.5">
+                <Check size={13} strokeWidth={3} className="shrink-0" />
+                <span>
+                  Điểm danh lúc{' '}
+                  {new Date(r.checkinAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </p>
+            </div>
+            {r.sessionId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDay(null)
+                  navigate(`/sessions/${r.sessionId}`)
+                }}
+                className="shrink-0 min-h-11 px-3 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-slate-50 transition"
+              >
+                Xem ca
+              </button>
+            )}
           </div>
-        </div>
-      )}
+        ))}
+      </BottomSheet>
     </div>
   )
 }

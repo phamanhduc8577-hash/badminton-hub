@@ -8,6 +8,7 @@ import { DuckMascot } from '../components/DuckMascot'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { useToast } from '../components/ToastProvider'
 import { formatSessionDateTime } from '../lib/dateUtils'
+import { getEffectiveSessionStatus, SESSION_STATUS_LABEL } from '../lib/sessionStatus'
 import {
   Clock,
   MapPin,
@@ -182,16 +183,7 @@ export const SessionListView: React.FC = () => {
     })
   }
 
-  const getEffectiveStatus = (session: SessionItem) => {
-    const now = new Date().getTime()
-    const start = new Date(session.startTime).getTime()
-    const end = new Date(session.endTime).getTime()
-
-    if (session.status === 'CANCELLED') return 'CANCELLED'
-    if (now > end) return 'COMPLETED'
-    if (now >= start && now <= end) return 'ACTIVE'
-    return 'UPCOMING'
-  }
+  const getEffectiveStatus = (session: SessionItem) => getEffectiveSessionStatus(session)
 
   const formatDateTime = (dateStr: string) => {
     return formatSessionDateTime(dateStr)
@@ -266,12 +258,12 @@ export const SessionListView: React.FC = () => {
   return (
     <div className="space-y-10">
       {/* 1. Ultra High-End Editorial Sports Hero Section */}
-      <div className="saas-card rounded-3xl p-8 sm:p-10 md:p-12 relative overflow-hidden border border-slate-300/80 shadow-2xl shadow-slate-900/[0.06]">
+      <div className="saas-card rounded-3xl p-5 sm:p-10 md:p-12 relative overflow-hidden border border-slate-300/80 shadow-2xl shadow-slate-900/[0.06]">
         {/* Subtle decorative athletic stripes */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-rose-500/[0.06] via-indigo-500/[0.04] to-transparent rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 relative z-10">
-          <div className="space-y-6 max-w-2xl">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 sm:gap-10 relative z-10">
+          <div className="space-y-4 sm:space-y-6 max-w-2xl">
             {/* Pill Tag with Live Indicator */}
             <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-950 text-white text-xs font-bold shadow-md">
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
@@ -281,7 +273,7 @@ export const SessionListView: React.FC = () => {
             </div>
 
             {/* Editorial Sharp Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-[1.08]">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-[1.08]">
               Quản trị ca đấu & <br />
               <span className="bg-gradient-to-r from-slate-950 via-rose-700 to-slate-950 bg-clip-text text-transparent underline decoration-rose-600/40 decoration-4 underline-offset-8">
                 điểm danh thông minh
@@ -325,8 +317,8 @@ export const SessionListView: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Spotlight Mascot Frame */}
-          <div className="flex flex-col items-center justify-center">
+          {/* Right Spotlight Mascot Frame (ẩn trên mobile để danh sách ca hiện sớm hơn) */}
+          <div className="hidden sm:flex flex-col items-center justify-center">
             <div className="p-6 rounded-3xl bg-white border border-slate-300/90 shadow-2xl shadow-slate-900/10 flex flex-col items-center gap-4 relative group">
               <div className="absolute -top-3 -right-3 px-3 py-1 bg-rose-600 text-white text-[10px] font-black uppercase rounded-full tracking-wider shadow-md">
                 Official Mascot
@@ -344,8 +336,8 @@ export const SessionListView: React.FC = () => {
           </div>
         </div>
 
-        {/* Feature Grid Highlights - Member Benefits */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-10 pt-8 border-t border-slate-200 text-xs">
+        {/* Feature Grid Highlights - Member Benefits (ẩn trên mobile) */}
+        <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-4 mt-10 pt-8 border-t border-slate-200 text-xs">
           <div
             onClick={() => navigate('/loyalty')}
             className="p-4.5 rounded-2xl bg-white border border-slate-200/90 shadow-sm space-y-1 cursor-pointer hover:border-rose-300 hover:shadow-md transition group"
@@ -408,7 +400,7 @@ export const SessionListView: React.FC = () => {
           <div className="flex items-center gap-1.5 p-1 bg-slate-200/80 rounded-2xl w-full sm:w-auto overflow-x-auto no-scrollbar shadow-inner touch-pan-x">
             <button
               onClick={() => setStatusFilter('ALL')}
-              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`min-h-10 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 statusFilter === 'ALL'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-600 hover:text-slate-950'
@@ -421,7 +413,7 @@ export const SessionListView: React.FC = () => {
             {user && (
               <button
                 onClick={() => setStatusFilter('MY_SESSIONS')}
-                className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+                className={`min-h-10 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                   statusFilter === 'MY_SESSIONS'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-950'
@@ -434,7 +426,7 @@ export const SessionListView: React.FC = () => {
 
             <button
               onClick={() => setStatusFilter('ACTIVE_UPCOMING')}
-              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`min-h-10 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 statusFilter === 'ACTIVE_UPCOMING'
                   ? 'bg-slate-950 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-950'
@@ -446,7 +438,7 @@ export const SessionListView: React.FC = () => {
 
             <button
               onClick={() => setStatusFilter('COMPLETED')}
-              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`min-h-10 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
                 statusFilter === 'COMPLETED'
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-600 hover:text-slate-950'
@@ -533,11 +525,7 @@ export const SessionListView: React.FC = () => {
                               : 'bg-slate-200/80 text-slate-600 border-slate-300'
                           }`}
                         >
-                          {effectiveStatus === 'ACTIVE'
-                            ? '• Đang diễn ra'
-                            : effectiveStatus === 'UPCOMING'
-                            ? 'Sắp diễn ra'
-                            : 'Đã kết thúc'}
+                          {SESSION_STATUS_LABEL[effectiveStatus]}
                         </span>
 
                         {session.courtNames && (
@@ -612,7 +600,7 @@ export const SessionListView: React.FC = () => {
                           title="Mở Bảng điều khiển Host (Bắt kèo, Điểm danh, Thu tiền)"
                         >
                           <ShieldCheck size={12} />
-                          <span className="hidden xs:inline">Host Panel</span>
+                          <span className="hidden sm:inline">Host Panel</span>
                         </button>
 
                         <button
@@ -641,7 +629,7 @@ export const SessionListView: React.FC = () => {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl border border-slate-200 space-y-5 relative max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl border border-slate-200 space-y-5 relative max-h-[90dvh] overflow-y-auto overscroll-contain"
           >
             <button
               onClick={() => setEditingSession(null)}

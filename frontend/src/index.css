@@ -78,6 +78,30 @@ body {
   font-size: 10px;
 }
 
+/*
+ * iOS Safari tự phóng to trang khi focus vào ô nhập có font-size < 16px.
+ * Rule này cố ý KHÔNG nằm trong @layer: trong Tailwind v4 mọi utility (text-xs, text-sm...)
+ * nằm trong @layer utilities, và style không thuộc layer nào luôn thắng style trong layer
+ * (bất kể độ đặc hiệu). Nhờ vậy dưới 640px ô nhập luôn 16px, còn từ sm trở lên
+ * các class như sm:text-xs vẫn hoạt động bình thường.
+ */
+@media (width < 40rem) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Ẩn thanh cuộn ngang cho nhóm nút lọc / tab (vẫn cuộn được bằng tay) */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Minimal Crisp Light Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

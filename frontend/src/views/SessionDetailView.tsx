@@ -6,8 +6,10 @@ import { SessionItem, Participant, Match } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { QrCameraScanner } from '../components/QrCameraScanner'
 import { DuckMascot } from '../components/DuckMascot'
+import { BottomSheet } from '../components/BottomSheet'
 import { useToast } from '../components/ToastProvider'
-import { formatSessionDateTime } from '../lib/dateUtils'
+import { formatSessionDateTime, parseServerDate } from '../lib/dateUtils'
+import { getEffectiveSessionStatus, SESSION_STATUS_LABEL } from '../lib/sessionStatus'
 import {
   Clock,
   MapPin,
@@ -23,8 +25,20 @@ import {
   Calendar,
   Sparkles,
   Check,
-  X,
+  Loader2,
 } from 'lucide-react'
+
+const getErrorMessage = (err: any, fallback: string): string =>
+  err?.response?.data?.message || fallback
+
+/** Hiển thị SĐT: Host thấy đủ; server đã che sẵn (có '*') thì giữ nguyên; thiếu SĐT thì ẩn. */
+const formatParticipantPhone = (phone: string | undefined | null, viewerIsHost: boolean): string | null => {
+  const value = (phone || '').trim()
+  if (!value || value.toUpperCase() === 'N/A') return null
+  if (viewerIsHost || value.includes('*')) return value
+  if (value.length < 7) return '***'
+  return `${value.slice(0, 4)}***${value.slice(-3)}`
+}
 
 export const SessionDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -44,14 +58,19 @@ export const SessionDetailView: React.FC = () => {
   const [showPaymentQrModal, setShowPaymentQrModal] = useState<string | null>(null)
   const [showCashNoticeModal, setShowCashNoticeModal] = useState(false)
   const [depositQrData, setDepositQrData] = useState<{ qrUrl: string; participant: Participant } | null>(null)
+  const [depositQrLoading, setDepositQrLoading] = useState(false)
+  const [paymentPending, setPaymentPending] = useState<'VIETQR' | 'CASH' | null>(null)
 
   // Checkin states
   const [checkinTokenInput, setCheckinTokenInput] = useState('')
   const [checkinDurationHours, setCheckinDurationHours] = useState<number | undefined>(undefined)
   const [checkinError, setCheckinError] = useState('')
   const [checkinSuccess, setCheckinSuccess] = useState(false)
-  const [locatingGps, setLocatingGps] = useState(false)
+  const [checkinSubmitting, setCheckinSubmitting] = useState(false)
   const autoCheckinTriggered = useRef(false)
+
+  const findMyParticipant = (s: SessionItem | undefined) =>
+    s?.participants?.find((p) => (user?.id && p.userId === user.id) || (user?.phone && p.phone === user.phone))
 
   const { data: session, isLoading } = useQuery<SessionItem>({
     queryKey: ['session', id],
@@ -59,7 +78,17 @@ export const SessionDetailView: React.FC = () => {
       const res = await api.get(`/sessions/${id}`)
       return res.data
     },
-    refetchInterval: false,
+    // Tự tải lại mỗi 15s khi đang chờ Host xác nhận cọc hoặc ca đang diễn ra (điểm danh / thu tiền thay đổi liên tục)
+    refetchInterval: (query) => {
+      const s = query.state.data
+      if (!s) return false
+      const status = getEffectiveSessionStatus(s)
+      if (status === 'COMPLETED' || status === 'CANCELLED') return false
+      const me = findMyParticipant(s)
+      const pendingDeposit =
+        !!me && Number(me.depositAmount) > 0 && (me.depositStatus === 'PENDING' || me.depositStatus === 'NONE')
+      return pendingDeposit || status === 'ACTIVE' ? 15000 : false
+    },
   })
 
   const { data: matches } = useQuery<Match[]>({
@@ -247,28 +276,32 @@ export const SessionDetailView: React.FC = () => {
     },
   })
 
-  // Instant Token Checkin (No GPS friction)
-  const handleCheckinSubmit = async (tokenToUse?: string) => {
+  // Instant Token Checkin (No GPS friction). Trả về thông báo lỗi (nếu có) để nơi gọi xử lý tiếp.
+  const handleCheckinSubmit = async (tokenToUse?: string): Promise<{ ok: boolean; error?: string }> => {
     const tokenVal = (tokenToUse || checkinTokenInput).trim().toUpperCase()
     setCheckinError('')
     if (!tokenVal) {
-      setCheckinError('Vui lòng nhập hoặc quét mã Token điểm danh!')
-      return
+      const msg = 'Vui lòng nhập hoặc quét mã Token điểm danh!'
+      setCheckinError(msg)
+      return { ok: false, error: msg }
     }
 
-    setLocatingGps(true)
+    setCheckinSubmitting(true)
     try {
       await api.post(`/sessions/${id}/checkin`, {
         token: tokenVal,
         durationHours: checkinDurationHours,
       })
-      setLocatingGps(false)
       setCheckinSuccess(true)
       showToast('Điểm danh thành công! Chúc bạn chơi vui vẻ 🏸', 'success')
       queryClient.invalidateQueries({ queryKey: ['session', id] })
+      return { ok: true }
     } catch (err: any) {
-      setLocatingGps(false)
-      setCheckinError(err.response?.data?.message || 'Điểm danh thất bại!')
+      const msg = getErrorMessage(err, 'Điểm danh thất bại!')
+      setCheckinError(msg)
+      return { ok: false, error: msg }
+    } finally {
+      setCheckinSubmitting(false)
     }
   }
 
@@ -289,7 +322,7 @@ export const SessionDetailView: React.FC = () => {
       setShowCheckinModal(true)
 
       // If user is already registered in this session and hasn't checked in yet, auto-trigger checkin
-      const currentUserParticipant = session.participants?.find((p) => (user?.id && p.userId === user.id) || (user?.phone && p.phone === user.phone))
+      const currentUserParticipant = findMyParticipant(session)
       if (currentUserParticipant && currentUserParticipant.checkinStatus !== 'CHECKED_IN') {
         autoCheckinTriggered.current = true
         handleCheckinSubmit(cleanToken)
@@ -297,8 +330,16 @@ export const SessionDetailView: React.FC = () => {
     }
   }, [searchParams, session, user])
 
+  // Mở form nhập mã tay (từ nút trong máy quét hoặc khi quét lỗi)
+  const openManualCheckin = (errorMessage?: string) => {
+    setShowCameraScanner(false)
+    setCheckinSuccess(false)
+    setCheckinError(errorMessage || '')
+    setShowCheckinModal(true)
+  }
+
   // Handle Scan QR from Camera
-  const handleScanSuccess = (scannedText: string) => {
+  const handleScanSuccess = async (scannedText: string) => {
     setShowCameraScanner(false)
     let token = scannedText.trim()
     try {
@@ -308,16 +349,38 @@ export const SessionDetailView: React.FC = () => {
         if (paramToken) token = paramToken
       }
     } catch (_) {}
-    setCheckinTokenInput(token.toUpperCase())
-    handleCheckinSubmit(token.toUpperCase())
+    const cleanToken = token.toUpperCase()
+    setCheckinTokenInput(cleanToken)
+    const result = await handleCheckinSubmit(cleanToken)
+    if (!result.ok) {
+      // Quét lỗi: báo ngay + mở form nhập tay (đã điền sẵn mã vừa quét) kèm lý do
+      showToast(result.error || 'Điểm danh thất bại!', 'error')
+      openManualCheckin(result.error)
+    }
+  }
+
+  const handleOpenDepositQr = async (participant: Participant) => {
+    if (depositQrLoading) return
+    setDepositQrLoading(true)
+    try {
+      const qrRes = await api.get(`/sessions/participants/${participant.id}/deposit-qr`)
+      setDepositQrData({ qrUrl: qrRes.data.qrUrl, participant })
+      setShowMemberDepositModal(true)
+    } catch (err: any) {
+      showToast(getErrorMessage(err, 'Không thể tạo mã VietQR cọc!'), 'error')
+    } finally {
+      setDepositQrLoading(false)
+    }
   }
 
   const handleOpenFinalPaymentQr = async (participantId: number) => {
+    if (paymentPending) return
+    setPaymentPending('VIETQR')
     try {
-      // Auto register intent as VietQR
+      // Ghi nhận ý định thanh toán VietQR để Host thấy trên bảng điều khiển
       await api.post(`/sessions/participants/${participantId}/select-payment-method`, {
-        paymentMethod: 'VIETQR'
-      }).catch(() => {})
+        paymentMethod: 'VIETQR',
+      })
       queryClient.invalidateQueries({ queryKey: ['session', id] })
       const res = await api.get(`/sessions/participants/${participantId}/payment-qr`)
       if (res.data?.qrUrl) {
@@ -327,19 +390,26 @@ export const SessionDetailView: React.FC = () => {
       }
     } catch (err: any) {
       console.error('QR Payment Error:', err)
-      showToast(err.response?.data?.message || 'Không thể tạo mã QR thanh toán! Vui lòng kiểm tra lại kết nối Backend.', 'error')
+      showToast(getErrorMessage(err, 'Không thể tạo mã QR thanh toán! Vui lòng kiểm tra kết nối và thử lại.'), 'error')
+    } finally {
+      setPaymentPending(null)
     }
   }
 
   const handleSelectCashPayment = async (participantId: number) => {
+    if (paymentPending) return
+    setPaymentPending('CASH')
     try {
       await api.post(`/sessions/participants/${participantId}/select-payment-method`, {
-        paymentMethod: 'CASH'
-      }).catch(() => {})
+        paymentMethod: 'CASH',
+      })
       queryClient.invalidateQueries({ queryKey: ['session', id] })
+      // Chỉ báo "Host đã ghi nhận" khi server thật sự lưu thành công
       setShowCashNoticeModal(true)
-    } catch (err) {
-      setShowCashNoticeModal(true)
+    } catch (err: any) {
+      showToast(getErrorMessage(err, 'Không thể ghi nhận hình thức Tiền mặt, vui lòng thử lại!'), 'error')
+    } finally {
+      setPaymentPending(null)
     }
   }
 
@@ -353,10 +423,16 @@ export const SessionDetailView: React.FC = () => {
   }
 
   // Find user participant info (Strictly match logged-in user by ID or Phone)
-  const isUserParticipant = session.participants?.find((p) => (user?.id && p.userId === user.id) || (user?.phone && p.phone === user.phone))
+  const isUserParticipant = findMyParticipant(session)
   const isPendingDeposit = isUserParticipant && Number(isUserParticipant.depositAmount) > 0 && isUserParticipant.depositStatus !== 'PAID'
   const isCheckedIn = isUserParticipant?.checkinStatus === 'CHECKED_IN'
   const isFull = session.bookedSlots >= session.maxSlots
+  const effectiveStatus = getEffectiveSessionStatus(session)
+  const viewerIsHost = user?.role === 'HOST'
+  const checkinTimeLabel = isUserParticipant?.checkinAt
+    ? parseServerDate(isUserParticipant.checkinAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    : ''
+  const spinner = <Loader2 size={15} className="animate-spin" aria-hidden="true" />
 
   return (
     <div className="space-y-8">
@@ -431,11 +507,7 @@ export const SessionDetailView: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-2.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-black uppercase px-3 py-1 rounded-full bg-slate-100 text-slate-800 border border-slate-200">
-                  {session.status === 'ACTIVE'
-                    ? '• Đang diễn ra'
-                    : session.status === 'UPCOMING'
-                    ? 'Sắp diễn ra'
-                    : 'Đã kết thúc'}
+                  {SESSION_STATUS_LABEL[effectiveStatus]}
                 </span>
 
                 {session.courtNames && (
@@ -567,9 +639,13 @@ export const SessionDetailView: React.FC = () => {
                 </button>
               )}
 
-              {session.status === 'COMPLETED' || new Date().getTime() > new Date(session.endTime).getTime() ? (
+              {effectiveStatus === 'COMPLETED' || effectiveStatus === 'CANCELLED' ? (
                 <div className="w-full py-3.5 bg-slate-100 border border-slate-200 text-slate-600 font-bold rounded-xl text-center flex items-center justify-center gap-2 text-xs shadow-sm">
-                  <span>Ca đánh này đã kết thúc (Đã đóng đăng ký)</span>
+                  <span>
+                    {effectiveStatus === 'CANCELLED'
+                      ? 'Ca đánh này đã bị hủy (Đã đóng đăng ký)'
+                      : 'Ca đánh này đã kết thúc (Đã đóng đăng ký)'}
+                  </span>
                 </div>
               ) : isPendingDeposit ? (
                 /* Thành viên vãng lai lần đầu: Bắt buộc chuyển khoản cọc và chờ Host duyệt mới mở giao diện tham gia */
@@ -588,19 +664,17 @@ export const SessionDetailView: React.FC = () => {
 
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
                     <button
-                      onClick={async () => {
-                        try {
-                          const qrRes = await api.get(`/sessions/participants/${isUserParticipant.id}/deposit-qr`)
-                          setDepositQrData({ qrUrl: qrRes.data.qrUrl, participant: isUserParticipant })
-                          setShowMemberDepositModal(true)
-                        } catch (e) {
-                          showToast('Không thể tạo mã VietQR cọc!', 'error')
-                        }
-                      }}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-slate-950 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95"
+                      onClick={() => handleOpenDepositQr(isUserParticipant)}
+                      disabled={depositQrLoading}
+                      aria-busy={depositQrLoading}
+                      className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-slate-950 hover:bg-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm sm:text-xs flex items-center justify-center gap-2 shadow-sm transition active:scale-95 disabled:active:scale-100"
                     >
-                      <QrCode size={15} />
-                      <span>Xem lại mã VietQR Cọc 20.000đ</span>
+                      {depositQrLoading ? spinner : <QrCode size={15} />}
+                      <span>
+                        {depositQrLoading
+                          ? 'Đang tạo mã VietQR...'
+                          : `Xem lại mã VietQR Cọc ${Number(isUserParticipant.depositAmount).toLocaleString('vi-VN')}đ`}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -610,7 +684,7 @@ export const SessionDetailView: React.FC = () => {
                   {isCheckedIn ? (
                     <div className="w-full py-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold rounded-xl text-center flex items-center justify-center gap-2 text-sm shadow-sm">
                       <CheckCircle2 size={18} className="text-emerald-600" />
-                      <span>Đã điểm danh lúc {new Date(isUserParticipant.checkinAt!).toLocaleTimeString()}</span>
+                      <span>Đã điểm danh lúc {checkinTimeLabel}</span>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -623,15 +697,15 @@ export const SessionDetailView: React.FC = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <button
                           onClick={() => setShowCameraScanner(true)}
-                          className="py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white rounded-xl flex items-center justify-center gap-2 text-xs transition active:scale-95 shadow-sm"
+                          className="min-h-11 py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white rounded-xl flex items-center justify-center gap-2 text-sm sm:text-xs transition active:scale-95 shadow-sm"
                         >
                           <Camera size={16} />
                           <span>Quét QR sân (Camera)</span>
                         </button>
 
                         <button
-                          onClick={() => setShowCheckinModal(true)}
-                          className="py-3 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl flex items-center justify-center gap-2 text-xs transition border border-slate-200 active:scale-95 shadow-sm"
+                          onClick={() => openManualCheckin()}
+                          className="min-h-11 py-3 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl flex items-center justify-center gap-2 text-sm sm:text-xs transition border border-slate-200 active:scale-95 shadow-sm"
                         >
                           <QrCode size={16} />
                           <span>Nhập mã Token</span>
@@ -695,25 +769,30 @@ export const SessionDetailView: React.FC = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                         <button
                           onClick={() => handleOpenFinalPaymentQr(isUserParticipant.id)}
-                          className={`py-2.5 font-bold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm ${
+                          disabled={paymentPending !== null}
+                          aria-busy={paymentPending === 'VIETQR'}
+                          className={`min-h-11 py-2.5 font-bold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm text-sm sm:text-xs disabled:opacity-60 disabled:cursor-not-allowed ${
                             isUserParticipant.paymentMethod === 'VIETQR'
                               ? 'bg-indigo-600 hover:bg-indigo-700 text-white ring-2 ring-indigo-400'
                               : 'bg-slate-950 hover:bg-slate-800 text-white'
                           }`}
                         >
-                          <QrCode size={15} />
-                          <span>Quét VietQR chuyển khoản</span>
+                          {paymentPending === 'VIETQR' ? spinner : <QrCode size={15} />}
+                          <span>{paymentPending === 'VIETQR' ? 'Đang tạo mã QR...' : 'Quét VietQR chuyển khoản'}</span>
                         </button>
 
                         <button
                           onClick={() => handleSelectCashPayment(isUserParticipant.id)}
-                          className={`py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center text-center transition border ${
+                          disabled={paymentPending !== null}
+                          aria-busy={paymentPending === 'CASH'}
+                          className={`min-h-11 py-2.5 px-3 rounded-xl font-bold text-sm sm:text-xs flex items-center justify-center gap-1.5 text-center transition border disabled:opacity-60 disabled:cursor-not-allowed ${
                             isUserParticipant.paymentMethod === 'CASH'
                               ? 'bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-300'
                               : 'bg-white hover:bg-slate-50 border-amber-300 text-amber-950 shadow-2xs'
                           }`}
                         >
-                          <span>💵 Trả Tiền mặt cho Host</span>
+                          {paymentPending === 'CASH' && spinner}
+                          <span>{paymentPending === 'CASH' ? 'Đang gửi cho Host...' : '💵 Trả Tiền mặt cho Host'}</span>
                         </button>
                       </div>
                     </div>
@@ -774,13 +853,14 @@ export const SessionDetailView: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+            <div className="space-y-2 lg:max-h-[500px] lg:overflow-y-auto lg:pr-1">
               {session.participants?.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">Chưa có ai đăng ký ca này</div>
               ) : (
                 session.participants?.map((p, idx) => {
                   const uid = String(p.userId || p.id)
                   const stats = playerStatsMap[uid] || { totalSets: 0, wins: 0, losses: 0 }
+                  const phoneLabel = formatParticipantPhone(p.phone, viewerIsHost)
 
                   return (
                     <div
@@ -829,9 +909,9 @@ export const SessionDetailView: React.FC = () => {
                             >
                               🏸 {stats.totalSets} set ({stats.wins}W - {stats.losses}L)
                             </span>
-                            <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
-                              {user?.role === 'HOST' ? p.phone : p.phone ? (p.phone.slice(0, 4) + '***' + p.phone.slice(-3)) : 'Chưa có SĐT'}
-                            </span>
+                            {phoneLabel && (
+                              <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">{phoneLabel}</span>
+                            )}
                             {p.slotWindow && (
                               <span className="text-[9px] font-extrabold text-slate-900 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded shrink-0">
                                 ⏱️ {p.slotWindow}
@@ -871,12 +951,32 @@ export const SessionDetailView: React.FC = () => {
       </div>
 
       {/* Member First-Time Deposit VietQR Modal */}
-      {showMemberDepositModal && depositQrData && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-7 space-y-4 shadow-2xl text-center">
+      <BottomSheet
+        open={showMemberDepositModal && !!depositQrData}
+        onClose={() => {
+          setShowMemberDepositModal(false)
+          setDepositQrData(null)
+        }}
+        closeOnBackdrop={false}
+        labelledBy="deposit-qr-title"
+        bodyClassName="space-y-4 text-center"
+        footer={
+          <button
+            onClick={() => {
+              setShowMemberDepositModal(false)
+              setDepositQrData(null)
+            }}
+            className="w-full min-h-11 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm sm:text-xs shadow-sm active:scale-95 transition"
+          >
+            Dạ vâng, mình đã chuyển khoản cọc rồi! 🏸
+          </button>
+        }
+      >
+        {depositQrData && (
+          <>
             <DuckMascot size={52} rounded="2xl" className="mx-auto shadow-md border border-slate-200" />
             <div>
-              <h3 className="font-black text-base text-slate-900">Quét VietQR cọc giữ chỗ (Lần đầu)</h3>
+              <h3 id="deposit-qr-title" className="font-black text-base text-slate-900">Quét VietQR cọc giữ chỗ (Lần đầu)</h3>
               <p className="text-xs text-slate-600 mt-1">
                 Số tiền cọc: <b className="text-rose-600 text-sm font-black">{Number(depositQrData.participant.depositAmount || session?.depositAmount || 20000).toLocaleString()}đ</b>
               </p>
@@ -887,10 +987,10 @@ export const SessionDetailView: React.FC = () => {
             </div>
 
             <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs space-y-1.5">
-              <div className="flex justify-between text-amber-950">
+              <div className="flex justify-between gap-2 text-amber-950">
                 <span className="font-semibold">Nội dung CK:</span>
                 <span className="font-mono font-bold text-slate-950 bg-white px-2 py-0.5 rounded border border-amber-300">
-                  COC {session?.id} {depositQrData.participant.phone}
+                  COC SF{depositQrData.participant.id}
                 </span>
               </div>
               <p className="text-[11px] text-amber-900 leading-relaxed font-medium pt-1 border-t border-amber-200/80">
@@ -898,139 +998,182 @@ export const SessionDetailView: React.FC = () => {
                 (Số tiền 20k này sẽ được trừ thẳng vào tiền sân khi bạn đến đánh và từ lần thứ 2 trở đi bạn sẽ được <b>MIỄN CỌC 100%</b> nha!)
               </p>
             </div>
-
-            <button
-              onClick={() => {
-                setShowMemberDepositModal(false)
-                setDepositQrData(null)
-              }}
-              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-sm active:scale-95 transition"
-            >
-              Dạ vâng, mình đã chuyển khoản cọc rồi! 🏸
-            </button>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </BottomSheet>
 
       {/* Manual Check-in Modal */}
-      {showCheckinModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div className="text-center">
-              <h3 className="font-black text-base text-slate-900">Điểm danh 1-Chạm</h3>
-              <p className="text-xs text-slate-600 mt-1">
-                Nhập hoặc quét mã Token hiển thị trên màn hình Host
-              </p>
+      <BottomSheet
+        open={showCheckinModal}
+        onClose={() => {
+          setShowCheckinModal(false)
+          setCheckinSuccess(false)
+        }}
+        labelledBy="manual-checkin-title"
+        bodyClassName="space-y-4"
+        footer={
+          checkinSuccess ? (
+            <button
+              onClick={() => {
+                setShowCheckinModal(false)
+                setCheckinSuccess(false)
+              }}
+              className="w-full min-h-11 py-2.5 bg-slate-900 text-white font-bold text-sm sm:text-xs rounded-xl"
+            >
+              Xác nhận
+            </button>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCheckinModal(false)}
+                className="flex-1 min-h-11 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm sm:text-xs rounded-xl"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={checkinSubmitting || !checkinTokenInput}
+                aria-busy={checkinSubmitting}
+                onClick={() => handleCheckinSubmit()}
+                className="flex-1 min-h-11 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm sm:text-xs rounded-xl shadow-sm flex items-center justify-center gap-2"
+              >
+                {checkinSubmitting && spinner}
+                <span>{checkinSubmitting ? 'Đang xác nhận...' : 'Xác nhận'}</span>
+              </button>
+            </div>
+          )
+        }
+      >
+        <div className="text-center px-8">
+          <h3 id="manual-checkin-title" className="font-black text-base text-slate-900">Điểm danh 1-Chạm</h3>
+          <p className="text-xs text-slate-600 mt-1">
+            Nhập hoặc quét mã Token hiển thị trên màn hình Host
+          </p>
+        </div>
+
+        {checkinSuccess ? (
+          <div className="py-4 text-center space-y-3">
+            <CheckCircle2 size={44} className="text-emerald-600 mx-auto" />
+            <h4 className="font-bold text-sm text-emerald-800">Điểm danh thành công!</h4>
+          </div>
+        ) : (
+          <div className="space-y-3.5">
+            {checkinError && (
+              <div role="alert" className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2 font-medium">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{checkinError}</span>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="checkin-token-input" className="block text-xs font-bold text-slate-700 mb-1.5">
+                Mã Token (8 ký tự)
+              </label>
+              <input
+                id="checkin-token-input"
+                type="text"
+                maxLength={8}
+                placeholder="VD: A1B2C3D4"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                value={checkinTokenInput}
+                onChange={(e) => setCheckinTokenInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && checkinTokenInput && !checkinSubmitting) handleCheckinSubmit()
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-lg font-mono font-bold text-slate-900 focus:border-slate-900 focus:outline-none"
+              />
             </div>
 
-            {checkinSuccess ? (
-              <div className="py-4 text-center space-y-3">
-                <CheckCircle2 size={44} className="text-emerald-600 mx-auto" />
-                <h4 className="font-bold text-sm text-emerald-800">Điểm danh thành công!</h4>
-                <button
-                  onClick={() => {
-                    setShowCheckinModal(false)
-                    setCheckinSuccess(false)
-                  }}
-                  className="mt-3 px-6 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl"
-                >
-                  Xác nhận
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3.5">
-                {checkinError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2 font-medium">
-                    <AlertCircle size={15} className="shrink-0" />
-                    <span>{checkinError}</span>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Mã Token (8 ký tự)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={8}
-                    placeholder="VD: A1B2C3D4"
-                    value={checkinTokenInput}
-                    onChange={(e) => setCheckinTokenInput(e.target.value.toUpperCase())}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-lg font-mono font-bold text-slate-900 focus:border-slate-900 focus:outline-none"
-                  />
-                </div>
-
-                {session.memberMalePrice2h && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Thời lượng bạn chơi hôm nay
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCheckinDurationHours(undefined)}
-                        className={`py-2 px-2 rounded-xl font-bold text-xs border transition ${
-                          checkinDurationHours === undefined
-                            ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                            : 'bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        Toàn bộ ca
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCheckinDurationHours(2.0)}
-                        className={`py-2 px-2 rounded-xl font-bold text-xs border transition ${
-                          checkinDurationHours === 2.0
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                            : 'bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        Chỉ đánh 2 Tiếng
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-2">
+            {session.memberMalePrice2h && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Thời lượng bạn chơi hôm nay
+                </label>
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => setShowCheckinModal(false)}
-                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                    type="button"
+                    onClick={() => setCheckinDurationHours(undefined)}
+                    className={`min-h-11 py-2 px-2 rounded-xl font-bold text-sm sm:text-xs border transition ${
+                      checkinDurationHours === undefined
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
                   >
-                    Hủy
+                    Toàn bộ ca
                   </button>
                   <button
-                    disabled={locatingGps || !checkinTokenInput}
-                    onClick={() => handleCheckinSubmit()}
-                    className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm"
+                    type="button"
+                    onClick={() => setCheckinDurationHours(2.0)}
+                    className={`min-h-11 py-2 px-2 rounded-xl font-bold text-sm sm:text-xs border transition ${
+                      checkinDurationHours === 2.0
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
                   >
-                    {locatingGps ? 'Đang dò GPS...' : 'Xác nhận'}
+                    Chỉ đánh 2 Tiếng
                   </button>
                 </div>
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </BottomSheet>
 
       {/* Member Time Slot & Duration Selection Modal for >2h Sessions */}
-      {showJoinOptionModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <DuckMascot size={40} rounded="xl" className="border border-slate-200 shadow-2xs shrink-0" />
-                <div>
-                  <h3 className="font-black text-base text-slate-950">Chọn Khung Giờ Đánh ({totalSessionHours}h)</h3>
-                  <p className="text-xs text-slate-500 font-semibold">Tùy chọn đánh trọn ca hoặc chỉ đánh 2 tiếng</p>
-                </div>
+      <BottomSheet
+        open={showJoinOptionModal}
+        onClose={() => setShowJoinOptionModal(false)}
+        labelledBy="join-option-title"
+        bodyClassName="space-y-5"
+        footer={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowJoinOptionModal(false)}
+              className="flex-1 min-h-11 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm sm:text-xs rounded-xl transition"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              disabled={memberJoinMutation.isPending}
+              aria-busy={memberJoinMutation.isPending}
+              onClick={() => {
+                const chosenWindow = subSlotWindows.find((w) => w.key === selectedSlotWindow)
+                const slotWindowStr = chosenWindow && chosenWindow.key !== 'FULL'
+                  ? `${chosenWindow.timeRange} (${chosenWindow.key === 'EARLY_2H' ? 'Về sớm' : 'Đến muộn'})`
+                  : undefined
+                memberJoinMutation.mutate({
+                  durationHours: selectedDurationHours,
+                  slotWindow: slotWindowStr,
+                })
+              }}
+              className="flex-1 min-h-11 py-3 bg-slate-950 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm sm:text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2"
+            >
+              {memberJoinMutation.isPending ? (
+                <>
+                  {spinner}
+                  <span>Đang đăng ký...</span>
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  <span>Xác nhận đăng ký</span>
+                </>
+              )}
+            </button>
+          </div>
+        }
+      >
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100 pr-10">
+              <DuckMascot size={40} rounded="xl" className="border border-slate-200 shadow-2xs shrink-0" />
+              <div className="min-w-0">
+                <h3 id="join-option-title" className="font-black text-base text-slate-950">Chọn Khung Giờ Đánh ({totalSessionHours}h)</h3>
+                <p className="text-xs text-slate-500 font-semibold">Tùy chọn đánh trọn ca hoặc chỉ đánh 2 tiếng</p>
               </div>
-              <button
-                onClick={() => setShowJoinOptionModal(false)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-              >
-                <X size={18} />
-              </button>
             </div>
 
             <div className="space-y-3">
@@ -1038,7 +1181,7 @@ export const SessionDetailView: React.FC = () => {
                 Bạn muốn tham gia vào khung giờ nào?
               </label>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2.5" role="radiogroup" aria-labelledby="join-option-title">
                 {subSlotWindows.map((win) => {
                   const isSelected = selectedSlotWindow === win.key
                   const is2h = win.duration === 2.0
@@ -1052,13 +1195,16 @@ export const SessionDetailView: React.FC = () => {
                         : (user?.gender === 'FEMALE' ? session.guestFemalePrice : session.guestMalePrice))
 
                   return (
-                    <div
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
                       key={win.key}
                       onClick={() => {
                         setSelectedSlotWindow(win.key)
                         setSelectedDurationHours(win.duration === totalSessionHours ? undefined : win.duration)
                       }}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all duration-150 flex items-center justify-between ${
+                      className={`w-full text-left p-4 rounded-2xl border-2 cursor-pointer transition-all duration-150 flex items-center justify-between ${
                         isSelected
                           ? 'border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/20'
                           : 'border-slate-200 hover:border-slate-400 bg-white text-slate-900 shadow-2xs hover:shadow-sm'
@@ -1089,105 +1235,76 @@ export const SessionDetailView: React.FC = () => {
                           {isMember ? 'Giá Thành viên' : 'Giá Vãng lai'}
                         </span>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
             </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowJoinOptionModal(false)}
-                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                disabled={memberJoinMutation.isPending}
-                onClick={() => {
-                  const chosenWindow = subSlotWindows.find((w) => w.key === selectedSlotWindow)
-                  const slotWindowStr = chosenWindow && chosenWindow.key !== 'FULL'
-                    ? `${chosenWindow.timeRange} (${chosenWindow.key === 'EARLY_2H' ? 'Về sớm' : 'Đến muộn'})`
-                    : undefined
-                  memberJoinMutation.mutate({
-                    durationHours: selectedDurationHours,
-                    slotWindow: slotWindowStr,
-                  })
-                }}
-                className="flex-1 py-3 bg-slate-950 hover:bg-slate-800 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2"
-              >
-                {memberJoinMutation.isPending ? (
-                  <span>Đang đăng ký...</span>
-                ) : (
-                  <>
-                    <Check size={16} />
-                    <span>Xác nhận đăng ký</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </BottomSheet>
 
       {/* Camera Scanner */}
       {showCameraScanner && (
         <QrCameraScanner
           onScanSuccess={handleScanSuccess}
           onClose={() => setShowCameraScanner(false)}
+          onManualEntry={() => openManualCheckin()}
         />
       )}
 
       {/* Final Bill QR Modal */}
-      {showPaymentQrModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-4 text-center shadow-2xl">
-            <h3 className="font-black text-base text-slate-900">Quét VietQR thanh toán</h3>
-            <div className="bg-white p-3 rounded-2xl inline-block border border-slate-200 shadow-sm">
-              <img src={showPaymentQrModal} alt="VietQR Final Payment" className="w-52 h-52 mx-auto object-contain" />
-            </div>
-            <p className="text-xs text-slate-600">
-              Quét mã bằng ứng dụng ngân hàng bất kỳ để thanh toán đúng số tiền.
-            </p>
-            <button
-              onClick={() => setShowPaymentQrModal(null)}
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-sm"
-            >
-              Đã chuyển khoản xong
-            </button>
+      <BottomSheet
+        open={!!showPaymentQrModal}
+        onClose={() => setShowPaymentQrModal(null)}
+        title="Quét VietQR thanh toán"
+        bodyClassName="space-y-4 text-center"
+        footer={
+          <button
+            onClick={() => setShowPaymentQrModal(null)}
+            className="w-full min-h-11 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm sm:text-xs shadow-sm"
+          >
+            Đã chuyển khoản xong
+          </button>
+        }
+      >
+        {showPaymentQrModal && (
+          <div className="bg-white p-3 rounded-2xl inline-block border border-slate-200 shadow-sm">
+            <img src={showPaymentQrModal} alt="VietQR Final Payment" className="w-52 h-52 mx-auto object-contain" />
           </div>
-        </div>
-      )}
+        )}
+        <p className="text-xs text-slate-600">
+          Quét mã bằng ứng dụng ngân hàng bất kỳ để thanh toán đúng số tiền.
+        </p>
+      </BottomSheet>
 
       {/* Cash Payment Notice Modal */}
-      {showCashNoticeModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 space-y-5 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <DuckMascot size={56} rounded="2xl" className="mx-auto shadow-md border border-slate-200" />
+      <BottomSheet
+        open={showCashNoticeModal}
+        onClose={() => setShowCashNoticeModal(false)}
+        labelledBy="cash-notice-title"
+        bodyClassName="space-y-5 text-center"
+        footer={
+          <button
+            onClick={() => setShowCashNoticeModal(false)}
+            className="w-full min-h-11 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm sm:text-xs shadow-md active:scale-95 transition"
+          >
+            Dạ vâng, mình nhớ rồi ạ! 🥰
+          </button>
+        }
+      >
+        <DuckMascot size={56} rounded="2xl" className="mx-auto shadow-md border border-slate-200" />
 
-            <div className="space-y-2">
-              <h3 className="font-black text-base text-slate-900">
-                Host đã ghi nhận hình thức Tiền mặt! 💵
-              </h3>
-              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-950 font-medium leading-relaxed">
-                ✨ Host đã nhận được thông tin bạn chọn trả tiền mặt tại sân.
-                <p className="mt-1 font-bold text-rose-600">
-                  💖 Mong khách iu có mặt đúng giờ và hong bùng slot nà! 🏸
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowCashNoticeModal(false)}
-              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md active:scale-95 transition"
-            >
-              Dạ vâng, mình nhớ rồi ạ! 🥰
-            </button>
+        <div className="space-y-2">
+          <h3 id="cash-notice-title" className="font-black text-base text-slate-900">
+            Host đã ghi nhận hình thức Tiền mặt! 💵
+          </h3>
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-950 font-medium leading-relaxed">
+            ✨ Host đã nhận được thông tin bạn chọn trả tiền mặt tại sân.
+            <p className="mt-1 font-bold text-rose-600">
+              💖 Mong khách iu có mặt đúng giờ và hong bùng slot nà! 🏸
+            </p>
           </div>
         </div>
-      )}
+      </BottomSheet>
     </div>
   )
 }

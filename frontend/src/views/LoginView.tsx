@@ -47,6 +47,12 @@ export const LoginView: React.FC = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const errorRef = useRef<HTMLDivElement>(null)
+
+  // Có lỗi mới → cuộn tới thông báo lỗi (cạnh nút gửi) để người dùng mobile thấy ngay
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  }, [error])
 
   // Handle local image file upload & resize/compress to base64
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,48 +209,49 @@ export const LoginView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-semibold">
-                    {error}
-                  </div>
-                )}
-
                 {isRegister && !isForgotPassword && (
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">Họ và tên của bạn</label>
+                    <label htmlFor="auth-fullname" className="block text-xs font-bold text-slate-700 mb-1.5">Họ và tên của bạn</label>
                     <div className="relative">
                       <UserIcon className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                       <input
+                        id="auth-fullname"
+                        name="name"
                         type="text"
+                        autoComplete="name"
                         required
                         placeholder="Nguyễn Văn A"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
+                        className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
                       />
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Số điện thoại</label>
+                  <label htmlFor="auth-phone" className="block text-xs font-bold text-slate-700 mb-1.5">Số điện thoại</label>
                   <div className="relative">
                     <Phone className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                     <input
+                      id="auth-phone"
+                      name="phone"
                       type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
                       required
                       placeholder="Nhập số điện thoại của bạn..."
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
+                      className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
                     />
                   </div>
                 </div>
 
                 {!isForgotPassword && (
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-xs font-bold text-slate-700">Mật khẩu</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="auth-password" className="block text-xs font-bold text-slate-700">Mật khẩu</label>
                       {!isRegister && (
                         <button
                           type="button"
@@ -253,7 +260,7 @@ export const LoginView: React.FC = () => {
                             setError('')
                             setForgotSuccess('')
                           }}
-                          className="text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
+                          className="min-h-11 -my-2 -mr-2 px-2 inline-flex items-center text-xs sm:text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
                         >
                           Quên mật khẩu?
                         </button>
@@ -262,12 +269,15 @@ export const LoginView: React.FC = () => {
                     <div className="relative">
                       <Lock className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                       <input
+                        id="auth-password"
+                        name="password"
                         type="password"
+                        autoComplete={isRegister ? 'new-password' : 'current-password'}
                         required
                         placeholder="••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
+                        className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
                       />
                     </div>
                   </div>
@@ -281,7 +291,7 @@ export const LoginView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setGender('MALE')}
-                          className={`py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                          className={`min-h-11 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                             gender === 'MALE'
                               ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -292,7 +302,7 @@ export const LoginView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setGender('FEMALE')}
-                          className={`py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                          className={`min-h-11 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
                             gender === 'FEMALE'
                               ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -363,10 +373,11 @@ export const LoginView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute -bottom-1 -right-1 p-1.5 bg-slate-950 text-white rounded-xl shadow border border-white cursor-pointer"
+                            className="absolute -bottom-2 -right-2 min-h-9 min-w-9 inline-flex items-center justify-center bg-slate-950 text-white rounded-xl shadow border-2 border-white cursor-pointer"
                             title="Tải ảnh từ máy"
+                            aria-label="Tải ảnh đại diện từ máy"
                           >
-                            <Camera size={12} />
+                            <Camera size={14} />
                           </button>
                         </div>
 
@@ -382,7 +393,7 @@ export const LoginView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full py-2 px-3 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
+                            className="w-full min-h-11 py-2 px-3 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
                           >
                             <Upload size={14} className="text-slate-600" />
                             <span>Tải ảnh từ máy / điện thoại</span>
@@ -391,7 +402,7 @@ export const LoginView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setAvatarUrl('/duck-mascot.png')}
-                            className="w-full py-1 text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
+                            className="w-full min-h-11 py-1 text-xs sm:text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
                           >
                             Dùng Mascot mặc định
                           </button>
@@ -401,10 +412,21 @@ export const LoginView: React.FC = () => {
                   </>
                 )}
 
+                {/* Lỗi hiển thị ngay trên nút gửi để không bị khuất khi form dài (đăng ký) */}
+                {error && (
+                  <div
+                    ref={errorRef}
+                    role="alert"
+                    className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-semibold scroll-mt-24"
+                  >
+                    {error}
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white text-xs rounded-xl shadow flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50 mt-4 cursor-pointer"
+                  className="w-full min-h-11 py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white text-sm sm:text-xs rounded-xl shadow flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50 mt-4 cursor-pointer"
                 >
                   {isForgotPassword ? (
                     <>
@@ -435,7 +457,7 @@ export const LoginView: React.FC = () => {
                       setIsForgotPassword(false)
                       setError('')
                     }}
-                    className="text-xs text-slate-900 hover:underline font-bold flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                    className="min-h-11 text-xs text-slate-900 hover:underline font-bold flex items-center justify-center gap-1 mx-auto cursor-pointer"
                   >
                     <ArrowLeft size={14} />
                     <span>Quay lại Đăng nhập</span>
@@ -447,7 +469,7 @@ export const LoginView: React.FC = () => {
                       setIsRegister(!isRegister)
                       setError('')
                     }}
-                    className="text-xs text-slate-900 hover:underline font-bold cursor-pointer"
+                    className="min-h-11 px-2 text-xs text-slate-900 hover:underline font-bold cursor-pointer"
                   >
                     {isRegister ? 'Đã có tài khoản? Đăng nhập ngay' : 'Chưa có tài khoản? Đăng ký thành viên'}
                   </button>

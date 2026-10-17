@@ -1,4 +1,5 @@
 import React from 'react'
+import { twMerge } from 'tailwind-merge'
 
 interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
   value: number | undefined
@@ -48,7 +49,10 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
         value={displayVal}
         onChange={handleChange}
         placeholder={placeholder}
-        className={`w-full bg-white border border-slate-200 rounded-xl p-2.5 text-slate-900 font-bold focus:border-slate-900 focus:outline-none shadow-sm pr-8 ${className}`}
+        className={twMerge(
+          'w-full bg-white border border-slate-200 rounded-xl p-2.5 text-base text-slate-900 font-bold focus:border-slate-900 focus:outline-none shadow-sm pr-8',
+          className
+        )}
         {...rest}
       />
       {suffix && (
