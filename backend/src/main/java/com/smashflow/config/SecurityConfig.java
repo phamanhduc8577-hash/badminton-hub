@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/webhooks/**", "/api/webhook/**", "/api/sepay/**").permitAll()
                         // Mã QR chuyển khoản: bắt buộc đăng nhập (chủ lượt đăng ký hoặc Host, kiểm tra trong service).
                         // Phải đặt TRƯỚC permitAll GET /api/sessions/**
                         .requestMatchers(HttpMethod.GET,
