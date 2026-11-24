@@ -52,9 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
-                        // Webhook SePay & thông tin cấu hình công khai
-                        .requestMatchers("/api/sepay/webhook", "/api/webhook/sepay", "/webhook/bank", "/webhook/sepay").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/sepay/config").permitAll()
+                        .requestMatchers("/api/webhooks/**", "/api/webhook/**", "/api/sepay/**", "/webhook/**").permitAll()
                         // Mã QR chuyển khoản: bắt buộc đăng nhập (chủ lượt đăng ký hoặc Host, kiểm tra trong service).
                         // Phải đặt TRƯỚC permitAll GET /api/sessions/**
                         .requestMatchers(HttpMethod.GET,

@@ -3,7 +3,6 @@ package com.smashflow.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smashflow.dto.SepayWebhookPayload;
 import com.smashflow.dto.SepayWebhookResponse;
-import com.smashflow.model.Role;
 import com.smashflow.model.SepayWebhookEvent;
 import com.smashflow.model.User;
 import com.smashflow.service.SepayWebhookService;
@@ -39,12 +38,17 @@ public class SepayWebhookController {
      * Endpoint chính và các alias nhận Webhook từ SePay khi có biến động số dư:
      * - POST /api/sepay/webhook (Đường dẫn chuẩn khuyến nghị)
      * - POST /api/webhook/sepay (Alias)
+     * - POST /api/webhooks (Alias)
      * - POST /webhook/bank (Alias Seller API)
      * - POST /webhook/sepay (Alias)
      */
     @PostMapping({
             "/api/sepay/webhook",
             "/api/webhook/sepay",
+            "/api/webhooks",
+            "/api/webhooks/webhook",
+            "/api/webhook",
+            "/api/sepay",
             "/webhook/bank",
             "/webhook/sepay"
     })
@@ -57,8 +61,10 @@ public class SepayWebhookController {
         sepayWebhookService.validateAuthorization(authHeader);
 
         // 2. Kiểm tra IP allowlist nếu bật cấu hình
-        String remoteIp = extractClientIp(request);
-        sepayWebhookService.validateIpAddress(remoteIp);
+        if (request != null) {
+            String remoteIp = extractClientIp(request);
+            sepayWebhookService.validateIpAddress(remoteIp);
+        }
 
         // 3. Parse JSON payload
         SepayWebhookPayload payload;

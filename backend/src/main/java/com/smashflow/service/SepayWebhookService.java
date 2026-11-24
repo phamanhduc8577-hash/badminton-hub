@@ -113,22 +113,26 @@ public class SepayWebhookService {
     }
 
     /**
+     * Xử lý webhook payload (overload cho đơn giản hóa khi không truyền raw JSON)
+     */
+    @Transactional
+    public SepayWebhookResponse processWebhook(SepayWebhookPayload payload) {
+        return processWebhook(payload, null);
+    }
+
+    /**
      * Xử lý webhook payload từ SePay gửi tới
      */
     @Transactional
     public SepayWebhookResponse processWebhook(SepayWebhookPayload payload, String rawPayload) {
-        if (payload == null || payload.getId() == null) {
-            return SepayWebhookResponse.builder()
-                    .success(false)
-                    .matched(false)
-                    .message("Payload rỗng hoặc thiếu transaction id")
-                    .build();
+        if (payload == null) {
+            return new SepayWebhookResponse(false, "Payload is null");
         }
 
         Long transId = payload.getId();
 
-        // 1. Chống ghi trùng (Idempotency)
-        if (eventRepository.existsBySepayTransactionId(transId)) {
+        // 1. Chống ghi trùng (Idempotency) nếu có ID giao dịch
+        if (transId != null && eventRepository.existsBySepayTransactionId(transId)) {
             log.info("SePay Webhook: Giao dịch #{} đã được ghi nhận trước đó, bỏ qua để chống trùng lặp", transId);
             return SepayWebhookResponse.builder()
                     .success(true)
@@ -163,7 +167,19 @@ public class SepayWebhookService {
             return SepayWebhookResponse.builder()
                     .success(true)
                     .matched(false)
-                    .message("Bỏ qua giao dịch tiền ra")
+                    .message("Ignored outgoing or non-incoming transfer")
+                    .build();
+        }
+
+        BigDecimal transferAmount = payload.getTransferAmount() != null ? payload.getTransferAmount() : BigDecimal.ZERO;
+        if (transferAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Invalid transfer amount: {}", transferAmount);
+            event.setErrorMessage("Số tiền không hợp lệ: " + transferAmount);
+            eventRepository.save(event);
+            return SepayWebhookResponse.builder()
+                    .success(false)
+                    .matched(false)
+                    .message("Invalid transfer amount")
                     .build();
         }
 
@@ -181,7 +197,7 @@ public class SepayWebhookService {
             return SepayWebhookResponse.builder()
                     .success(true)
                     .matched(false)
-                    .message("Không tìm thấy mã thanh toán SF trong nội dung giao dịch")
+                    .message("No matching payment code in transaction content")
                     .build();
         }
 
@@ -199,15 +215,32 @@ public class SepayWebhookService {
                     .success(true)
                     .matched(false)
                     .participantId(participantId)
-                    .message("Không tìm thấy người tham gia ID " + participantId)
+                    .message("Participant not found: " + participantId)
                     .build();
         }
 
         SessionParticipant participant = optParticipant.get();
-        BigDecimal transferAmount = payload.getTransferAmount() != null ? payload.getTransferAmount() : BigDecimal.ZERO;
-        String participantName = participant.getIsGuest()
-                ? participant.getGuestName()
-                : (participant.getUser() != null ? participant.getUser().getFullName() : "Thành viên");
+
+        // 5. Kiểm tra ca đánh có bị hủy hay không
+        if (participant.getSession() != null && participant.getSession().getStatus() == SessionStatus.CANCELLED) {
+            log.warn("Deposit/Payment webhook: session id={} is cancelled", participant.getSession().getId());
+            event.setErrorMessage("Ca đánh đã bị hủy");
+            eventRepository.save(event);
+            telegramService.sendNotification(String.format(
+                    "⚠️ <b>[SePay Webhook] Nhận %s ca đã hủy!</b>\nCa: %s\nKhách: %s (%s)\nSố tiền: %s VNĐ",
+                    isDeposit ? "tiền cọc" : "thanh toán",
+                    participant.getSession().getTitle(),
+                    participantName(participant),
+                    participantPhone(participant),
+                    transferAmount.toPlainString()
+            ));
+            return SepayWebhookResponse.builder()
+                    .success(true)
+                    .matched(false)
+                    .participantId(participantId)
+                    .message("Session is cancelled")
+                    .build();
+        }
 
         if (isDeposit) {
             // Xử lý cọc giữ chỗ
@@ -219,20 +252,39 @@ public class SepayWebhookService {
                         .matched(true)
                         .participantId(participantId)
                         .paymentType("DEPOSIT")
-                        .message("Tiền cọc của lượt này đã được thanh toán trước đó")
+                        .message("Deposit already confirmed")
                         .build();
             }
 
-            BigDecimal requiredDeposit = participant.getDepositAmount() != null ? participant.getDepositAmount() : BigDecimal.ZERO;
-            if (transferAmount.compareTo(requiredDeposit) < 0) {
+            BigDecimal requiredDeposit = participant.getDepositAmount() != null
+                    ? participant.getDepositAmount()
+                    : (participant.getSession() != null ? participant.getSession().getDepositAmount() : BigDecimal.ZERO);
+
+            if (requiredDeposit != null && transferAmount.compareTo(requiredDeposit) < 0) {
+                log.warn("Deposit underpaid for participant id={}: expected={}, actual={}", participantId, requiredDeposit, transferAmount);
                 event.setErrorMessage(String.format("Số tiền chuyển (%s) nhỏ hơn tiền cọc yêu cầu (%s)", transferAmount, requiredDeposit));
                 eventRepository.save(event);
+                telegramService.sendNotification(String.format(
+                        "⚠️ <b>[SePay CẢNH BÁO THIẾU TIỀN CỌC]</b>\n\n" +
+                        "👤 <b>Khách hàng:</b> %s (%s)\n" +
+                        "🏸 <b>Ca đánh:</b> %s\n" +
+                        "💵 <b>Yêu cầu cọc:</b> %s VNĐ\n" +
+                        "⚠️ <b>Thực nhận:</b> %s VNĐ\n" +
+                        "📝 <b>Nội dung CK:</b> %s\n" +
+                        "<i>Vui lòng liên hệ khách để bổ sung hoặc duyệt thủ công!</i>",
+                        participantName(participant),
+                        participantPhone(participant),
+                        participant.getSession() != null ? participant.getSession().getTitle() : "N/A",
+                        requiredDeposit.toPlainString(),
+                        transferAmount.toPlainString(),
+                        payload.getContent()
+                ));
                 return SepayWebhookResponse.builder()
-                        .success(true)
+                        .success(false)
                         .matched(false)
                         .participantId(participantId)
                         .paymentType("DEPOSIT")
-                        .message("Số tiền chuyển không đủ tiền cọc")
+                        .message("Transfer amount is less than required deposit")
                         .build();
             }
 
@@ -246,8 +298,18 @@ public class SepayWebhookService {
 
             // Bắn Telegram thông báo tức thời
             telegramService.sendNotification(String.format(
-                    "⚡ [SePay] Đã nhận cọc VietQR thành công!\n👤 Người nộp: %s\n💰 Số tiền: %,d đ\n🔖 Mã: SF%d\n📅 Giao dịch: #%d (%s)",
-                    participantName, transferAmount.longValue(), participantId, transId, payload.getGateway()
+                    "⚡ <b>[SmashFlow - SePay TỰ ĐỘNG DUYỆT CỌC]</b>\n\n" +
+                    "👤 <b>Khách hàng:</b> %s (%s)\n" +
+                    "💵 <b>Số tiền cọc:</b> %s VNĐ\n" +
+                    "🏸 <b>Ca đánh:</b> %s\n" +
+                    "🏦 <b>Ngân hàng:</b> %s (Ref: %s)\n" +
+                    "✅ <b>Trạng thái:</b> Tự động duyệt thành công qua SePay! Đã nhận cọc VietQR",
+                    participantName(participant),
+                    participantPhone(participant),
+                    transferAmount.toPlainString(),
+                    participant.getSession() != null ? participant.getSession().getTitle() : "N/A",
+                    payload.getGateway() != null ? payload.getGateway() : "N/A",
+                    payload.getReferenceCode() != null ? payload.getReferenceCode() : String.valueOf(transId)
             ));
 
             return SepayWebhookResponse.builder()
@@ -255,7 +317,7 @@ public class SepayWebhookService {
                     .matched(true)
                     .participantId(participantId)
                     .paymentType("DEPOSIT")
-                    .message("Xác nhận tiền cọc thành công qua SePay")
+                    .message("Deposit confirmed successfully")
                     .build();
 
         } else {
@@ -268,20 +330,36 @@ public class SepayWebhookService {
                         .matched(true)
                         .participantId(participantId)
                         .paymentType("FINAL_PAYMENT")
-                        .message("Tiền sân của lượt này đã được thanh toán trước đó")
+                        .message("Payment already settled")
                         .build();
             }
 
             BigDecimal remaining = participant.getRemainingPaymentAmount();
-            if (transferAmount.compareTo(remaining) < 0) {
+            if (remaining != null && transferAmount.compareTo(remaining) < 0) {
+                log.warn("Final payment underpaid for participant id={}: expected={}, actual={}", participantId, remaining, transferAmount);
                 event.setErrorMessage(String.format("Số tiền chuyển (%s) nhỏ hơn tiền sân cần thanh toán (%s)", transferAmount, remaining));
                 eventRepository.save(event);
+                telegramService.sendNotification(String.format(
+                        "⚠️ <b>[SePay CẢNH BÁO THIẾU TIỀN SÂN]</b>\n\n" +
+                        "👤 <b>Người chơi:</b> %s (%s)\n" +
+                        "🏸 <b>Ca đánh:</b> %s\n" +
+                        "💵 <b>Cần thu:</b> %s VNĐ\n" +
+                        "⚠️ <b>Thực nhận:</b> %s VNĐ\n" +
+                        "📝 <b>Nội dung CK:</b> %s\n" +
+                        "<i>Vui lòng kiểm tra lại trước khi xác nhận hoàn tất!</i>",
+                        participantName(participant),
+                        participantPhone(participant),
+                        participant.getSession() != null ? participant.getSession().getTitle() : "N/A",
+                        remaining.toPlainString(),
+                        transferAmount.toPlainString(),
+                        payload.getContent()
+                ));
                 return SepayWebhookResponse.builder()
-                        .success(true)
+                        .success(false)
                         .matched(false)
                         .participantId(participantId)
                         .paymentType("FINAL_PAYMENT")
-                        .message("Số tiền chuyển không đủ tiền sân còn lại")
+                        .message("Transfer amount is less than remaining bill")
                         .build();
             }
 
@@ -289,6 +367,7 @@ public class SepayWebhookService {
             participant.setPaymentStatus(PaymentStatus.PAID);
             participant.setPaymentMethod(PaymentMethod.VIETQR);
             participant.setPaidAt(LocalDateTime.now());
+            participant.setPaidBy(null);
             participantRepository.save(participant);
 
             event.setMatched(true);
@@ -296,8 +375,18 @@ public class SepayWebhookService {
 
             // Bắn Telegram thông báo tức thời
             telegramService.sendNotification(String.format(
-                    "🎉 [SePay] Đã nhận thanh toán tiền sân VietQR!\n👤 Người nộp: %s\n💰 Số tiền: %,d đ\n🔖 Mã: SF%d\n📅 Giao dịch: #%d (%s)",
-                    participantName, transferAmount.longValue(), participantId, transId, payload.getGateway()
+                    "🎉 <b>[SmashFlow - SePay TỰ ĐỘNG THU TIỀN SÂN]</b>\n\n" +
+                    "👤 <b>Người chơi:</b> %s (%s)\n" +
+                    "💵 <b>Số tiền thu:</b> %s VNĐ\n" +
+                    "💳 <b>Phương thức:</b> VietQR (SePay Auto) - Đã nhận thanh toán tiền sân VietQR\n" +
+                    "🏸 <b>Ca đánh:</b> %s\n" +
+                    "🏦 <b>Ngân hàng:</b> %s (Ref: %s)",
+                    participantName(participant),
+                    participantPhone(participant),
+                    transferAmount.toPlainString(),
+                    participant.getSession() != null ? participant.getSession().getTitle() : "N/A",
+                    payload.getGateway() != null ? payload.getGateway() : "N/A",
+                    payload.getReferenceCode() != null ? payload.getReferenceCode() : String.valueOf(transId)
             ));
 
             return SepayWebhookResponse.builder()
@@ -305,7 +394,7 @@ public class SepayWebhookService {
                     .matched(true)
                     .participantId(participantId)
                     .paymentType("FINAL_PAYMENT")
-                    .message("Xác nhận thanh toán tiền sân thành công qua SePay")
+                    .message("Payment settled successfully")
                     .build();
         }
     }
@@ -438,6 +527,26 @@ public class SepayWebhookService {
     private String maskAccountNumber(String acc) {
         if (acc == null || acc.length() <= 4) return acc;
         return "***" + acc.substring(acc.length() - 4);
+    }
+
+    private static String participantName(SessionParticipant p) {
+        if (p == null) return "Khách";
+        if (Boolean.TRUE.equals(p.getIsGuest())) {
+            return p.getGuestName() != null && !p.getGuestName().isBlank() ? p.getGuestName() : "Khách vãng lai";
+        }
+        return p.getUser() != null && p.getUser().getFullName() != null && !p.getUser().getFullName().isBlank()
+                ? p.getUser().getFullName()
+                : (p.getGuestName() != null && !p.getGuestName().isBlank() ? p.getGuestName() : "Khách");
+    }
+
+    private static String participantPhone(SessionParticipant p) {
+        if (p == null) return "N/A";
+        if (Boolean.TRUE.equals(p.getIsGuest())) {
+            return p.getGuestPhone() != null && !p.getGuestPhone().isBlank() ? p.getGuestPhone() : "N/A";
+        }
+        return p.getUser() != null && p.getUser().getPhone() != null && !p.getUser().getPhone().isBlank()
+                ? p.getUser().getPhone()
+                : (p.getGuestPhone() != null && !p.getGuestPhone().isBlank() ? p.getGuestPhone() : "N/A");
     }
 
     private static class ParsedPaymentInfo {

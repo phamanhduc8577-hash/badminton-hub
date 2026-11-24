@@ -6,6 +6,7 @@ import { DuckMascot } from '../components/DuckMascot'
 import { BadmintonHeroEditorial } from '../components/BadmintonHeroEditorial'
 import { BottomSheet } from '../components/BottomSheet'
 import { useToast } from '../components/ToastProvider'
+import { uploadAvatarToStorage } from '../lib/storage'
 import {
   LogIn,
   UserPlus,
@@ -50,6 +51,7 @@ export const LoginView: React.FC = () => {
   const [avatarUrl, setAvatarUrl] = useState('/duck-mascot.png')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const errorRef = useRef<HTMLDivElement>(null)
 
@@ -58,8 +60,8 @@ export const LoginView: React.FC = () => {
     if (error) errorRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
   }, [error])
 
-  // Handle local image file upload & resize/compress to base64
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle local image file upload -> Resize & upload directly to Supabase Storage URL
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -74,27 +76,22 @@ export const LoginView: React.FC = () => {
     }
 
     setError('')
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const img = new window.Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const size = 128 // 128x128 đủ nét trên màn hình Retina/OLED mà dung lượng chỉ vài KB
-        canvas.width = size
-        canvas.height = size
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          const minDim = Math.min(img.width, img.height)
-          const sx = (img.width - minDim) / 2
-          const sy = (img.height - minDim) / 2
-          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size)
-          const base64 = canvas.toDataURL('image/jpeg', 0.7) // Chất lượng 70%, dung lượng chỉ vài KB
-          setAvatarUrl(base64)
-        }
-      }
-      img.src = event.target?.result as string
+    setUploadingAvatar(true)
+
+    // Hiển thị preview ngay tức thì bằng ObjectURL
+    const tempPreview = URL.createObjectURL(file)
+    setAvatarUrl(tempPreview)
+
+    try {
+      const publicUrl = await uploadAvatarToStorage(file, phone.trim() || 'register')
+      setAvatarUrl(publicUrl)
+    } catch (err: any) {
+      setError(err?.message || 'Không thể tải ảnh lên Supabase Storage')
+    } finally {
+      setUploadingAvatar(false)
+      URL.revokeObjectURL(tempPreview)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
-    reader.readAsDataURL(file)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -24,6 +24,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -182,6 +183,34 @@ class SepayWebhookServiceTest {
         }
 
         @Test
+        @DisplayName("Tự động duyệt cọc kể cả khi viết hoa/thường hoặc dính chữ 'coc sf 101'")
+        void autoConfirmsDepositCaseInsensitiveAndLoose() {
+            Long participantId = 101L;
+            SessionParticipant participant = SessionParticipant.builder()
+                    .id(participantId)
+                    .isGuest(true)
+                    .guestName("Khách Thử Nghiệm")
+                    .depositAmount(new BigDecimal("50000"))
+                    .depositStatus(DepositStatus.PENDING)
+                    .build();
+
+            when(eventRepository.existsBySepayTransactionId(8889L)).thenReturn(false);
+            when(participantRepository.findByIdForUpdate(participantId)).thenReturn(Optional.of(participant));
+
+            SepayWebhookPayload payload = SepayWebhookPayload.builder()
+                    .id(8889L)
+                    .transferType("in")
+                    .transferAmount(new BigDecimal("50000"))
+                    .content("MBVCB.999.coc sf 101 ck")
+                    .build();
+
+            SepayWebhookResponse res = service.processWebhook(payload);
+
+            assertTrue(res.isSuccess());
+            assertEquals(DepositStatus.PAID, participant.getDepositStatus());
+        }
+
+        @Test
         @DisplayName("Tự động thanh toán tiền sân: Nhận cú pháp 'SF101' với số tiền đủ tiền sân")
         void autoConfirmFinalPayment() {
             Long participantId = 101L;
@@ -243,7 +272,7 @@ class SepayWebhookServiceTest {
 
             SepayWebhookResponse res = service.processWebhook(payload, "{}");
 
-            assertTrue(res.isSuccess());
+            assertFalse(res.isSuccess());
             assertFalse(res.isMatched()); // Không khớp vì thiếu tiền
             assertEquals(PaymentStatus.UNPAID, participant.getPaymentStatus()); // Vẫn UNPAID
 
@@ -270,6 +299,75 @@ class SepayWebhookServiceTest {
             assertTrue(res.isSuccess());
             assertFalse(res.isMatched());
             verify(participantRepository, never()).findByIdForUpdate(any());
+        }
+
+        @Test
+        @DisplayName("Cảnh báo và không duyệt cọc nếu khách chuyển thiếu tiền")
+        void depositUnderpaidTriggersAlert() {
+            Long participantId = 101L;
+            SessionParticipant participant = SessionParticipant.builder()
+                    .id(participantId)
+                    .isGuest(true)
+                    .guestName("Khách Thiếu Tiền Cọc")
+                    .depositAmount(new BigDecimal("50000"))
+                    .depositStatus(DepositStatus.PENDING)
+                    .build();
+
+            when(eventRepository.existsBySepayTransactionId(8885L)).thenReturn(false);
+            when(participantRepository.findByIdForUpdate(participantId)).thenReturn(Optional.of(participant));
+
+            SepayWebhookPayload payload = SepayWebhookPayload.builder()
+                    .id(8885L)
+                    .transferType("in")
+                    .transferAmount(new BigDecimal("20000")) // Cần 50k nhưng chuyển 20k
+                    .content("COC SF101 chuyen thieu")
+                    .build();
+
+            SepayWebhookResponse res = service.processWebhook(payload);
+
+            assertFalse(res.isSuccess());
+            assertEquals("Transfer amount is less than required deposit", res.getMessage());
+            assertEquals(DepositStatus.PENDING, participant.getDepositStatus());
+            verify(participantRepository, never()).save(any());
+            verify(telegramService).sendNotification(contains("CẢNH BÁO THIẾU TIỀN CỌC"));
+        }
+
+        @Test
+        @DisplayName("Nhận tiền cho ca đã bị hủy thì cảnh báo và không duyệt")
+        void cancelledSessionWarnsHost() {
+            Long participantId = 101L;
+            Session session = Session.builder()
+                    .id(1L)
+                    .title("Ca Thứ 7 Sân 1-2")
+                    .status(SessionStatus.CANCELLED)
+                    .depositAmount(new BigDecimal("50000"))
+                    .build();
+
+            SessionParticipant participant = SessionParticipant.builder()
+                    .id(participantId)
+                    .session(session)
+                    .isGuest(true)
+                    .guestName("Khách Đặt Sân")
+                    .depositAmount(new BigDecimal("50000"))
+                    .depositStatus(DepositStatus.PENDING)
+                    .build();
+
+            when(eventRepository.existsBySepayTransactionId(8886L)).thenReturn(false);
+            when(participantRepository.findByIdForUpdate(participantId)).thenReturn(Optional.of(participant));
+
+            SepayWebhookPayload payload = SepayWebhookPayload.builder()
+                    .id(8886L)
+                    .transferType("in")
+                    .transferAmount(new BigDecimal("50000"))
+                    .content("COC SF101")
+                    .build();
+
+            SepayWebhookResponse res = service.processWebhook(payload);
+
+            assertTrue(res.isSuccess());
+            assertEquals("Session is cancelled", res.getMessage());
+            assertEquals(DepositStatus.PENDING, participant.getDepositStatus());
+            verify(telegramService).sendNotification(contains("Nhận tiền cọc ca đã hủy"));
         }
     }
 }
