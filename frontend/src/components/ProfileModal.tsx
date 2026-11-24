@@ -5,7 +5,8 @@ import { useAuthStore } from '../store/useAuthStore'
 import { api } from '../lib/api'
 import { DuckMascot } from './DuckMascot'
 import { BottomSheet } from './BottomSheet'
-import { User as UserIcon, Upload, Check, Sparkles, Camera, Lock, KeyRound, Eye, EyeOff, LogOut } from 'lucide-react'
+import { uploadAvatarToStorage } from '../lib/storage'
+import { User as UserIcon, Upload, Check, Sparkles, Camera, Lock, KeyRound, Eye, EyeOff, LogOut, Loader2 } from 'lucide-react'
 
 interface ProfileModalProps {
   isOpen: boolean
@@ -30,6 +31,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [confirmLogout, setConfirmLogout] = useState(false)
 
   const [loading, setLoading] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
@@ -82,8 +84,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const currentGender: 'MALE' | 'FEMALE' = user.gender === 'FEMALE' ? 'FEMALE' : 'MALE'
   const genderChanged = gender !== currentGender
 
-  // Handle local image file upload & resize/compress to base64
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle local image file upload -> Resize & upload directly to Supabase Storage URL
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -99,28 +101,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
 
     setError('')
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const img = new window.Image()
-      img.onload = () => {
-        // Center-crop & square resize to 128x128 (đủ nét cho màn hình Retina, dung lượng nhỏ)
-        const canvas = document.createElement('canvas')
-        const size = 128
-        canvas.width = size
-        canvas.height = size
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          const minDim = Math.min(img.width, img.height)
-          const sx = (img.width - minDim) / 2
-          const sy = (img.height - minDim) / 2
-          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size)
-          const base64 = canvas.toDataURL('image/jpeg', 0.7)
-          setAvatarUrl(base64)
-        }
-      }
-      img.src = event.target?.result as string
+    setUploadingAvatar(true)
+
+    // Hiển thị preview ngay tức thì bằng ObjectURL
+    const tempPreview = URL.createObjectURL(file)
+    setAvatarUrl(tempPreview)
+
+    try {
+      const publicUrl = await uploadAvatarToStorage(file, user.phone || `user_${user.id}`)
+      setAvatarUrl(publicUrl)
+    } catch (err: any) {
+      setError(err?.message || 'Không thể tải ảnh lên Supabase Storage')
+    } finally {
+      setUploadingAvatar(false)
+      // Giải phóng bộ nhớ tempPreview
+      URL.revokeObjectURL(tempPreview)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
-    reader.readAsDataURL(file)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,11 +216,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       <button
         type="submit"
         form="profile-modal-form"
-        disabled={loading}
+        disabled={loading || uploadingAvatar}
         className="min-h-11 px-6 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-sm sm:text-xs font-black rounded-xl shadow-md transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
       >
         <Sparkles size={14} />
-        <span>{loading ? 'Đang lưu...' : 'Lưu hồ sơ'}</span>
+        <span>{loading ? 'Đang lưu...' : uploadingAvatar ? 'Đang tải ảnh...' : 'Lưu hồ sơ'}</span>
       </button>
     </div>
   )
@@ -258,10 +255,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 rounded="3xl"
                 className="shadow-xl border-2 border-slate-900/10 ring-4 ring-slate-100"
               />
+              {uploadingAvatar && (
+                <div className="absolute inset-0 bg-slate-950/60 rounded-3xl flex flex-col items-center justify-center text-white gap-1 z-10 backdrop-blur-xs">
+                  <Loader2 size={24} className="animate-spin text-rose-400" />
+                  <span className="text-[10px] font-bold">Đang tải...</span>
+                </div>
+              )}
               <button
                 type="button"
+                disabled={uploadingAvatar}
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute -bottom-2 -right-2 p-2 bg-slate-950 hover:bg-slate-800 text-white rounded-2xl shadow-lg border-2 border-white transition active:scale-90"
+                className="absolute -bottom-2 -right-2 p-2 bg-slate-950 hover:bg-slate-800 disabled:opacity-50 text-white rounded-2xl shadow-lg border-2 border-white transition active:scale-90"
                 title="Tải ảnh mới từ điện thoại / máy tính"
                 aria-label="Tải ảnh đại diện mới"
               >
