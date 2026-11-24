@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   Calendar,
   Trophy,
@@ -9,15 +10,16 @@ import {
   Shield,
   LogOut,
   Plus,
-  Flame,
   UserCheck,
   Settings,
 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { api } from '../lib/api'
+import { LoyaltyReward } from '../types'
 import { DuckMascot } from './DuckMascot'
 import { BadmintonCourtBg } from './BadmintonCourtBg'
 import { ProfileModal } from './ProfileModal'
+import { LiquidNavbar, LiquidNavItem } from '@/components/ui/liquid-glass-navbar'
 
 export const Layout: React.FC = () => {
   const { user, token, setAuth, logout } = useAuthStore()
@@ -39,13 +41,62 @@ export const Layout: React.FC = () => {
     }
   }, [token])
 
+  // Lấy danh sách quà để hiện badge thông báo trên tab Đổi thưởng
+  const { data: loyaltyRewards } = useQuery<LoyaltyReward[]>({
+    queryKey: ['loyalty-rewards'],
+    queryFn: async () => {
+      const res = await api.get('/loyalty/my-rewards')
+      return res.data
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  })
+
+  const unclaimedRewardsCount = loyaltyRewards?.filter((r) => !r.isClaimed).length ?? 0
+
+  const navItems: LiquidNavItem[] = [
+    { label: 'Lịch ca đánh', icon: <Calendar size={15} />, fx: 'none' },
+    { label: 'Bảng xếp hạng', icon: <Trophy size={15} />, fx: 'none' },
+    { label: 'Thành viên', icon: <Users size={15} />, fx: 'none' },
+    {
+      label: unclaimedRewardsCount > 0 ? `Đổi thưởng (${unclaimedRewardsCount})` : 'Đổi thưởng',
+      icon: <Gift size={15} />,
+      fx: 'none',
+    },
+    ...(user?.role === 'HOST'
+      ? [{ label: 'Host Panel', icon: <Shield size={15} />, fx: 'none' }]
+      : []),
+  ]
+
+  const getActiveNavIndex = () => {
+    if (location.pathname === '/leaderboard') return 1
+    if (location.pathname === '/members') return 2
+    if (location.pathname === '/loyalty') return 3
+    if (location.pathname.startsWith('/host') && user?.role === 'HOST') return 4
+    if (location.pathname === '/' || location.pathname.startsWith('/session')) return 0
+    return 0
+  }
+
+  const handleNavChange = (index: number) => {
+    const paths = [
+      '/',
+      '/leaderboard',
+      '/members',
+      '/loyalty',
+      ...(user?.role === 'HOST' ? ['/host'] : []),
+    ]
+    if (paths[index] && paths[index] !== location.pathname) {
+      navigate(paths[index])
+    }
+  }
+
   return (
-    <div className="flex flex-col min-h-screen bg-[#F4F6F9] text-slate-900 relative font-sans selection:bg-slate-900 selection:text-white">
-      {/* High-End Editorial Background with Sharp Badminton Backdrop */}
+    <div className="flex flex-col min-h-screen bg-white text-slate-900 relative font-sans selection:bg-slate-900 selection:text-white">
+      {/* High-End Clean Athletic Background */}
       <BadmintonCourtBg />
 
-      {/* Editorial Sticky Header with Enhanced Contrast & Sharp Border */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-2xl border-b border-slate-200/90 shadow-sm shadow-slate-900/[0.03] transition-all">
+      {/* Editorial Sticky Header with Clean Contrast */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-xs transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
           {/* Brand & Duck Mascot */}
           <div
@@ -57,95 +108,21 @@ export const Layout: React.FC = () => {
               <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="font-black text-lg sm:text-xl tracking-tight text-slate-950 group-hover:text-slate-700 transition truncate">
-                  SmashFlow
-                </span>
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-slate-900 text-white tracking-wider shrink-0">
-                  Pro
-                </span>
-              </div>
-              <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold mt-0.5 min-w-0">
-                <Flame size={12} className="text-rose-600 shrink-0" />
-                <span className="truncate">CLB Làng Địa Ngục • Host by anhduck</span>
-              </div>
+              <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-slate-700 transition truncate block">
+                Cầu Lông Làng Địa Ngục
+              </span>
             </div>
           </div>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200">
-            <NavLink
-              to="/"
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-                  isActive
-                    ? 'bg-slate-950 text-white shadow-md'
-                    : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
-                }`
-              }
-            >
-              <Calendar size={15} />
-              <span>Lịch ca đánh</span>
-            </NavLink>
-
-            <NavLink
-              to="/leaderboard"
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-                  isActive
-                    ? 'bg-slate-950 text-white shadow-md'
-                    : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
-                }`
-              }
-            >
-              <Trophy size={15} />
-              <span>Bảng xếp hạng</span>
-            </NavLink>
-
-            <NavLink
-              to="/members"
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-                  isActive
-                    ? 'bg-slate-950 text-white shadow-md'
-                    : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
-                }`
-              }
-            >
-              <Users size={15} />
-              <span>Thành viên</span>
-            </NavLink>
-
-            <NavLink
-              to="/loyalty"
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-                  isActive
-                    ? 'bg-slate-950 text-white shadow-md'
-                    : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
-                }`
-              }
-            >
-              <Gift size={15} />
-              <span>Đổi thưởng</span>
-            </NavLink>
-
-            {user?.role === 'HOST' && (
-              <NavLink
-                to="/host"
-                className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition ${
-                    isActive || location.pathname.startsWith('/host')
-                      ? 'bg-rose-600 text-white shadow-md'
-                      : 'text-slate-600 hover:text-slate-950 hover:bg-white/80'
-                  }`
-                }
-              >
-                <Shield size={15} />
-                <span>Host Panel</span>
-              </NavLink>
-            )}
-          </nav>
+          {/* Desktop Navigation Links with Liquid Glass Water Effect */}
+          <div className="hidden md:flex items-center">
+            <LiquidNavbar
+              items={navItems}
+              active={getActiveNavIndex()}
+              onChange={handleNavChange}
+              tone="light"
+            />
+          </div>
 
           {/* User Profile & Actions */}
           <div className="flex items-center gap-3 shrink-0 ml-3">
@@ -166,14 +143,14 @@ export const Layout: React.FC = () => {
                   className="text-right hidden sm:block cursor-pointer group"
                   title="Bấm để chỉnh sửa hồ sơ & avatar"
                 >
-                  <span className="text-xs font-black text-slate-950 block truncate max-w-[140px] group-hover:text-rose-600 transition">
+                  <span className="text-xs font-bold text-slate-900 block truncate max-w-[140px] group-hover:text-rose-600 transition">
                     {user.fullName}
                   </span>
                   <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                    <span className="text-[10px] px-2 py-0.2 rounded font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                    <span className="text-xs px-1.5 py-0.5 rounded font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                       {user.role}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-semibold">
+                    <span className="text-xs text-slate-500 font-medium">
                       {user.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
                     </span>
                   </div>
@@ -240,20 +217,17 @@ export const Layout: React.FC = () => {
         onClose={() => setShowProfileModal(false)}
       />
 
-      {/* Clean Minimalist Editorial Footer */}
-      <footer className="hidden md:block relative z-10 border-t border-slate-200/90 bg-white/80 backdrop-blur-md py-8 text-center text-xs text-slate-500">
+      {/* Clean Minimalist Sports Footer */}
+      <footer className="hidden md:block relative z-10 border-t border-slate-200 bg-white/80 backdrop-blur-md py-6 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <DuckMascot size={32} rounded="xl" />
-            <div className="text-left">
-              <span className="font-black text-slate-950 block">
-                SmashFlow Pro Edition
-              </span>
-              <span className="text-[11px] text-slate-400">Hệ sinh thái cầu lông thông minh CLB Làng Địa Ngục</span>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <DuckMascot size={28} rounded="xl" />
+            <span className="font-bold text-slate-800">
+              CLB Cầu Lông Làng Địa Ngục
+            </span>
           </div>
           <p className="text-slate-500 font-medium">
-            Designed & Engineered with precision by <span className="font-bold text-slate-950">anhduck</span>
+            Hệ thống quản lý ca đánh & bắt kèo cầu lông
           </p>
         </div>
       </footer>
@@ -307,7 +281,14 @@ export const Layout: React.FC = () => {
             }`
           }
         >
-          <Gift size={18} />
+          <div className="relative">
+            <Gift size={18} />
+            {unclaimedRewardsCount > 0 && (
+              <span className="absolute -top-1 -right-2 min-w-3.5 h-3.5 px-0.5 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white">
+                {unclaimedRewardsCount}
+              </span>
+            )}
+          </div>
           <span>Đổi thưởng</span>
         </NavLink>
 

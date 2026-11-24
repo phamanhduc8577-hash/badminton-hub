@@ -7,6 +7,10 @@
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom/vitest"],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",

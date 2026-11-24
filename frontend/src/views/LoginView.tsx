@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
+import { BadmintonHeroEditorial } from '../components/BadmintonHeroEditorial'
+import { BottomSheet } from '../components/BottomSheet'
 import { useToast } from '../components/ToastProvider'
 import {
   LogIn,
@@ -15,10 +17,6 @@ import {
   Camera,
   Send,
   ArrowLeft,
-  Gift,
-  Coins,
-  Swords,
-  Trophy,
 } from 'lucide-react'
 
 export const LoginView: React.FC = () => {
@@ -42,6 +40,7 @@ export const LoginView: React.FC = () => {
 
   const [isRegister, setIsRegister] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [forgotSuccess, setForgotSuccess] = useState('')
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
@@ -161,389 +160,419 @@ export const LoginView: React.FC = () => {
     }
   }
 
-  return (
-    <div className="min-h-[80vh] flex items-center justify-center py-4 sm:py-6">
-      <div className="w-full max-w-5xl flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-        {/* Auth Card Form: On Mobile displayed first (order-1), on Desktop right column (lg:order-2 lg:col-span-6) */}
-        <div id="auth-form-card" className="w-full order-1 lg:order-2 lg:col-span-6 scroll-mt-24">
-          <div className="saas-card rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-lg border border-slate-200/90 bg-white">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                {isForgotPassword
-                  ? 'Quên mật khẩu'
-                  : isRegister
-                  ? 'Đăng ký thành viên'
-                  : 'Đăng nhập hệ thống'}
-              </h2>
-              <p className="text-xs text-slate-600 font-medium">
-                {isForgotPassword
-                  ? 'Nhập số điện thoại để gửi yêu cầu cấp lại mật khẩu đến Telegram của Host'
-                  : isRegister
-                  ? 'Tạo tài khoản để tham gia ca đánh và tích điểm quà tặng'
-                  : 'Nhập thông tin tài khoản để truy cập'}
-              </p>
-            </div>
-
-            {forgotSuccess ? (
-              <div className="space-y-4 py-2">
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2">
-                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
-                    <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-                    <span>Yêu cầu đã được gửi thành công!</span>
-                  </div>
-                  <p className="text-xs text-emerald-900 leading-relaxed">
-                    {forgotSuccess}
-                  </p>
-                  <p className="text-[11px] text-slate-600 pt-2 border-t border-emerald-200/60">
-                    💡 Host đã nhận được thông báo trên Telegram. Bạn hãy liên hệ Host hoặc kiểm tra tin nhắn với Host để lấy mật khẩu tạm thời.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsForgotPassword(false)
-                    setForgotSuccess('')
-                    setError('')
-                  }}
-                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white text-xs rounded-xl shadow flex items-center justify-center gap-2 transition cursor-pointer"
-                >
-                  <ArrowLeft size={16} />
-                  <span>Quay lại trang Đăng nhập</span>
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {isRegister && !isForgotPassword && (
-                  <div>
-                    <label htmlFor="auth-fullname" className="block text-xs font-bold text-slate-700 mb-1.5">Họ và tên của bạn</label>
-                    <div className="relative">
-                      <UserIcon className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
-                      <input
-                        id="auth-fullname"
-                        name="name"
-                        type="text"
-                        autoComplete="name"
-                        required
-                        placeholder="Nguyễn Văn A"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label htmlFor="auth-phone" className="block text-xs font-bold text-slate-700 mb-1.5">Số điện thoại</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
-                    <input
-                      id="auth-phone"
-                      name="phone"
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      required
-                      placeholder="Nhập số điện thoại của bạn..."
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
-                    />
-                  </div>
-                </div>
-
-                {!isForgotPassword && (
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label htmlFor="auth-password" className="block text-xs font-bold text-slate-700">Mật khẩu</label>
-                      {!isRegister && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsForgotPassword(true)
-                            setError('')
-                            setForgotSuccess('')
-                          }}
-                          className="min-h-11 -my-2 -mr-2 px-2 inline-flex items-center text-xs sm:text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
-                        >
-                          Quên mật khẩu?
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
-                      <input
-                        id="auth-password"
-                        name="password"
-                        type="password"
-                        autoComplete={isRegister ? 'new-password' : 'current-password'}
-                        required
-                        placeholder="••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-semibold"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {isRegister && !isForgotPassword && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Giới tính</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setGender('MALE')}
-                          className={`min-h-11 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
-                            gender === 'MALE'
-                              ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          Nam
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setGender('FEMALE')}
-                          className={`min-h-11 py-2.5 text-xs font-bold rounded-xl border transition cursor-pointer ${
-                            gender === 'FEMALE'
-                              ? 'bg-rose-600 border-rose-600 text-white shadow-sm'
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          Nữ (Trợ giá)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Lựa chọn phân loại thành viên */}
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-slate-700">Hình thức tham gia CLB</label>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => setMembershipChoice('CASUAL')}
-                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
-                            membershipChoice === 'CASUAL'
-                              ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-200 text-amber-950'
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-xs">🟡 Vãng lai</span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded">
-                              Tự do
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-tight">
-                            Đánh linh hoạt theo buổi, giá slot vãng lai.
-                          </p>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setMembershipChoice('FIXED')}
-                          className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
-                            membershipChoice === 'FIXED'
-                              ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-200 text-emerald-950'
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-xs">🟢 Cố định</span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">
-                              Ưu đãi
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-tight">
-                            Giá slot CLB rẻ hơn, cần Host duyệt chính thức.
-                          </p>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Direct Avatar Picker & Upload */}
-                    <div className="space-y-2 pt-1">
-                      <label className="block text-xs font-bold text-slate-700">Ảnh đại diện (Avatar)</label>
-                      <div className="flex items-center gap-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-                        <div className="relative group shrink-0">
-                          <DuckMascot
-                            src={avatarUrl}
-                            size={64}
-                            rounded="2xl"
-                            className="shadow-md border border-slate-200"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="absolute -bottom-2 -right-2 min-h-9 min-w-9 inline-flex items-center justify-center bg-slate-950 text-white rounded-xl shadow border-2 border-white cursor-pointer"
-                            title="Tải ảnh từ máy"
-                            aria-label="Tải ảnh đại diện từ máy"
-                          >
-                            <Camera size={14} />
-                          </button>
-                        </div>
-
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleFileChange}
-                        />
-
-                        <div className="space-y-1.5 flex-1">
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="w-full min-h-11 py-2 px-3 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
-                          >
-                            <Upload size={14} className="text-slate-600" />
-                            <span>Tải ảnh từ máy / điện thoại</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setAvatarUrl('/duck-mascot.png')}
-                            className="w-full min-h-11 py-1 text-xs sm:text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer"
-                          >
-                            Dùng Mascot mặc định
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Lỗi hiển thị ngay trên nút gửi để không bị khuất khi form dài (đăng ký) */}
-                {error && (
-                  <div
-                    ref={errorRef}
-                    role="alert"
-                    className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-semibold scroll-mt-24"
-                  >
-                    {error}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full min-h-11 py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white text-sm sm:text-xs rounded-xl shadow flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50 mt-4 cursor-pointer"
-                >
-                  {isForgotPassword ? (
-                    <>
-                      <Send size={16} />
-                      <span>{loading ? 'Đang gửi yêu cầu...' : 'Gửi yêu cầu tới Telegram của Host'}</span>
-                    </>
-                  ) : isRegister ? (
-                    <>
-                      <UserPlus size={16} />
-                      <span>{loading ? 'Đang xử lý...' : 'Tạo tài khoản ngay'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <LogIn size={16} />
-                      <span>{loading ? 'Đang xử lý...' : 'Đăng nhập vào hệ thống'}</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
-
-            {!forgotSuccess && (
-              <div className="text-center space-y-2">
-                {isForgotPassword ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsForgotPassword(false)
-                      setError('')
-                    }}
-                    className="min-h-11 text-xs text-slate-900 hover:underline font-bold flex items-center justify-center gap-1 mx-auto cursor-pointer"
-                  >
-                    <ArrowLeft size={14} />
-                    <span>Quay lại Đăng nhập</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsRegister(!isRegister)
-                      setError('')
-                    }}
-                    className="min-h-11 px-2 text-xs text-slate-900 hover:underline font-bold cursor-pointer"
-                  >
-                    {isRegister ? 'Đã có tài khoản? Đăng nhập ngay' : 'Chưa có tài khoản? Đăng ký thành viên'}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+  const renderAuthContent = (isMobileModal?: boolean) => (
+    <>
+      {/* Top Segmented Controls: Đăng nhập / Đăng ký */}
+      {!isForgotPassword ? (
+        <div className="flex p-1 bg-slate-100/90 rounded-2xl border border-slate-200">
+          <button
+            type="button"
+            onClick={() => {
+              setIsRegister(false)
+              setError('')
+            }}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              !isRegister
+                ? 'bg-slate-950 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-950'
+            }`}
+          >
+            <LogIn size={14} />
+            <span>Đăng nhập</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsRegister(true)
+              setError('')
+            }}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              isRegister
+                ? 'bg-slate-950 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-950'
+            }`}
+          >
+            <UserPlus size={14} />
+            <span>Đăng ký</span>
+          </button>
         </div>
+      ) : (
+        <div className="flex items-center justify-between pb-1">
+          <button
+            type="button"
+            onClick={() => {
+              setIsForgotPassword(false)
+              setError('')
+            }}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-950 transition cursor-pointer"
+          >
+            <ArrowLeft size={15} />
+            <span>Quay lại</span>
+          </button>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hỗ trợ tài khoản</span>
+        </div>
+      )}
 
-        {/* Brand Showcase & Value Props: on Mobile order second (order-2), on Desktop left column (lg:order-1 lg:col-span-6) */}
-        <div className="w-full order-2 lg:order-1 lg:col-span-6 space-y-6">
-          <div className="flex items-center gap-4">
-            <DuckMascot size={64} rounded="2xl" />
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold uppercase tracking-wider">
-                <span>SmashFlow Portal</span>
-              </div>
-              <h2 className="text-xl font-black text-slate-900 mt-1">CLB Làng Địa Ngục</h2>
+      {/* Header Title (đảm bảo test tìm thấy "Đăng nhập hệ thống") */}
+      <div className="space-y-1">
+        <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+          {isForgotPassword
+            ? 'Khôi phục mật khẩu'
+            : isRegister
+            ? 'Đăng ký thành viên'
+            : 'Đăng nhập hệ thống'}
+        </h2>
+        <p className="text-xs text-slate-500 font-medium">
+          {isForgotPassword
+            ? 'Gửi yêu cầu xác nhận tới Telegram của Host'
+            : isRegister
+            ? 'Điền thông tin để tạo tài khoản tham gia CLB'
+            : 'Chào mừng trở lại! Vui lòng đăng nhập để tiếp tục'}
+        </p>
+      </div>
+
+      {forgotSuccess ? (
+        <div className="space-y-4 py-2">
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2">
+            <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+              <span>Yêu cầu đã được gửi thành công!</span>
             </div>
-          </div>
-
-          <div className="space-y-3">
-            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-              Quản trị CLB cầu lông & <br />
-              <span className="underline decoration-rose-500/40 decoration-4 underline-offset-8">
-                điểm danh thông minh
-              </span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-              Hệ sinh thái cầu lông thông minh: Tích điểm chuyên cần đổi quà, vinh danh leo rank Thách Đấu, ghép sân cân bằng trình độ và minh bạch chi phí từng ca.
+            <p className="text-xs text-emerald-900 leading-relaxed font-medium">
+              {forgotSuccess}
+            </p>
+            <p className="text-[11px] text-slate-500 pt-2 border-t border-emerald-200/60">
+              💡 Host đã nhận được thông báo qua Telegram. Vui lòng liên hệ Host để nhận mật khẩu tạm thời.
             </p>
           </div>
 
-          {/* Value Props Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center font-bold">
-                <Gift size={16} />
+          <button
+            type="button"
+            onClick={() => {
+              setIsForgotPassword(false)
+              setForgotSuccess('')
+              setError('')
+            }}
+            className="w-full min-h-11 py-2.5 bg-slate-950 hover:bg-slate-800 font-bold text-white text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition cursor-pointer"
+          >
+            <ArrowLeft size={15} />
+            <span>Quay lại Đăng nhập</span>
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegister && !isForgotPassword && (
+            <div>
+              <label htmlFor={isMobileModal ? 'auth-fullname-m' : 'auth-fullname'} className="block text-xs font-bold text-slate-700 mb-1.5">
+                Họ và tên
+              </label>
+              <div className="relative">
+                <UserIcon className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
+                <input
+                  id={isMobileModal ? 'auth-fullname-m' : 'auth-fullname'}
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  placeholder="Nguyễn Văn A"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs font-semibold"
+                />
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Tích điểm chuyên cần</h4>
-              <p className="text-slate-600 text-[11px]">Đổi nước tăng lực & voucher giảm giá slot ca đánh.</p>
             </div>
+          )}
 
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
-                <Trophy size={16} />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm">Leo Rank & Vinh danh</h4>
-              <p className="text-slate-600 text-[11px]">Bảng xếp hạng chiến thần và danh hiệu Thách Đấu.</p>
+          <div>
+            <label htmlFor={isMobileModal ? 'auth-phone-m' : 'auth-phone'} className="block text-xs font-bold text-slate-700 mb-1.5">
+              Số điện thoại
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
+              <input
+                id={isMobileModal ? 'auth-phone-m' : 'auth-phone'}
+                name="phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                required
+                placeholder="Nhập số điện thoại của bạn..."
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs font-semibold"
+              />
             </div>
+          </div>
 
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center font-bold">
-                <Swords size={16} />
+          {!isForgotPassword && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor={isMobileModal ? 'auth-password-m' : 'auth-password'} className="block text-xs font-bold text-slate-700">
+                  Mật khẩu
+                </label>
+                {!isRegister && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPassword(true)
+                      setError('')
+                      setForgotSuccess('')
+                    }}
+                    className="text-xs font-bold text-slate-500 hover:text-slate-950 transition cursor-pointer"
+                  >
+                    Quên mật khẩu?
+                  </button>
+                )}
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Ghép sân thông minh</h4>
-              <p className="text-slate-600 text-[11px]">Cân bằng trình độ 100%, bắt kèo đấu sòng phẳng.</p>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
+                <input
+                  id={isMobileModal ? 'auth-password-m' : 'auth-password'}
+                  name="password"
+                  type="password"
+                  autoComplete={isRegister ? 'new-password' : 'current-password'}
+                  required
+                  placeholder="••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full min-h-11 bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-2xs font-semibold"
+                />
+              </div>
             </div>
+          )}
 
-            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-1.5">
-              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
-                <Coins size={16} />
+          {isRegister && !isForgotPassword && (
+            <>
+              {/* Giới tính */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Giới tính</label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setGender('MALE')}
+                    className={`min-h-11 py-2 text-xs font-bold rounded-xl border transition cursor-pointer ${
+                      gender === 'MALE'
+                        ? 'bg-slate-950 border-slate-950 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    Nam
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGender('FEMALE')}
+                    className={`min-h-11 py-2 text-xs font-bold rounded-xl border transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      gender === 'FEMALE'
+                        ? 'bg-rose-600 border-rose-600 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>Nữ</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-extrabold ${gender === 'FEMALE' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'}`}>
+                      Trợ giá
+                    </span>
+                  </button>
+                </div>
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Chia tiền tự động</h4>
-              <p className="text-slate-600 text-[11px]">Hạch toán chi phí sân, cầu, nước rõ ràng từng buổi.</p>
+
+              {/* Hình thức thành viên */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">Hình thức tham gia</label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setMembershipChoice('CASUAL')}
+                    className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                      membershipChoice === 'CASUAL'
+                        ? 'bg-slate-950 border-slate-950 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="font-bold text-xs">Vãng lai</span>
+                    <span className={`text-[11px] font-medium mt-0.5 ${membershipChoice === 'CASUAL' ? 'text-slate-300' : 'text-slate-500'}`}>
+                      Đánh linh hoạt theo buổi
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMembershipChoice('FIXED')}
+                    className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                      membershipChoice === 'FIXED'
+                        ? 'bg-slate-950 border-slate-950 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs">Cố định</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${membershipChoice === 'FIXED' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-800'}`}>
+                        Giá ưu đãi
+                      </span>
+                    </div>
+                    <span className={`text-[11px] font-medium mt-0.5 ${membershipChoice === 'FIXED' ? 'text-slate-300' : 'text-slate-500'}`}>
+                      Sinh hoạt định kỳ CLB
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Avatar Picker & Upload */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-xs font-bold text-slate-700">Ảnh đại diện</label>
+                <div className="flex items-center gap-3.5 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div className="relative group shrink-0">
+                    <DuckMascot
+                      src={avatarUrl}
+                      size={56}
+                      rounded="2xl"
+                      className="shadow-sm border border-slate-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute -bottom-1.5 -right-1.5 min-h-7 min-w-7 inline-flex items-center justify-center bg-slate-950 text-white rounded-lg shadow-xs border-2 border-white cursor-pointer"
+                      title="Tải ảnh từ máy"
+                      aria-label="Tải ảnh đại diện từ máy"
+                    >
+                      <Camera size={13} />
+                    </button>
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full min-h-9 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
+                    >
+                      <Upload size={13} className="text-slate-600" />
+                      <span className="truncate">Tải ảnh từ máy / điện thoại</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAvatarUrl('/duck-mascot.png')}
+                      className="w-full text-[11px] font-bold text-slate-500 hover:text-slate-900 transition cursor-pointer text-center"
+                    >
+                      Dùng Mascot mặc định
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Error Banner */}
+          {error && (
+            <div
+              ref={errorRef}
+              role="alert"
+              className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-semibold scroll-mt-24"
+            >
+              {error}
             </div>
+          )}
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full min-h-11 py-3 bg-slate-950 hover:bg-slate-800 font-bold text-white text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-50 mt-4 cursor-pointer"
+          >
+            {isForgotPassword ? (
+              <>
+                <Send size={15} />
+                <span>{loading ? 'Đang gửi yêu cầu...' : 'Gửi yêu cầu tới Host'}</span>
+              </>
+            ) : isRegister ? (
+              <>
+                <UserPlus size={15} />
+                <span>{loading ? 'Đang xử lý...' : 'Tạo tài khoản'}</span>
+              </>
+            ) : (
+              <>
+                <LogIn size={15} />
+                <span>{loading ? 'Đang xử lý...' : 'Đăng nhập ngay'}</span>
+              </>
+            )}
+          </button>
+        </form>
+      )}
+    </>
+  )
+
+  return (
+    <div className="min-h-[82vh] flex items-center justify-center py-6 sm:py-10">
+      <div className="w-full max-w-5xl flex flex-col lg:grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        {/* Left Column: Real Athletic Badminton Showcase (Desktop lg:col-span-6, Mobile full width) */}
+        <div className="w-full lg:col-span-6 space-y-4 text-left">
+          {/* Authentic Badminton Hero Panel */}
+          <div>
+            <BadmintonHeroEditorial />
+          </div>
+
+          {/* Mobile Action Buttons: Bấm mở BottomSheet mượt mà */}
+          <div className="lg:hidden w-full pt-1 space-y-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegister(false)
+                setIsForgotPassword(false)
+                setError('')
+                setIsSheetOpen(true)
+              }}
+              className="w-full min-h-12 py-3 px-4 bg-slate-950 hover:bg-slate-900 active:scale-[0.98] text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <LogIn size={16} />
+              <span>Vào ca đấu / Đăng nhập</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegister(true)
+                setIsForgotPassword(false)
+                setError('')
+                setIsSheetOpen(true)
+              }}
+              className="w-full min-h-11 py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-200 active:scale-[0.98] text-slate-800 font-bold text-xs rounded-2xl shadow-xs flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <UserPlus size={15} className="text-slate-600" />
+              <span>Chưa có tài khoản? Đăng ký ngay</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Right Column: Modern Athletic Form Card (Desktop lg:col-span-6, Ẩn trên mobile) */}
+        <div id="auth-form-card" className="w-full hidden lg:block lg:col-span-6 scroll-mt-24">
+          <div className="saas-card rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-xl border border-slate-200/90 bg-white/98">
+            {renderAuthContent(false)}
           </div>
         </div>
       </div>
+
+      {/* Mobile Bottom Sheet: Trượt từ đáy màn hình lên, chống bàn phím che form */}
+      <BottomSheet
+        open={isSheetOpen}
+        onClose={() => setIsSheetOpen(false)}
+        title={
+          <div className="flex items-center gap-2">
+            <DuckMascot size={22} rounded="xl" />
+            <span className="text-sm font-black text-slate-900">Làng Địa Ngục</span>
+          </div>
+        }
+      >
+        <div className="py-2 space-y-4">
+          {renderAuthContent(true)}
+        </div>
+      </BottomSheet>
     </div>
   )
 }

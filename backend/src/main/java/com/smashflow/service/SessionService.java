@@ -614,10 +614,21 @@ public class SessionService {
         return vietQrService.generateQrUrl(participant.getDepositAmount(), depositMemo(participant.getId()));
     }
 
+    public String getDepositSepayQrUrl(Long participantId, User viewer) {
+        SessionParticipant participant = findParticipantForQr(participantId, viewer);
+        return vietQrService.generateSepayQrUrl(participant.getDepositAmount(), depositMemo(participant.getId()));
+    }
+
     public String getFinalPaymentQrUrl(Long participantId, User viewer) {
         SessionParticipant participant = findParticipantForQr(participantId, viewer);
         BigDecimal remaining = participant.getRemainingPaymentAmount();
         return vietQrService.generateQrUrl(remaining, finalPaymentMemo(participant.getId()));
+    }
+
+    public String getFinalPaymentSepayQrUrl(Long participantId, User viewer) {
+        SessionParticipant participant = findParticipantForQr(participantId, viewer);
+        BigDecimal remaining = participant.getRemainingPaymentAmount();
+        return vietQrService.generateSepayQrUrl(remaining, finalPaymentMemo(participant.getId()));
     }
 
     /** Chỉ Host hoặc chính chủ lượt đăng ký mới được xem mã QR chuyển khoản. */

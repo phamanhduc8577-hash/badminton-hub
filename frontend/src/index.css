@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-primary: #090e17;
-  --color-brand-accent: #e11d48;
-  --color-brand-navy: #1e3a8a;
-  --color-surface-card: rgba(255, 255, 255, 0.88);
+  --color-brand-primary: #0f172a;
+  --color-brand-accent: #059669;
+  --color-brand-gold: #d97706;
+  --color-surface-white: #ffffff;
 }
 
 :root {
@@ -15,8 +15,8 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #f4f6f9;
-  color: #090e17;
+  background-color: #ffffff;
+  color: #0f172a;
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
@@ -24,66 +24,138 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Premium High-End Editorial Sports Card Styling */
+/* 3D Perspective & Depth Foundations */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.perspective-1200 {
+  perspective: 1200px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+.rotate-y-0 {
+  transform: rotateY(0deg);
+}
+
+/* 3D Soft Floating Animation */
+@keyframes float3d {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1.5deg);
+  }
+}
+
+@keyframes floatShuttlecock {
+  0%, 100% {
+    transform: translateY(0px) rotate(-8deg) scale(1);
+  }
+  50% {
+    transform: translateY(-12px) rotate(4deg) scale(1.02);
+  }
+}
+
+@keyframes shadowPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.18;
+  }
+  50% {
+    transform: scale(0.85);
+    opacity: 0.08;
+  }
+}
+
+@keyframes bounceShuttlecock {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(3deg);
+  }
+}
+
+.animate-float-3d {
+  animation: float3d 4s ease-in-out infinite;
+}
+
+.animate-float-shuttlecock {
+  animation: floatShuttlecock 5s ease-in-out infinite;
+}
+
+.animate-shadow-pulse {
+  animation: shadowPulse 5s ease-in-out infinite;
+}
+
+/* Crisp Clean White Surface (Thay thế saas-card mờ đục cũ) */
 .saas-card {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(203, 213, 225, 0.85);
-  box-shadow: 0 12px 35px -12px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 16px -2px rgba(15, 23, 42, 0.03);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .saas-card:hover {
-  border-color: rgba(148, 163, 184, 0.9);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 22px 45px -15px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255, 255, 255, 1);
+  border-color: rgba(203, 213, 225, 0.95);
+  box-shadow: 0 6px 20px -4px rgba(15, 23, 42, 0.07);
 }
 
 .saas-card-interactive {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(203, 213, 225, 0.85);
-  box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 6px 18px -3px rgba(15, 23, 42, 0.04);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .saas-card-interactive:hover {
-  transform: translateY(-3px);
-  border-color: rgba(15, 23, 42, 0.35);
-  background: #ffffff;
-  box-shadow: 0 25px 40px -12px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.08);
 }
 
-/* Editorial Crisp Typography Gradients & Accents */
-.text-gradient-slate {
-  background: linear-gradient(180deg, #090E17 0%, #334155 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* 3D Tactile Button Press Feedback */
+.btn-tactile {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 0 0 rgba(15, 23, 42, 0.2), 0 4px 12px -2px rgba(15, 23, 42, 0.12);
 }
 
-.text-gradient-crimson {
-  background: linear-gradient(135deg, #090E17 0%, #E11D48 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.btn-tactile:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 0 transparent, 0 1px 4px 0 rgba(15, 23, 42, 0.1);
 }
 
-.editorial-badge {
-  background: #090e17;
-  color: #ffffff;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  font-weight: 800;
-  font-size: 10px;
+/* Holographic Glare for 3D Cards */
+.hologram-shine {
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 35%,
+    rgba(255, 255, 255, 0.35) 48%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.35) 52%,
+    rgba(255, 255, 255, 0) 65%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 
 /*
  * iOS Safari tự phóng to trang khi focus vào ô nhập có font-size < 16px.
- * Rule này cố ý KHÔNG nằm trong @layer: trong Tailwind v4 mọi utility (text-xs, text-sm...)
- * nằm trong @layer utilities, và style không thuộc layer nào luôn thắng style trong layer
- * (bất kể độ đặc hiệu). Nhờ vậy dưới 640px ô nhập luôn 16px, còn từ sm trở lên
- * các class như sm:text-xs vẫn hoạt động bình thường.
  */
 @media (width < 40rem) {
   input,
@@ -93,7 +165,7 @@ body {
   }
 }
 
-/* Ẩn thanh cuộn ngang cho nhóm nút lọc / tab (vẫn cuộn được bằng tay) */
+/* Ẩn thanh cuộn ngang cho nhóm nút lọc / tab */
 @utility no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -108,12 +180,12 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #e2e8f0;
+  background: #f8fafc;
 }
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #94a3b8;
 }

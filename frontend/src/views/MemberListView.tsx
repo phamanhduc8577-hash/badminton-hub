@@ -370,204 +370,195 @@ export const MemberListView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="saas-card rounded-3xl p-6 sm:p-8 relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
+      <div className="saas-card rounded-3xl p-5 sm:p-8 space-y-6 border border-slate-300 shadow-xl shadow-slate-900/[0.04]">
+        {/* Editorial Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200/80">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Danh Sách Thành Viên Làng Địa Ngục
+            <div className="text-[11px] font-bold tracking-widest text-slate-400 uppercase">
+              CLB CẦU LÔNG LÀNG ĐỊA NGỤC
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-0.5">
+              Thành viên
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <DuckMascot size={56} rounded="2xl" className="shadow-md border border-slate-200" />
-          </div>
-        </div>
-
-        {/* Quick Stats Grid */}
-        <div
-          className={`grid gap-3 pt-6 mt-6 border-t border-slate-200/80 text-xs ${
-            user?.role === 'HOST' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'
-          }`}
-        >
-          <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl">
-            <span className="text-[11px] font-bold text-emerald-800 block">🟢 Thành viên Cố định</span>
-            <span className="text-xl font-black text-emerald-950 mt-0.5 block">{fixedMembers.length} người</span>
-          </div>
-
+          {/* Host Quick Actions */}
           {user?.role === 'HOST' && (
-            <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-2xl">
-              <span className="text-[11px] font-bold text-amber-800 block">⏳ Đang chờ duyệt</span>
-              <span className="text-xl font-black text-amber-950 mt-0.5 block">{pendingMembers.length} người</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={openRestore}
+                className="min-h-9 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                title="Xem danh sách và khôi phục các thành viên đã lỡ xóa"
+              >
+                <RotateCcw size={13} />
+                <span>Khôi phục thành viên</span>
+                {deletedMembers.length > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-slate-900 text-white text-[10px]">
+                    {deletedMembers.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={handleOptimizeAvatars}
+                disabled={optimizeAvatarsMutation.isPending}
+                title="Thu nhỏ ảnh đại diện cũ để giảm băng thông"
+                className="min-h-9 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed shadow-2xs"
+              >
+                {optimizeAvatarsMutation.isPending ? 'Đang xử lý...' : 'Tối ưu ảnh đại diện'}
+              </button>
             </div>
           )}
-
-          <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl">
-            <span className="text-[11px] font-bold text-blue-800 block">🟡 Khách vãng lai</span>
-            <span className="text-xl font-black text-blue-950 mt-0.5 block">{casualMembers.length} người</span>
-          </div>
         </div>
 
-        {user?.role === 'HOST' && (
-          <div className="pt-4 flex flex-wrap items-center justify-end gap-2">
-            <button
-              onClick={openRestore}
-              className="min-h-11 sm:min-h-0 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs sm:text-[11px] font-bold transition active:scale-95 flex items-center gap-1.5"
-              title="Xem danh sách và khôi phục các thành viên đã lỡ xóa"
-            >
-              <RotateCcw size={13} />
-              <span>Khôi phục thành viên</span>
-              {deletedMembers.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px]">
-                  {deletedMembers.length}
+        {/* Quà cần trao: chỉ Host thấy */}
+        {user?.role === 'HOST' && pendingHandovers.length > 0 && (
+          <div className="rounded-2xl p-4 sm:p-5 space-y-3 border border-amber-200/80 bg-amber-50/50">
+            <div className="flex items-center justify-between pb-2 border-b border-amber-200/80">
+              <div className="flex items-center gap-2">
+                <Gift size={15} className="text-amber-600" />
+                <h2 className="text-xs font-bold text-slate-900">Quà cần trao tận tay</h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black">
+                  {pendingHandovers.length}
                 </span>
-              )}
-            </button>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Bấm "Đã trao" sau khi đưa quà cho thành viên
+              </span>
+            </div>
+
+            <div className="divide-y divide-amber-100">
+              {pendingHandovers.map((h) => (
+                <div key={h.rewardId} className="py-2.5 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <DuckMascot
+                      src={h.avatarUrl || '/duck-mascot.png'}
+                      size={32}
+                      rounded="xl"
+                      className="border border-slate-200 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <span className="font-bold text-slate-900 text-xs block truncate">{h.fullName}</span>
+                      <span className="text-[10px] text-slate-500">
+                        {h.phone ? `${h.phone} • ` : ''}đã đi {h.sessionsAttended} buổi
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <div className="text-right">
+                      <span className="text-xs font-black text-slate-900 block">{h.rewardName}</span>
+                      <span className="text-[10px] text-amber-700 font-bold">Mốc {h.milestoneSessions} buổi</span>
+                    </div>
+                    <button
+                      onClick={() => confirmHandoverMutation.mutate(h.rewardId)}
+                      disabled={confirmHandoverMutation.isPending}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition disabled:opacity-60 cursor-pointer"
+                    >
+                      <CheckCircle2 size={13} />
+                      <span>Đã trao</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Action Banner khi có thành viên chờ duyệt Cố định (Chỉ Host thấy, đập vào mắt không sợ miss) */}
+        {user?.role === 'HOST' && pendingMembers.length > 0 && (
+          <div className="flex items-center justify-between p-3 sm:p-4 bg-amber-50/80 border border-amber-200/90 rounded-2xl gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <span className="text-xs font-bold text-amber-950 truncate">
+                {pendingMembers.length} thành viên đang chờ duyệt cố định
+              </span>
+            </div>
             <button
-              onClick={handleOptimizeAvatars}
-              disabled={optimizeAvatarsMutation.isPending}
-              title="Thu nhỏ ảnh đại diện cũ để giảm băng thông"
-              className="min-h-11 sm:min-h-0 px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs sm:text-[11px] font-bold transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              type="button"
+              onClick={() => setActiveTab('PENDING')}
+              className={`min-h-8.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'PENDING'
+                  ? 'bg-amber-700 text-white shadow-xs'
+                  : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-200 shadow-2xs'
+              }`}
             >
-              {optimizeAvatarsMutation.isPending ? 'Đang xử lý...' : '🖼️ Tối ưu ảnh đại diện'}
+              <span>Chờ duyệt cố định</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200/70 text-amber-900 font-black">
+                {pendingMembers.length}
+              </span>
             </button>
           </div>
         )}
-      </div>
 
-      {/* Quà cần trao: chỉ Host thấy */}
-      {user?.role === 'HOST' && pendingHandovers.length > 0 && (
-        <div className="saas-card rounded-3xl p-6 space-y-4 border border-amber-200 bg-amber-50/40">
-          <div className="flex items-center justify-between pb-3 border-b border-amber-200/80">
-            <div className="flex items-center gap-2">
-              <Gift size={16} className="text-amber-600" />
-              <h2 className="text-sm font-bold text-slate-900">Quà cần trao tận tay</h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black">
-                {pendingHandovers.length}
-              </span>
-            </div>
-            <span className="text-[11px] text-slate-500 font-medium">
-              Bấm "Đã trao" sau khi đưa quà cho thành viên
-            </span>
-          </div>
-
-          <div className="divide-y divide-amber-100">
-            {pendingHandovers.map((h) => (
-              <div key={h.rewardId} className="py-3 flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-3 min-w-0">
-                  <DuckMascot
-                    src={h.avatarUrl || '/duck-mascot.png'}
-                    size={36}
-                    rounded="xl"
-                    className="border border-slate-200 shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <span className="font-bold text-slate-900 text-sm block truncate">{h.fullName}</span>
-                    <span className="text-[11px] text-slate-500">
-                      {h.phone ? `${h.phone} • ` : ''}đã đi {h.sessionsAttended} buổi
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <span className="text-xs font-black text-slate-900 block">{h.rewardName}</span>
-                    <span className="text-[10px] text-amber-700 font-bold">Mốc {h.milestoneSessions} buổi</span>
-                  </div>
-                  <button
-                    onClick={() => confirmHandoverMutation.mutate(h.rewardId)}
-                    disabled={confirmHandoverMutation.isPending}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition disabled:opacity-60 cursor-pointer"
-                  >
-                    <CheckCircle2 size={13} />
-                    <span>Đã trao</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Tabs & Search Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        {/* Tabs */}
-        <div className="flex items-center gap-1.5 p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto no-scrollbar touch-pan-x">
-          <button
-            onClick={() => setActiveTab('FIXED')}
-            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
-              activeTab === 'FIXED'
-                ? 'bg-slate-900 text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <span>🟢 Thành viên Cố định</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-400/20 text-emerald-300 font-black">
-              {fixedMembers.length}
-            </span>
-          </button>
-
-          {user?.role === 'HOST' && (
+        {/* Navigation Tabs & Search Toolbar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Tabs Segmented Control - 2 Tabs cân xứng 50/50 trên Mobile */}
+          <div role="tablist" aria-label="Loại thành viên" className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold w-full sm:w-auto sm:min-w-[260px] shrink-0">
             <button
-              onClick={() => setActiveTab('PENDING')}
-              className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
-                activeTab === 'PENDING'
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              role="tab"
+              aria-selected={activeTab === 'FIXED'}
+              onClick={() => setActiveTab('FIXED')}
+              className={`min-h-9 py-2 px-3 rounded-lg transition cursor-pointer whitespace-nowrap text-center flex items-center justify-center gap-1.5 ${
+                activeTab === 'FIXED'
+                  ? 'bg-white text-slate-950 shadow-xs border border-slate-200/80 font-black'
+                  : 'text-slate-600 hover:text-slate-950'
               }`}
             >
-              <span>⏳ Chờ duyệt cố định</span>
-              {pendingMembers.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black animate-pulse">
-                  {pendingMembers.length}
-                </span>
-              )}
+              <span>Cố định</span>
+              <span className="text-[11px] text-slate-500 font-bold">({fixedMembers.length} người)</span>
             </button>
-          )}
 
-          <button
-            onClick={() => setActiveTab('CASUAL')}
-            className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 ${
-              activeTab === 'CASUAL'
-                ? 'bg-slate-900 text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <span>🟡 Khách Vãng lai</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700 font-bold">
-              {casualMembers.length}
-            </span>
-          </button>
-        </div>
-
-        {/* Search Box */}
-        <div className="relative w-full sm:w-auto sm:min-w-[240px]">
-          <Search className="absolute left-3.5 top-2.5 text-slate-400" size={15} />
-          <input
-            type="text"
-            placeholder="Tìm theo tên hoặc SĐT..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 shadow-sm font-medium"
-          />
-        </div>
-      </div>
-
-      {/* Member Roster Card */}
-      <div className="saas-card rounded-3xl p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <Users size={16} className="text-slate-900" />
-            <h2 className="text-sm font-bold text-slate-900">
-              {activeTab === 'FIXED'
-                ? 'Danh sách Thành Viên Cố Định (Chính thức)'
-                : activeTab === 'PENDING'
-                ? 'Yêu cầu đăng ký Thành Viên Cố Định (Chờ Host phê duyệt)'
-                : 'Danh sách Thành Viên / Khách Vãng Lai'}
-            </h2>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'CASUAL'}
+              onClick={() => setActiveTab('CASUAL')}
+              className={`min-h-9 py-2 px-3 rounded-lg transition cursor-pointer whitespace-nowrap text-center flex items-center justify-center gap-1.5 ${
+                activeTab === 'CASUAL'
+                  ? 'bg-white text-slate-950 shadow-xs border border-slate-200/80 font-black'
+                  : 'text-slate-600 hover:text-slate-950'
+              }`}
+            >
+              <span>Vãng lai</span>
+              <span className="text-[11px] text-slate-500 font-bold">({casualMembers.length} người)</span>
+            </button>
           </div>
-          <span className="text-xs text-slate-500 font-medium">Hiển thị {filteredList.length} thành viên</span>
+
+          {/* Search Box */}
+          <div className="relative w-full sm:w-auto sm:min-w-[240px]">
+            <Search className="absolute left-3.5 top-2.5 text-slate-400" size={15} />
+            <input
+              type="text"
+              placeholder="Tìm theo tên hoặc SĐT..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-400 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition shadow-2xs font-medium"
+            />
+          </div>
         </div>
+
+        {/* Member Roster List & Table */}
+        <div className="space-y-4 pt-1">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-900">
+                {activeTab === 'FIXED'
+                  ? 'Thành viên Cố định'
+                  : activeTab === 'PENDING'
+                  ? 'Yêu cầu chờ duyệt Cố định'
+                  : 'Khách Vãng lai'}
+              </span>
+              {activeTab === 'PENDING' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('FIXED')}
+                  className="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                >
+                  (Quay lại)
+                </button>
+              )}
+            </div>
+            <span className="text-slate-500 font-medium">Hiển thị {filteredList.length} người</span>
+          </div>
 
         {isLoading ? (
           <div className="py-16 text-center text-slate-500 text-xs font-semibold animate-pulse">
@@ -874,6 +865,7 @@ export const MemberListView: React.FC = () => {
           </div>
           </>
         )}
+        </div>
       </div>
 
       {/* Mobile: menu thao tác "⋯" cho 1 thành viên (Xóa luôn nằm cuối, màu đỏ) */}

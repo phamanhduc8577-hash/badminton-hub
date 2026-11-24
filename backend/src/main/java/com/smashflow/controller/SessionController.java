@@ -62,14 +62,16 @@ public class SessionController {
     public ResponseEntity<Map<String, String>> getDepositQr(@PathVariable Long participantId,
                                                             @AuthenticationPrincipal User currentUser) {
         String qrUrl = sessionService.getDepositQrUrl(participantId, currentUser);
-        return ResponseEntity.ok(Collections.singletonMap("qrUrl", qrUrl));
+        String sepayQrUrl = sessionService.getDepositSepayQrUrl(participantId, currentUser);
+        return ResponseEntity.ok(Map.of("qrUrl", qrUrl != null ? qrUrl : "", "sepayQrUrl", sepayQrUrl != null ? sepayQrUrl : ""));
     }
 
     @GetMapping("/participants/{participantId}/payment-qr")
     public ResponseEntity<Map<String, String>> getPaymentQr(@PathVariable Long participantId,
                                                             @AuthenticationPrincipal User currentUser) {
         String qrUrl = sessionService.getFinalPaymentQrUrl(participantId, currentUser);
-        return ResponseEntity.ok(Collections.singletonMap("qrUrl", qrUrl));
+        String sepayQrUrl = sessionService.getFinalPaymentSepayQrUrl(participantId, currentUser);
+        return ResponseEntity.ok(Map.of("qrUrl", qrUrl != null ? qrUrl : "", "sepayQrUrl", sepayQrUrl != null ? sepayQrUrl : ""));
     }
 
     @PostMapping("/participants/{participantId}/confirm-deposit")

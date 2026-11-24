@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
@@ -19,7 +19,6 @@ import {
   QrCode,
   CheckCircle2,
   AlertCircle,
-  Camera,
   DollarSign,
   Shield,
   ArrowLeft,
@@ -27,11 +26,6 @@ import {
   Loader2,
   RefreshCw,
 } from 'lucide-react'
-
-// Máy quét QR (html5-qrcode khá nặng) chỉ tải khi bấm mở camera
-const QrCameraScanner = lazy(() =>
-  import('../components/QrCameraScanner').then((m) => ({ default: m.QrCameraScanner }))
-)
 
 const getErrorMessage = (err: any, fallback: string): string =>
   err?.response?.data?.message || fallback
@@ -61,7 +55,6 @@ export const SessionDetailView: React.FC = () => {
   const [selectedDurationHours, setSelectedDurationHours] = useState<number | undefined>(undefined)
   const [selectedSlotWindow, setSelectedSlotWindow] = useState<string>('FULL')
   const [showCheckinModal, setShowCheckinModal] = useState(false)
-  const [showCameraScanner, setShowCameraScanner] = useState(false)
   const [showPaymentQrModal, setShowPaymentQrModal] = useState<string | null>(null)
   const [showCashNoticeModal, setShowCashNoticeModal] = useState(false)
   const [depositQrData, setDepositQrData] = useState<{ qrUrl: string; participant: Participant } | null>(null)
@@ -351,33 +344,11 @@ export const SessionDetailView: React.FC = () => {
     }
   }, [searchParams, session, user])
 
-  // Mở form nhập mã tay (từ nút trong máy quét hoặc khi quét lỗi)
+  // Mở form nhập mã điểm danh
   const openManualCheckin = (errorMessage?: string) => {
-    setShowCameraScanner(false)
     setCheckinSuccess(false)
     setCheckinError(errorMessage || '')
     setShowCheckinModal(true)
-  }
-
-  // Handle Scan QR from Camera
-  const handleScanSuccess = async (scannedText: string) => {
-    setShowCameraScanner(false)
-    let token = scannedText.trim()
-    try {
-      if (token.startsWith('http')) {
-        const url = new URL(token)
-        const paramToken = url.searchParams.get('token')
-        if (paramToken) token = paramToken
-      }
-    } catch (_) {}
-    const cleanToken = token.toUpperCase()
-    setCheckinTokenInput(cleanToken)
-    const result = await handleCheckinSubmit(cleanToken)
-    if (!result.ok) {
-      // Quét lỗi: báo ngay + mở form nhập tay (đã điền sẵn mã vừa quét) kèm lý do
-      showToast(result.error || 'Điểm danh thất bại!', 'error')
-      openManualCheckin(result.error)
-    }
   }
 
   const handleOpenDepositQr = async (participant: Participant) => {
@@ -545,40 +516,40 @@ export const SessionDetailView: React.FC = () => {
 
       {/* Session MVP Highlight Box for all members and host */}
       {sessionMvp && (
-        <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 rounded-3xl p-5 sm:p-7 text-slate-950 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 relative overflow-hidden">
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl p-5 sm:p-6 border-2 border-amber-400/80 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 relative overflow-hidden">
           <div className="flex items-center gap-3.5 sm:gap-4 relative z-10 min-w-0 flex-1">
             <div className="relative shrink-0">
               <DuckMascot
                 src={sessionMvp.avatarUrl || '/duck-mascot.png'}
-                size={60}
-                rounded="2xl"
-                className="border-2 border-slate-950/80 shadow-xl"
+                size={54}
+                rounded="xl"
+                className="border-2 border-amber-400 shadow-sm"
               />
-              <div className="absolute -top-2 -right-2 w-6 h-6 rounded-xl bg-slate-950 text-amber-300 flex items-center justify-center text-xs shadow-md border border-amber-400">
+              <div className="absolute -top-2 -right-2 w-6 h-6 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center text-xs shadow-xs font-black">
                 👑
               </div>
             </div>
             <div className="min-w-0 flex-1 pr-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-950 text-amber-300 text-[10px] sm:text-xs font-black uppercase tracking-wider mb-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold uppercase tracking-wider mb-1">
                 <span>Vinh danh MVP Ca Đấu</span>
               </div>
-              <h3 className="text-lg sm:text-2xl font-black truncate" title={sessionMvp.name}>
+              <h3 className="text-lg sm:text-xl font-black text-slate-950 truncate" title={sessionMvp.name}>
                 {sessionMvp.name}
               </h3>
-              <p className="text-xs font-bold text-slate-900 mt-0.5">
-                Thắng nhiều nhất: <b>{sessionMvp.wins} Thắng</b> (-{sessionMvp.losses} Thua) • {sessionMvp.totalSets} set
+              <p className="text-xs text-slate-700 mt-0.5">
+                Thắng nhiều nhất: <b className="font-bold text-slate-950">{sessionMvp.wins} Thắng</b> (-{sessionMvp.losses} Thua) • {sessionMvp.totalSets} set
               </p>
             </div>
           </div>
 
-          <div className="bg-white/95 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-yellow-300/80 text-left md:text-right shrink-0 shadow-md relative z-10 md:max-w-xs">
-            <span className="text-[10px] sm:text-[11px] font-black uppercase text-amber-900 block">
-              Phần thưởng MVP Ca Đấu
+          <div className="bg-amber-50/80 p-3.5 sm:p-4 rounded-xl border border-amber-200 text-left md:text-right shrink-0 relative z-10 md:max-w-xs">
+            <span className="text-xs font-bold uppercase tracking-wide text-amber-900 block">
+              Phần thưởng MVP
             </span>
-            <span className="font-black text-xs sm:text-sm text-slate-950 block mt-0.5 whitespace-nowrap">
+            <span className="font-bold text-xs sm:text-sm text-slate-950 block mt-0.5 whitespace-nowrap">
               🥤 Tặng 01 Nước giải khát Revive
             </span>
-            <span className="text-[9px] sm:text-[10px] text-slate-600 block mt-0.5 font-semibold">
+            <span className="text-xs text-slate-500 block mt-0.5">
               (Host trao tặng trực tiếp tại sân)
             </span>
           </div>
@@ -614,16 +585,16 @@ export const SessionDetailView: React.FC = () => {
 
             {/* Venue & Time Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs text-slate-700">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
+              <div className="bg-slate-50/90 p-4 rounded-2xl border border-slate-200 space-y-1">
                 <div className="flex items-center gap-2 text-slate-900 font-bold">
                   <MapPin size={15} />
                   <span>Địa điểm thi đấu</span>
                 </div>
                 <p className="text-slate-900 font-bold text-sm mt-1">{session.venueName}</p>
-                <p className="text-slate-600 text-[11px] leading-relaxed font-medium">{session.venueAddress}</p>
+                <p className="text-slate-600 text-xs leading-relaxed font-medium">{session.venueAddress}</p>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
+              <div className="bg-slate-50/90 p-4 rounded-2xl border border-slate-200 space-y-1">
                 <div className="flex items-center gap-2 text-slate-900 font-bold">
                   <Clock size={15} className="text-rose-600" />
                   <span>Khung giờ ca đánh</span>
@@ -631,30 +602,30 @@ export const SessionDetailView: React.FC = () => {
                 <p className="text-slate-900 font-bold text-sm mt-1">
                   {formatSessionDateTime(session.startTime).time} - {formatSessionDateTime(session.endTime).time}
                 </p>
-                <p className="text-slate-600 text-[11px] font-medium">
+                <p className="text-slate-600 text-xs font-medium">
                   {formatSessionDateTime(session.startTime).day}
                 </p>
               </div>
             </div>
 
             {/* Pricing Matrix Banner */}
-            <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
                   <DollarSign size={15} className="text-slate-900" />
                   <span>Bảng giá slot tham gia</span>
                 </h3>
                 {sessionHoursLabel !== null && (
-                  <span className="text-[10px] font-black px-2.5 py-0.5 rounded-lg bg-slate-900 text-white shadow-xs">
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-slate-900 text-white shadow-xs">
                     ⏱️ Ca {sessionHoursLabel} Giờ
                   </span>
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <span className="text-[11px] text-slate-800 font-black uppercase tracking-wide">Thành viên CLB</span>
-                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">Miễn cọc</span>
+                    <span className="text-xs text-slate-900 font-bold uppercase tracking-wide">Thành viên CLB</span>
+                    <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">Miễn cọc</span>
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex items-center justify-between">
@@ -668,7 +639,7 @@ export const SessionDetailView: React.FC = () => {
                   </div>
                   {member2h && (
                     <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
-                      <span className="text-slate-800 font-black block text-[11px]">Tùy chọn 2 tiếng:</span>
+                      <span className="text-slate-800 font-bold block text-xs">Tùy chọn 2 tiếng:</span>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-700 font-bold">Nam:</span>
                         <span className="font-black text-slate-900">{formatMoney(member2h.male)}</span>
@@ -681,13 +652,13 @@ export const SessionDetailView: React.FC = () => {
                   )}
                 </div>
 
-                <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <span className="text-[11px] text-slate-800 font-black uppercase tracking-wide">Khách Vãng Lai</span>
+                    <span className="text-xs text-slate-900 font-bold uppercase tracking-wide">Khách Vãng Lai</span>
                     {Number(session.depositAmount) > 0 ? (
-                      <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">Cọc {depositLabel} (lần đầu)</span>
+                      <span className="text-xs text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">Cọc {depositLabel} (lần đầu)</span>
                     ) : (
-                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">Miễn cọc</span>
+                      <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">Miễn cọc</span>
                     )}
                   </div>
                   <div className="space-y-2 text-xs">
@@ -702,7 +673,7 @@ export const SessionDetailView: React.FC = () => {
                   </div>
                   {guest2h && (
                     <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
-                      <span className="text-slate-800 font-black block text-[11px]">Tùy chọn 2 tiếng:</span>
+                      <span className="text-slate-800 font-bold block text-xs">Tùy chọn 2 tiếng:</span>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-700 font-bold">Nam:</span>
                         <span className="font-black text-slate-900">{formatMoney(guest2h.male)}</span>
@@ -788,23 +759,13 @@ export const SessionDetailView: React.FC = () => {
                           Chưa điểm danh
                         </span>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                          onClick={() => setShowCameraScanner(true)}
-                          className="min-h-11 py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white rounded-xl flex items-center justify-center gap-2 text-sm sm:text-xs transition active:scale-95 shadow-sm"
-                        >
-                          <Camera size={16} />
-                          <span>Quét QR sân (Camera)</span>
-                        </button>
-
-                        <button
-                          onClick={() => openManualCheckin()}
-                          className="min-h-11 py-3 bg-white hover:bg-slate-50 text-slate-800 font-bold rounded-xl flex items-center justify-center gap-2 text-sm sm:text-xs transition border border-slate-200 active:scale-95 shadow-sm"
-                        >
-                          <QrCode size={16} />
-                          <span>Nhập mã Token</span>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => openManualCheckin()}
+                        className="w-full min-h-11 py-3 bg-slate-900 hover:bg-slate-800 font-bold text-white rounded-xl flex items-center justify-center gap-2 text-sm sm:text-xs transition active:scale-95 shadow-sm"
+                      >
+                        <QrCode size={16} />
+                        <span>Nhập mã Token điểm danh</span>
+                      </button>
                     </div>
                   )}
 
@@ -961,15 +922,15 @@ export const SessionDetailView: React.FC = () => {
                   return (
                     <div
                       key={p.id}
-                      className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl text-xs hover:border-slate-300 transition shadow-sm"
+                      className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl text-xs hover:border-slate-300 transition shadow-2xs"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-                        <span className="w-6 h-6 rounded-lg bg-slate-100 text-center font-bold text-slate-600 flex items-center justify-center text-[11px] shrink-0">
+                        <span className="w-6 h-6 rounded-lg bg-slate-100 text-center font-bold text-slate-600 flex items-center justify-center text-xs shrink-0">
                           {idx + 1}
                         </span>
                         <DuckMascot
                           src={p.avatarUrl || '/duck-mascot.png'}
-                          size={34}
+                          size={36}
                           rounded="xl"
                           className="border border-slate-200 shadow-2xs shrink-0"
                         />
@@ -977,7 +938,7 @@ export const SessionDetailView: React.FC = () => {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-slate-900 truncate">{p.name}</span>
                             <span
-                              className={`text-[9px] px-1.5 py-0.2 rounded font-bold shrink-0 ${
+                              className={`text-xs px-2 py-0.5 rounded font-bold shrink-0 ${
                                 p.gender === 'FEMALE'
                                   ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                   : 'bg-blue-50 text-blue-700 border border-blue-200'
@@ -986,18 +947,18 @@ export const SessionDetailView: React.FC = () => {
                               {p.gender === 'FEMALE' ? 'Nữ' : 'Nam'}
                             </span>
                             {p.isGuest ? (
-                              <span className="text-[9px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-200 rounded font-bold shrink-0">
+                              <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded font-bold shrink-0">
                                 Vãng lai
                               </span>
                             ) : (
-                              <span className="text-[9px] px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-bold shrink-0">
+                              <span className="text-xs px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded font-bold shrink-0">
                                 Cố định
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap mt-1">
                             <span
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                              className={`text-xs font-bold px-2 py-0.5 rounded border shrink-0 ${
                                 stats.totalSets === 0
                                   ? 'bg-slate-50 text-slate-500 border-slate-200'
                                   : 'bg-emerald-50 text-emerald-800 border-emerald-200'
@@ -1006,10 +967,10 @@ export const SessionDetailView: React.FC = () => {
                               🏸 {stats.totalSets} set ({stats.wins}W - {stats.losses}L)
                             </span>
                             {phoneLabel && (
-                              <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">{phoneLabel}</span>
+                              <span className="text-xs text-slate-500 font-medium whitespace-nowrap">{phoneLabel}</span>
                             )}
                             {p.slotWindow && (
-                              <span className="text-[9px] font-extrabold text-slate-900 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded shrink-0">
+                              <span className="text-xs font-bold text-slate-900 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded shrink-0">
                                 ⏱️ {p.slotWindow}
                               </span>
                             )}
@@ -1017,21 +978,21 @@ export const SessionDetailView: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0 flex flex-col items-end justify-center min-w-[72px]">
+                      <div className="text-right shrink-0 flex flex-col items-end justify-center min-w-[76px]">
                         {p.checkinStatus === 'CHECKED_IN' ? (
-                          <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center text-xs font-bold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
                             ✓ Đã đến
                           </span>
                         ) : Number(p.depositAmount) > 0 && p.depositStatus !== 'PAID' ? (
-                          <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 animate-pulse whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center text-xs font-bold px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 animate-pulse whitespace-nowrap">
                             Chờ cọc
                           </span>
                         ) : (
-                          <span className="inline-flex items-center justify-center text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 whitespace-nowrap">
+                          <span className="inline-flex items-center justify-center text-xs font-bold px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 whitespace-nowrap">
                             Chưa đến
                           </span>
                         )}
-                        <span className="block text-[10px] text-slate-600 font-medium mt-1 whitespace-nowrap">
+                        <span className="block text-xs text-slate-600 font-medium mt-1 whitespace-nowrap">
                           {p.paymentStatus === 'PAID'
                             ? 'Đã xong'
                             : `Thu: ${Number(p.remainingAmount).toLocaleString()}đ`}
@@ -1332,23 +1293,6 @@ export const SessionDetailView: React.FC = () => {
               </div>
             </div>
       </BottomSheet>
-
-      {/* Camera Scanner */}
-      {showCameraScanner && (
-        <Suspense
-          fallback={
-            <div className="fixed inset-0 z-[70] bg-slate-950/80 flex items-center justify-center text-white">
-              <PageLoader label="Đang mở camera..." compact />
-            </div>
-          }
-        >
-          <QrCameraScanner
-            onScanSuccess={handleScanSuccess}
-            onClose={() => setShowCameraScanner(false)}
-            onManualEntry={() => openManualCheckin()}
-          />
-        </Suspense>
-      )}
 
       {/* Final Bill QR Modal */}
       <BottomSheet

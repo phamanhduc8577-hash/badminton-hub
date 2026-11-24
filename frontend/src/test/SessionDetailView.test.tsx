@@ -116,26 +116,24 @@ describe('SessionDetailView - mobile cho thành viên', () => {
     expect(screen.queryByText(/\*\*\*\*/)).not.toBeInTheDocument()
   })
 
-  it('quét QR lỗi: hiện toast lỗi VÀ mở form nhập mã tay kèm lý do, đã điền sẵn mã', async () => {
+  it('nhập mã Token lỗi: hiện thông báo lỗi trong form nhập mã kèm lý do', async () => {
     ;(api.post as any).mockRejectedValue(rejectWith('Mã điểm danh không đúng hoặc đã hết hạn!'))
     renderView()
-    fireEvent.click(await screen.findByRole('button', { name: /Quét QR sân/i }))
-    // Máy quét được lazy load → chờ module tải xong
-    fireEvent.click(await screen.findByRole('button', { name: 'mock-scan' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Nhập mã Token/i }))
 
     const dialog = await screen.findByRole('dialog', { name: /Điểm danh 1-Chạm/i })
-    expect(within(dialog).getByRole('alert')).toHaveTextContent('Mã điểm danh không đúng hoặc đã hết hạn!')
+    const input = within(dialog).getByLabelText(/Mã Token/i)
+    fireEvent.change(input, { target: { value: 'BADTOK12' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /^Xác nhận$/i }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Mã điểm danh không đúng hoặc đã hết hạn!')
     expect(within(dialog).getByLabelText(/Mã Token/i)).toHaveValue('BADTOK12')
-    // Toast nằm trong vùng aria-live
-    expect(within(screen.getByRole('status')).getByText('Mã điểm danh không đúng hoặc đã hết hạn!')).toBeInTheDocument()
     expect(api.post).toHaveBeenCalledWith('/sessions/5/checkin', { token: 'BADTOK12', durationHours: undefined })
   })
 
-  it('nút "Nhập mã bằng tay" trong máy quét mở thẳng form nhập tay', async () => {
+  it('nút "Nhập mã Token" mở thẳng form nhập tay chuẩn accessibility', async () => {
     renderView()
-    fireEvent.click(await screen.findByRole('button', { name: /Quét QR sân/i }))
-    fireEvent.click(await screen.findByRole('button', { name: 'mock-manual' }))
-    expect(screen.queryByTestId('mock-scanner')).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /Nhập mã Token/i }))
     const dialog = await screen.findByRole('dialog', { name: /Điểm danh 1-Chạm/i })
     const input = within(dialog).getByLabelText(/Mã Token/i)
     expect(input).toHaveAttribute('autocapitalize', 'characters')
