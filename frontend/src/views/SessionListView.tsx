@@ -29,7 +29,6 @@ import {
   History,
   CheckCircle,
   RotateCcw,
-  Sparkles,
 } from 'lucide-react'
 
 export const SessionListView: React.FC = () => {
@@ -402,7 +401,7 @@ export const SessionListView: React.FC = () => {
             </span>
             <div>
               <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-none">
-                Bảng xếp hạng câu lạc bộ
+                Top 4 của bảng xếp hạng
               </h3>
               <p className="text-[11px] font-medium text-slate-500 mt-0.5">
                 {leaderboardTab === 'wins' ? 'Top chiến thần gánh team & điểm LP xếp hạng' : 'Top thành viên chuyên cần tham gia nhiều ca nhất'}
@@ -772,10 +771,9 @@ export const SessionListView: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Perks Banner (Khớp ảnh 13: ✨ Ưu đãi: [Ca 3h pill] Trợ giá Nữ • Tích điểm đổi nước) */}
+                    {/* Perks Banner (Ưu đãi: [Ca 3h pill] Trợ giá Nữ • Tích điểm đổi nước) */}
                     <div className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-50/70 border border-emerald-200/60 text-[11px] text-emerald-800 font-bold flex-wrap">
                       <div className="flex items-center gap-1 shrink-0">
-                        <Sparkles size={13} className="text-emerald-600 shrink-0" />
                         <span>Ưu đãi:</span>
                         {durHours !== null && (
                           <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">

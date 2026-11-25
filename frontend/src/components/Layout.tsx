@@ -100,18 +100,16 @@ export const Layout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
           {/* Brand & Duck Mascot */}
           <div
-            className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group min-w-0"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none group shrink-0"
             onClick={() => navigate('/')}
           >
             <div className="relative shrink-0">
-              <DuckMascot size={44} rounded="xl" />
-              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
+              <DuckMascot size={40} rounded="xl" />
+              <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white shadow-sm" />
             </div>
-            <div className="min-w-0">
-              <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-slate-700 transition truncate block">
-                Cầu Lông Làng Địa Ngục
-              </span>
-            </div>
+            <span className="font-extrabold text-sm sm:text-base md:text-lg tracking-tight text-slate-900 group-hover:text-slate-700 transition whitespace-nowrap">
+              Cầu Lông Làng Địa Ngục
+            </span>
           </div>
 
           {/* Desktop Navigation Links with Liquid Glass Water Effect */}
