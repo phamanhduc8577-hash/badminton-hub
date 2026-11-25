@@ -105,7 +105,7 @@ describe('MemberListView - Host sửa giới tính', () => {
     ;(api.put as any).mockResolvedValue({ data: { ...member, gender: 'MALE' } })
     render(<MemberListView />, { wrapper })
 
-    fireEvent.click(await screen.findByRole('button', { name: /Khách Vãng lai/ }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Vãng lai/ }))
     const badge = await screen.findByRole('button', { name: /Sửa giới tính của Lỡ Tay/i })
     fireEvent.click(badge)
 
@@ -119,7 +119,7 @@ describe('MemberListView - Host sửa giới tính', () => {
   it('Thành viên thường không thấy nút sửa giới tính', async () => {
     useAuthStore.getState().setAuth({ ...baseUser, id: 99, role: 'MEMBER' } as any, 'tok')
     render(<MemberListView />, { wrapper })
-    fireEvent.click(await screen.findByRole('button', { name: /Khách Vãng lai/ }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Vãng lai/ }))
     expect(await screen.findByText('Nữ (Trợ giá)')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Sửa giới tính/i })).not.toBeInTheDocument()
   })

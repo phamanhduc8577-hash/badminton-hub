@@ -64,7 +64,7 @@ export const Layout: React.FC = () => {
       fx: 'none',
     },
     ...(user?.role === 'HOST'
-      ? [{ label: 'Host Panel', icon: <Shield size={15} />, fx: 'none' }]
+      ? [{ label: 'Host Panel', icon: <Shield size={15} />, fx: 'none' as const }]
       : []),
   ]
 
