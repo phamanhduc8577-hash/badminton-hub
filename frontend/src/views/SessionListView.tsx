@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
-import { SessionItem } from '../types'
+import { SessionItem, LeaderboardPage } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { CurrencyInput } from '../components/CurrencyInput'
@@ -10,6 +10,8 @@ import { useToast } from '../components/ToastProvider'
 import { Shuttlecock3D } from '../components/3d/Shuttlecock3D'
 import { durationHours, formatSessionDateTime, parseServerDateTime, serverToDateTimeInput } from '../lib/dateUtils'
 import { getEffectiveSessionStatus, SESSION_STATUS_LABEL } from '../lib/sessionStatus'
+import { getLolRank, getPlayerRankDisplay } from '../lib/ranks'
+import { RankEmblem } from '../components/RankEmblem'
 import {
   Clock,
   MapPin,
@@ -27,6 +29,7 @@ import {
   History,
   CheckCircle,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react'
 
 export const SessionListView: React.FC = () => {
@@ -68,6 +71,21 @@ export const SessionListView: React.FC = () => {
       const res = await api.get('/sessions')
       return res.data
     },
+  })
+
+  // Tab chọn loại bảng xếp hạng preview: 'wins' (Thành tích LP) hoặc 'attendance' (Chuyên cần)
+  const [leaderboardTab, setLeaderboardTab] = useState<'attendance' | 'wins'>('wins')
+
+  // Đồng bộ Bảng xếp hạng trực tiếp với trang Leaderboard (/leaderboards/attendance hoặc /leaderboards/wins)
+  const { data: topPlayersData, isLoading: isLoadingTopPlayers } = useQuery<LeaderboardPage>({
+    queryKey: ['leaderboards', leaderboardTab, 'preview'],
+    queryFn: async () => {
+      const res = await api.get(`/leaderboards/${leaderboardTab}`, {
+        params: { page: 0, size: 4 },
+      })
+      return res.data
+    },
+    staleTime: 60_000,
   })
 
   // Mutation cập nhật sân, slot, địa điểm & bảng giá trực tiếp
@@ -375,78 +393,170 @@ export const SessionListView: React.FC = () => {
         )}
       </div>
 
-      {/* 2. Leaderboard Standings Preview - Pure Minimal Sports Club Style */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-3.5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-            Bảng xếp hạng
-          </h3>
-          <button
-            onClick={() => navigate('/leaderboard')}
-            className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition flex items-center gap-1 cursor-pointer"
-          >
-            <span>Xem tất cả</span>
-            <ChevronRight size={13} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {/* Top 1 */}
-          <div
-            onClick={() => navigate('/leaderboard')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition flex items-center gap-3 cursor-pointer group"
-          >
-            <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-black text-xs flex items-center justify-center shrink-0">
-              1
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate">Võ Long</div>
-              <div className="text-[11px] font-medium text-slate-500">1.650 điểm</div>
+      {/* 2. Leaderboard Standings Preview - Synchronized with Live Leaderboard */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 shadow-2xs">
+              <Trophy size={16} />
+            </span>
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-none">
+                Bảng xếp hạng câu lạc bộ
+              </h3>
+              <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                {leaderboardTab === 'wins' ? 'Top chiến thần gánh team & điểm LP xếp hạng' : 'Top thành viên chuyên cần tham gia nhiều ca nhất'}
+              </p>
             </div>
           </div>
 
-          {/* Top 2 */}
-          <div
-            onClick={() => navigate('/leaderboard')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition flex items-center gap-3 cursor-pointer group"
-          >
-            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
-              2
+          <div className="flex items-center gap-2">
+            {/* Tab switch Chuyên cần / Thành tích */}
+            <div role="tablist" aria-label="Loại bảng xếp hạng" className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={leaderboardTab === 'attendance'}
+                onClick={() => setLeaderboardTab('attendance')}
+                className={`py-1 px-2.5 rounded-lg transition cursor-pointer text-[11px] whitespace-nowrap ${
+                  leaderboardTab === 'attendance'
+                    ? 'bg-white text-slate-950 shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                Chuyên cần
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={leaderboardTab === 'wins'}
+                onClick={() => setLeaderboardTab('wins')}
+                className={`py-1 px-2.5 rounded-lg transition cursor-pointer text-[11px] whitespace-nowrap ${
+                  leaderboardTab === 'wins'
+                    ? 'bg-white text-slate-950 shadow-xs font-black'
+                    : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                Thành tích
+              </button>
             </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate">Phạm Đức</div>
-              <div className="text-[11px] font-medium text-slate-500">1.520 điểm</div>
-            </div>
-          </div>
 
-          {/* Top 3 */}
-          <div
-            onClick={() => navigate('/leaderboard')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition flex items-center gap-3 cursor-pointer group"
-          >
-            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
-              3
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate">Minh Trí</div>
-              <div className="text-[11px] font-medium text-slate-500">1.440 điểm</div>
-            </div>
-          </div>
-
-          {/* Top 4 */}
-          <div
-            onClick={() => navigate('/leaderboard')}
-            className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 transition flex items-center gap-3 cursor-pointer group"
-          >
-            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
-              4
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-slate-900 truncate">Hoàng Nam</div>
-              <div className="text-[11px] font-medium text-slate-500">1.360 điểm</div>
-            </div>
+            <button
+              onClick={() => navigate('/leaderboard')}
+              className="text-xs font-bold text-slate-600 hover:text-slate-950 transition flex items-center gap-1 cursor-pointer px-2 py-1.5 rounded-xl hover:bg-slate-100 shrink-0"
+            >
+              <span>Xem tất cả</span>
+              <ChevronRight size={13} />
+            </button>
           </div>
         </div>
+
+        {isLoadingTopPlayers ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-pulse">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 h-20" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {(topPlayersData?.entries && topPlayersData.entries.length > 0
+              ? topPlayersData.entries.slice(0, 4)
+              : [
+                  { id: 1, rank: 1, fullName: 'Võ Long', eloScore: 1650, sessionsAttended: 18, placementMatches: 0, shieldMatches: 0, avatarUrl: '' },
+                  { id: 2, rank: 2, fullName: 'Phạm Đức', eloScore: 1520, sessionsAttended: 14, placementMatches: 0, shieldMatches: 0, avatarUrl: '' },
+                  { id: 3, rank: 3, fullName: 'Minh Trí', eloScore: 1440, sessionsAttended: 11, placementMatches: 0, shieldMatches: 0, avatarUrl: '' },
+                  { id: 4, rank: 4, fullName: 'Hoàng Nam', eloScore: 1360, sessionsAttended: 9, placementMatches: 0, shieldMatches: 0, avatarUrl: '' },
+                ]
+            ).map((entry, idx) => {
+              const rank = entry.rank || idx + 1
+              const rankDisplay = getPlayerRankDisplay(
+                entry.eloScore ?? 0,
+                entry.placementMatches ?? 0,
+                entry.shieldMatches ?? 0
+              )
+              const baseTier = getLolRank(entry.eloScore ?? 0)
+              const isFirst = rank === 1
+              const isSecond = rank === 2
+              const isThird = rank === 3
+
+              return (
+                <div
+                  key={entry.id}
+                  onClick={() => navigate('/leaderboard')}
+                  className={`p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 flex items-center gap-3 cursor-pointer group hover:scale-[1.02] hover:shadow-md ${
+                    isFirst
+                      ? 'bg-amber-50/40 border-amber-200 hover:border-amber-300'
+                      : isSecond
+                      ? 'bg-slate-50/80 border-slate-200 hover:border-slate-300'
+                      : isThird
+                      ? 'bg-amber-50/20 border-amber-200/60 hover:border-amber-300/80'
+                      : 'bg-slate-50/50 border-slate-200/80 hover:border-slate-300'
+                  }`}
+                >
+                  {/* Rank Badge */}
+                  <div className="shrink-0 relative">
+                    {isFirst ? (
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 text-slate-950 flex items-center justify-center font-black text-xs shadow-md shadow-amber-400/30 border border-yellow-200">
+                        👑
+                      </div>
+                    ) : isSecond ? (
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-slate-300 via-slate-100 to-slate-400 text-slate-900 flex items-center justify-center font-black text-xs shadow-xs border border-slate-200">
+                        🥈
+                      </div>
+                    ) : isThird ? (
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-700 via-amber-600 to-yellow-800 text-white flex items-center justify-center font-black text-xs shadow-xs border border-amber-500">
+                        🥉
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 font-black text-xs flex items-center justify-center border border-slate-200">
+                        #{rank}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3D Rank Emblem Crest */}
+                  <div className="shrink-0 -my-2">
+                    <RankEmblem tier={baseTier} size="sm" showGlow={isFirst || isSecond} />
+                  </div>
+
+                  {/* Player Avatar & Details */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <DuckMascot
+                        src={entry.avatarUrl || '/duck-mascot.png'}
+                        size={22}
+                        rounded="full"
+                        className="shrink-0 border border-slate-200 shadow-2xs"
+                      />
+                      <span className="text-xs font-black text-slate-900 group-hover:text-emerald-700 transition truncate block">
+                        {entry.fullName}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {leaderboardTab === 'wins' ? (
+                        <>
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.2 rounded border leading-tight ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}
+                          >
+                            {rankDisplay.name}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-500 truncate">
+                            {entry.eloScore ?? 0} LP
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                          {entry.sessionsAttended ?? 0} buổi tham gia
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* 3. Main Sessions Grid Feed */}
@@ -577,27 +687,27 @@ export const SessionListView: React.FC = () => {
                 <div
                   key={session.id}
                   onClick={() => navigate(`/sessions/${session.id}`)}
-                  className={`bg-white rounded-3xl p-5 sm:p-6 cursor-pointer flex flex-col justify-between group relative border transition-all duration-200 ${
+                  className={`bg-white rounded-3xl p-5 sm:p-6 cursor-pointer flex flex-col justify-between group relative border transition-all duration-200 hover:shadow-xl ${
                     effectiveStatus === 'ACTIVE'
                       ? 'border-emerald-400 shadow-lg shadow-emerald-500/5 ring-2 ring-emerald-500/20'
                       : effectiveStatus === 'UPCOMING'
-                      ? 'border-slate-200 hover:border-slate-400 hover:shadow-xl shadow-xs'
+                      ? 'border-slate-200/90 hover:border-slate-400 shadow-xs'
                       : 'border-slate-200/80 bg-slate-50/40 opacity-90 hover:opacity-100 shadow-2xs'
                   }`}
                 >
-                  <div className="space-y-3">
-                    {/* Header Badges */}
+                  <div className="space-y-3.5">
+                    {/* Header Badges Pill Row */}
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {session.isBookedByCurrentUser && (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-xs">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-600 text-white shadow-xs">
                             <CheckCircle size={12} className="text-white" />
                             <span>Đã đăng ký</span>
                           </span>
                         )}
 
                         <span
-                          className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
                             effectiveStatus === 'ACTIVE'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-2xs'
                               : effectiveStatus === 'UPCOMING'
@@ -611,73 +721,83 @@ export const SessionListView: React.FC = () => {
                         </span>
 
                         {session.courtNames && (
-                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                            {session.courtNames}
+                          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200/80">
+                            🏸 {session.courtNames}
                           </span>
                         )}
                       </div>
 
                       <div className="flex items-center gap-2">
                         <span
-                          className={`text-xs font-bold px-2.5 py-0.5 rounded-lg border ${
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
                             isFull
                               ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : 'bg-slate-100 text-slate-800 border-slate-200'
+                              : 'bg-emerald-50/80 text-emerald-800 border-emerald-200/80'
                           }`}
                         >
-                          {session.bookedSlots}/{session.maxSlots} chỗ {isFull && '(Đầy)'}
+                          {session.bookedSlots}/{session.maxSlots} Slots {isFull && '(Đầy)'}
                         </span>
                       </div>
                     </div>
 
-                    {/* Slot Progress Bar */}
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-300 ${
-                          isFull ? 'bg-rose-500' : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${Math.min(100, Math.round((session.bookedSlots / (session.maxSlots || 1)) * 100))}%` }}
-                      />
-                    </div>
-
-                    {/* Title */}
-                    <h3 className="font-bold text-base sm:text-lg text-slate-900 group-hover:text-emerald-700 transition leading-snug line-clamp-1">
+                    {/* Main Title */}
+                    <h3 className="font-black text-base sm:text-lg text-slate-950 group-hover:text-emerald-700 transition leading-snug line-clamp-1">
                       {session.title}
                     </h3>
 
-                    {/* Venue & Location Details Box */}
-                    <div className="space-y-1.5 text-xs text-slate-600 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
-                      <div className="flex items-center gap-2 font-medium text-slate-800">
-                        <Clock size={14} className="text-emerald-600 shrink-0" />
-                        <span>
+                    {/* Inner Details Container (Rounded Inset Gray Box matching photo 9, 10, 13) */}
+                    <div className="bg-slate-50/90 rounded-2xl p-3.5 border border-slate-200/70 space-y-2">
+                      {/* Venue Name in uppercase bold with location pin */}
+                      <div className="flex items-center gap-2">
+                        <MapPin size={15} className="text-emerald-600 shrink-0" />
+                        <h4 className="font-black text-xs sm:text-sm text-slate-900 uppercase tracking-tight truncate">
+                          {session.venueName || 'SÂN ĐẠI PHÁT'}
+                        </h4>
+                      </div>
+
+                      {/* Time Schedule */}
+                      <div className="flex items-center gap-2 text-xs text-slate-700">
+                        <Clock size={14} className="text-slate-400 shrink-0" />
+                        <span className="font-semibold">
                           {start.day}, <b>{start.time} - {end.time}</b>
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <MapPin size={14} className="text-slate-400 shrink-0" />
-                        <span className="truncate">{session.venueName}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-500 text-xs pt-0.5">
+
+                      {/* Host Info */}
+                      <div className="flex items-center gap-2 text-xs text-slate-600 pt-0.5 border-t border-slate-200/40">
                         <Users size={13} className="text-slate-400 shrink-0" />
-                        <span>Host: <b className="text-slate-800">{session.hostName}</b></span>
+                        <span>
+                          Host: <b className="text-slate-900 font-bold">{session.hostName}</b>
+                        </span>
                       </div>
+                    </div>
+
+                    {/* Perks Banner (Khớp ảnh 13: ✨ Ưu đãi: [Ca 3h pill] Trợ giá Nữ • Tích điểm đổi nước) */}
+                    <div className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-50/70 border border-emerald-200/60 text-[11px] text-emerald-800 font-bold flex-wrap">
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Sparkles size={13} className="text-emerald-600 shrink-0" />
+                        <span>Ưu đãi:</span>
+                        {durHours !== null && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">
+                            Ca {durHours}h
+                          </span>
+                        )}
+                      </div>
+                      <span className="truncate">
+                        Trợ giá Nữ • Tích điểm đổi nước
+                      </span>
                     </div>
                   </div>
 
                   {/* Card Bottom Bar */}
-                  <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs gap-2">
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {durHours !== null && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                          {durHours} tiếng
-                        </span>
-                      )}
-                      <span className="text-xs font-bold text-slate-900 truncate">
+                      <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200/80 truncate">
                         {session.memberMalePrice ? `${Math.round(session.memberMalePrice / 1000)}k` : 'Miễn phí'}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       {user?.role === 'HOST' && (
                         <>
                           <button
@@ -685,21 +805,19 @@ export const SessionListView: React.FC = () => {
                               e.stopPropagation()
                               navigate(`/host/session/${session.id}`)
                             }}
-                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-2xs transition flex items-center gap-1 text-xs font-bold z-10 active:scale-95 cursor-pointer"
+                            className="w-8 h-8 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition flex items-center justify-center text-xs font-bold z-10 active:scale-95 cursor-pointer"
                             title="Host Panel"
                           >
-                            <ShieldCheck size={13} />
-                            <span className="hidden sm:inline">Host Panel</span>
+                            <ShieldCheck size={16} />
                           </button>
 
                           <button
                             onClick={(e) => handleOpenEditModal(e, session)}
-                            className="px-2 py-1.5 bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-200 rounded-lg shadow-2xs transition flex items-center gap-1 text-xs font-medium z-10 active:scale-95 cursor-pointer"
+                            className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-200 shadow-xs transition flex items-center justify-center text-xs font-medium z-10 active:scale-95 cursor-pointer"
                             title="Sửa nhanh thông tin ca"
                             aria-label="Sửa ca"
                           >
-                            <Settings size={13} className="text-slate-600" />
-                            <span className="hidden sm:inline">Sửa ca</span>
+                            <Settings size={16} className="text-slate-600" />
                           </button>
                         </>
                       )}
