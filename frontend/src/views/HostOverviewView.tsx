@@ -3,25 +3,24 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   ShieldCheck,
-  TrendingUp,
-  DollarSign,
-  Users,
-  Calendar,
   ChevronLeft,
   ChevronRight,
   ArrowUpRight,
-  Activity,
-  QrCode,
-  Banknote,
-  Award,
-  Wallet,
-  Layers,
-  CheckCircle2,
+  Calendar,
   Clock,
-  Zap,
+  PlayCircle,
   AlertTriangle,
   ChevronDown,
-  PlayCircle,
+  TrendingUp,
+  TrendingDown,
+  CircleDollarSign,
+  Receipt,
+  Users,
+  CreditCard,
+  Banknote,
+  Trophy,
+  PieChart,
+  Plus,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { MonthlyReport, ReconciliationEntry } from '../types'
@@ -31,7 +30,6 @@ import { getEffectiveSessionStatus } from '../lib/sessionStatus'
 
 /**
  * Thẻ chỉ-đọc cho Host: các lượt đã thu tiền + có cọc, thu trước bản sửa lỗi trừ cọc.
- * Khi đó tiền cọc bị trừ dù có thể chưa nhận → có thể đã thu thiếu đúng bằng tiền cọc. Không tự sửa dữ liệu.
  */
 export const ReconciliationCard: React.FC<{ formatVnd: (n?: number) => string }> = ({ formatVnd }) => {
   const [open, setOpen] = useState(false)
@@ -51,38 +49,38 @@ export const ReconciliationCard: React.FC<{ formatVnd: (n?: number) => string }>
   return (
     <section
       aria-labelledby="reconciliation-title"
-      className="bg-white rounded-3xl border border-amber-200 shadow-xs overflow-hidden"
+      className="bg-amber-50/60 rounded-2xl border border-amber-200/80 overflow-hidden text-slate-800 transition-all"
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls="reconciliation-body"
-        className="w-full min-h-11 flex items-center justify-between gap-3 p-4 sm:p-5 text-left hover:bg-amber-50/60 transition"
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-amber-100/40 transition"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0">
-            <AlertTriangle size={16} aria-hidden="true" />
+          <div className="p-1.5 bg-amber-100 text-amber-800 rounded-lg shrink-0">
+            <AlertTriangle size={15} aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <h2 id="reconciliation-title" className="text-sm font-black text-slate-950">
+            <h2 id="reconciliation-title" className="text-xs font-bold text-amber-950">
               Đối soát cọc trước đây
             </h2>
-            <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-              {rows.length} lượt • tổng cọc {formatVnd(totalDeposit)}
+            <p className="text-[11px] text-amber-800/80 font-medium">
+              {rows.length} lượt • Tổng cọc {formatVnd(totalDeposit)} (cần đối chiếu sao kê)
             </p>
           </div>
         </div>
         <ChevronDown
-          size={18}
+          size={16}
           aria-hidden="true"
-          className={`text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`text-amber-800/70 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
       {open && (
-        <div id="reconciliation-body" className="px-4 pb-4 sm:px-5 sm:pb-5 space-y-3">
-          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+        <div id="reconciliation-body" className="px-4 pb-4 space-y-3 pt-1 border-t border-amber-200/60">
+          <p className="text-xs text-amber-900 bg-white/70 border border-amber-200 rounded-xl p-3 leading-relaxed">
             Các lượt dưới đây đã được thu tiền <b>trước bản sửa lỗi tính cọc</b>. Khi đó tiền cọc luôn bị trừ vào số
             tiền thu (kể cả khi chưa thực nhận cọc), nên có thể đã <b>thu thiếu đúng bằng tiền cọc</b>. Hệ thống không tự
             sửa dữ liệu cũ — bạn có thể đối chiếu sao kê/ghi chép và xử lý tay nếu cần.
@@ -91,25 +89,25 @@ export const ReconciliationCard: React.FC<{ formatVnd: (n?: number) => string }>
             {rows.map((r) => (
               <li
                 key={r.participantId}
-                className="p-3 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-1.5"
+                className="p-3 rounded-xl border border-amber-200/70 bg-white/80 space-y-1.5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="text-sm font-black text-slate-900 block truncate">{r.name}</span>
-                    <span className="text-xs text-slate-500 font-medium">{r.phone}</span>
+                    <span className="text-xs font-bold text-slate-900 block truncate">{r.name}</span>
+                    <span className="text-[11px] text-slate-500 font-medium">{r.phone}</span>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-[11px] text-slate-500 block">Cọc</span>
-                    <span className="text-sm font-black text-amber-700">{formatVnd(Number(r.depositAmount))}</span>
+                    <span className="text-[10px] text-slate-500 block">Cọc</span>
+                    <span className="text-xs font-bold text-amber-700">{formatVnd(Number(r.depositAmount))}</span>
                   </div>
                 </div>
-                <div className="text-xs text-slate-600 font-medium truncate">
+                <div className="text-[11px] text-slate-600 font-medium truncate">
                   {r.sessionTitle}
                   {r.sessionStartTime && (
                     <> • {formatVnDate(r.sessionStartTime)}</>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600 pt-1 border-t border-slate-100">
                   <span>
                     Giá ca: <b className="text-slate-800">{formatVnd(Number(r.finalFee))}</b>
                   </span>
@@ -139,15 +137,9 @@ const DEPOSIT_LABEL: Record<ReconciliationEntry['depositStatus'], string> = {
 
 export const HostOverviewView: React.FC = () => {
   const navigate = useNavigate()
-  // Tháng/năm hiện tại theo giờ Việt Nam
   const now = getVnParts(new Date())
-  const [selectedYear, setSelectedYear] = useState<number>(() => {
-    // If year is 2026/2025
-    return now.year
-  })
-  const [selectedMonth, setSelectedMonth] = useState<number>(() => {
-    return now.month
-  })
+  const [selectedYear, setSelectedYear] = useState<number>(() => now.year)
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => now.month)
 
   const { data: report, isLoading } = useQuery<MonthlyReport>({
     queryKey: ['monthly-report', selectedYear, selectedMonth],
@@ -194,212 +186,219 @@ export const HostOverviewView: React.FC = () => {
     return report.sessionSummaries.find((s) => getEffectiveStatus(s) === 'UPCOMING') || null
   }, [report])
 
+  const marginRate = report?.totalRevenue
+    ? Math.round(((report.netProfit || 0) / report.totalRevenue) * 100)
+    : 0
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950 rounded-3xl p-5 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-80 h-80 bg-rose-600/20 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative z-10">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600/30 border border-rose-500/40 text-rose-300 text-[11px] sm:text-xs font-bold tracking-wide">
-              <ShieldCheck size={13} />
-              <span>Host Financial Console</span>
-            </div>
-            <h1 className="text-xl sm:text-3xl font-black tracking-tight">
-              Báo Cáo Tổng Quan CLB
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-medium">
-              Theo dõi dòng tiền, doanh thu ca đánh, chi phí sân cầu và tỷ lệ tăng trưởng thành viên theo tháng.
-            </p>
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 font-sans text-slate-900">
+      {/* Linear Style Sub-header Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="p-1 rounded-md bg-slate-900 text-white inline-flex">
+              <ShieldCheck size={14} />
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Host Console
+            </span>
           </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950 mt-1">
+            Báo cáo vận hành CLB
+          </h1>
+          <p className="text-xs text-slate-500 font-medium">
+            Dữ liệu tài chính, doanh thu ca đánh và cơ cấu thành viên theo tháng.
+          </p>
+        </div>
 
-          {/* Month Navigator */}
-          <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-3 bg-white/10 backdrop-blur-md p-2 rounded-2xl border border-white/15">
+        {/* Linear Date Navigator */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-2xs">
             <button
               onClick={handlePrevMonth}
-              className="p-2 hover:bg-white/20 rounded-xl transition text-white active:scale-95"
+              className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-600 hover:text-slate-900"
               title="Tháng trước"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={16} />
             </button>
-            <div className="px-3 text-center flex-1 sm:flex-initial">
-              <span className="text-[9px] sm:text-[10px] text-slate-300 block font-bold uppercase tracking-wider">
-                Tháng thống kê
-              </span>
-              <span className="text-sm sm:text-base font-black text-white">
-                {selectedMonth.toString().padStart(2, '0')}/{selectedYear}
+            <div className="px-3 py-0.5 text-center min-w-[100px]">
+              <span className="text-xs font-semibold text-slate-800 tracking-tight tabular-nums">
+                Tháng {selectedMonth.toString().padStart(2, '0')}/{selectedYear}
               </span>
             </div>
             <button
               onClick={handleNextMonth}
-              className="p-2 hover:bg-white/20 rounded-xl transition text-white active:scale-95"
+              className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-600 hover:text-slate-900"
               title="Tháng sau"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={16} />
             </button>
           </div>
+
+          <button
+            onClick={() => navigate('/host/create-session')}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-2xs transition active:scale-98"
+          >
+            <Plus size={14} />
+            <span>Tạo ca mới</span>
+          </button>
         </div>
       </div>
 
-      {/* Quick-Access Live Session Alert: Bảng điều hành nhanh cho Host */}
+      {/* Quick-Access Live Session Alert: Tối giản, dạng Linear Notice */}
       {activeOrNextSession && (
         <div
           onClick={() => navigate(`/host/session/${activeOrNextSession.sessionId}`)}
-          className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-950 rounded-3xl p-5 sm:p-6 border border-emerald-500/30 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.18)] cursor-pointer group hover:border-emerald-500/60 transition-all duration-300 relative overflow-hidden"
+          className="group relative bg-white border border-emerald-300/80 rounded-2xl p-4 sm:p-5 shadow-xs hover:border-emerald-500 hover:shadow-sm transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-hidden"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-            <div className="space-y-1.5 text-left">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2.5 w-2.5 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="relative flex h-3 w-3 mt-1 sm:mt-0 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  {getEffectiveStatus(activeOrNextSession) === 'ACTIVE' ? 'Ca đang diễn ra' : 'Ca tiếp theo'}
                 </span>
-                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
-                  {getEffectiveStatus(activeOrNextSession) === 'ACTIVE' ? 'Ca đang diễn ra' : 'Ca tiếp theo trong tháng'}
-                </span>
-                <span className="text-xs text-slate-400">
-                  • {activeOrNextSession.startTime ? formatVnDate(activeOrNextSession.startTime) : ''}
+                <span className="text-xs text-slate-400 font-medium">
+                  {activeOrNextSession.startTime ? formatVnDate(activeOrNextSession.startTime) : ''}
                 </span>
               </div>
-              <h2 className="text-base sm:text-lg font-black text-white group-hover:text-emerald-300 transition">
+              <h2 className="text-sm sm:text-base font-bold text-slate-950 group-hover:text-emerald-700 transition">
                 {activeOrNextSession.title}
               </h2>
-              <p className="text-xs text-slate-300 font-medium">
-                Quân số: <b className="text-white font-bold">{activeOrNextSession.checkedInPlayers}/{activeOrNextSession.totalPlayers}</b> • Thu: <b className="text-emerald-400">{formatVnd(activeOrNextSession.totalRevenue)}</b>
+              <p className="text-xs text-slate-500">
+                Quân số: <b className="text-slate-800">{activeOrNextSession.checkedInPlayers}/{activeOrNextSession.totalPlayers}</b> • Thu: <b className="text-emerald-700">{formatVnd(activeOrNextSession.totalRevenue)}</b>
               </p>
             </div>
+          </div>
 
-            <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg transition active:scale-95 shrink-0 self-start sm:self-auto">
-              <PlayCircle size={16} />
-              <span>Mở Bảng Điều Hành Ca Này</span>
-            </div>
+          <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs transition shrink-0 self-start sm:self-auto">
+            <PlayCircle size={15} />
+            <span>Mở điều hành ca</span>
           </div>
         </div>
       )}
 
-      {/* Đối soát cọc trước bản sửa lỗi (Q5) — chỉ hiện khi có dữ liệu */}
+      {/* Đối soát cọc (nếu có dữ liệu) */}
       <ReconciliationCard formatVnd={formatVnd} />
 
       {isLoading ? (
         <div className="space-y-6 animate-pulse">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white p-5 rounded-3xl border border-slate-200 h-32" />
+              <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200/80 h-28" />
             ))}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white p-6 rounded-3xl border border-slate-200 h-52" />
+              <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200/80 h-48" />
             ))}
           </div>
         </div>
       ) : (
         <>
-          {/* KPI 4 Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Doanh thu */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Tổng doanh thu</span>
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                  <DollarSign size={18} />
+          {/* Linear Minimalist KPI 4 Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* Lợi nhuận ròng (Net Profit) - Đặt lên số 1 */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition space-y-2">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-medium">Lợi nhuận ròng</span>
+                <div className={`p-1.5 rounded-lg ${(report?.netProfit || 0) >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                  {(report?.netProfit || 0) >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                 </div>
               </div>
-              <div>
-                <div className="text-2xl font-black text-slate-950">
+              <div className="space-y-1">
+                <div className={`text-xl sm:text-2xl font-bold tracking-tight tabular-nums ${(report?.netProfit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  {formatVnd(report?.netProfit)}
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                  <span className={`inline-flex items-center font-bold px-1.5 py-0.5 rounded ${marginRate >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                    {marginRate >= 0 ? `+${marginRate}%` : `${marginRate}%`}
+                  </span>
+                  <span>biên lợi nhuận</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Doanh thu */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition space-y-2">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-medium">Tổng doanh thu</span>
+                <div className="p-1.5 rounded-lg bg-slate-50 text-slate-600 border border-slate-100">
+                  <CircleDollarSign size={16} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-slate-950">
                   {formatVnd(report?.totalRevenue)}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1 font-medium">
-                  Cọc đã thu: <span className="font-bold text-slate-700">{formatVnd(report?.totalDepositCollected)}</span>
+                <div className="text-[11px] text-slate-500 font-medium">
+                  Cọc đã thu: <span className="font-semibold text-slate-700">{formatVnd(report?.totalDepositCollected)}</span>
                 </div>
               </div>
             </div>
 
             {/* Chi phí */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Tổng chi phí</span>
-                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                  <TrendingUp size={18} />
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition space-y-2">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-medium">Tổng chi phí</span>
+                <div className="p-1.5 rounded-lg bg-slate-50 text-slate-600 border border-slate-100">
+                  <Receipt size={16} />
                 </div>
               </div>
-              <div>
-                <div className="text-2xl font-black text-rose-600">
+              <div className="space-y-1">
+                <div className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-slate-900">
                   {formatVnd(report?.totalExpenses)}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1 font-medium">
-                  <span>Sân: {formatVnd(report?.costCourt)}</span>
-                  <span>•</span>
-                  <span>Cầu: {formatVnd(report?.costShuttlecock)}</span>
+                <div className="text-[11px] text-slate-500 font-medium truncate">
+                  Sân: <b className="font-semibold text-slate-700">{formatVnd(report?.costCourt)}</b> • Cầu: <b className="font-semibold text-slate-700">{formatVnd(report?.costShuttlecock)}</b>
                 </div>
               </div>
             </div>
 
-            {/* Lợi nhuận ròng */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Lợi nhuận ròng (Net)</span>
-                <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
-                  <Wallet size={18} />
+            {/* Quy mô ca đánh & Điểm danh */}
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition space-y-2">
+              <div className="flex items-center justify-between text-slate-500">
+                <span className="text-xs font-medium">Quy mô ca & Điểm danh</span>
+                <div className="p-1.5 rounded-lg bg-slate-50 text-slate-600 border border-slate-100">
+                  <Users size={16} />
                 </div>
               </div>
-              <div>
-                <div
-                  className={`text-2xl font-black ${
-                    (report?.netProfit || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                  }`}
-                >
-                  {formatVnd(report?.netProfit)}
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1 font-medium">
-                  Tỷ suất lợi nhuận:{' '}
-                  <span className="font-bold text-slate-800">
-                    {report?.totalRevenue
-                      ? `${Math.round(((report.netProfit || 0) / report.totalRevenue) * 100)}%`
-                      : '0%'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quy mô ca đánh & Tỷ lệ điểm danh */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Tổng ca & Lượt chơi</span>
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                  <Users size={18} />
-                </div>
-              </div>
-              <div>
-                <div className="text-2xl font-black text-slate-950">
+              <div className="space-y-1">
+                <div className="text-xl sm:text-2xl font-bold tracking-tight tabular-nums text-slate-950">
                   {report?.totalSessions || 0} ca{' '}
-                  <span className="text-sm text-slate-500 font-bold">({report?.totalPlayerTurnout || 0} lượt)</span>
+                  <span className="text-xs font-normal text-slate-500">({report?.totalPlayerTurnout || 0} lượt)</span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1 font-medium">
-                  Điểm danh: <span className="font-bold text-emerald-600">{report?.attendanceRate || 0}%</span>
+                <div className="text-[11px] text-slate-500 font-medium">
+                  Tỷ lệ điểm danh: <span className="font-bold text-emerald-700">{report?.attendanceRate || 0}%</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Breakdown Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Breakdown Insights Grid (Linear Clean Surface) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
             {/* Phân loại thành viên */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-4">
-              <div className="flex items-center gap-2">
-                <Layers size={16} className="text-rose-600" />
-                <h3 className="text-sm font-black text-slate-950">Cơ cấu thành viên tham gia</h3>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <PieChart size={15} className="text-slate-600" />
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Cơ cấu thành viên</h3>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">{report?.totalPlayerTurnout || 0} lượt</span>
               </div>
+
               <div className="space-y-3">
                 <div>
-                  <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                  <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
                     <span>Thành viên Cố định</span>
-                    <span className="text-rose-600">{report?.fixedMemberTurnout || 0} lượt</span>
+                    <span className="font-bold text-slate-900">{report?.fixedMemberTurnout || 0} lượt</span>
                   </div>
-                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                     <div
-                      className="bg-rose-600 h-full rounded-full transition-all duration-500"
+                      className="bg-slate-900 h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${
                           report?.totalPlayerTurnout
@@ -412,13 +411,13 @@ export const HostOverviewView: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                  <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
                     <span>Khách Vãng lai</span>
-                    <span className="text-slate-900">{report?.guestTurnout || 0} lượt</span>
+                    <span className="font-bold text-slate-900">{report?.guestTurnout || 0} lượt</span>
                   </div>
-                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                     <div
-                      className="bg-slate-900 h-full rounded-full transition-all duration-500"
+                      className="bg-slate-400 h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${
                           report?.totalPlayerTurnout
@@ -430,9 +429,9 @@ export const HostOverviewView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>Tỷ lệ Giới tính:</span>
-                  <span className="font-bold text-slate-800">
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Tỷ lệ giới tính:</span>
+                  <span className="font-semibold text-slate-700">
                     {report?.maleTurnout || 0} Nam • {report?.femaleTurnout || 0} Nữ
                   </span>
                 </div>
@@ -440,83 +439,88 @@ export const HostOverviewView: React.FC = () => {
             </div>
 
             {/* Phương thức thanh toán */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-4">
-              <div className="flex items-center gap-2">
-                <QrCode size={16} className="text-emerald-600" />
-                <h3 className="text-sm font-black text-slate-950">Hình thức thanh toán</h3>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={15} className="text-slate-600" />
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Hình thức thanh toán</h3>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">Đối soát</span>
               </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
-                      <QrCode size={16} />
+
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between p-2.5 bg-slate-50/70 rounded-xl border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg">
+                      <CreditCard size={14} />
                     </div>
                     <div>
-                      <span className="text-xs font-black text-slate-900 block">VietQR Tự Động</span>
-                      <span className="text-[10px] text-slate-500 font-medium">Chuyển khoản SePay</span>
+                      <span className="text-xs font-semibold text-slate-900 block leading-tight">VietQR Tự Động</span>
+                      <span className="text-[10px] text-slate-400 font-medium">Cổng SePay</span>
                     </div>
                   </div>
-                  <span className="text-sm font-black text-emerald-700">
+                  <span className="text-xs font-bold text-emerald-700 tabular-nums">
                     {report?.vietQrPayments || 0} lượt
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
-                      <Banknote size={16} />
+                <div className="flex items-center justify-between p-2.5 bg-slate-50/70 rounded-xl border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-amber-50 text-amber-700 rounded-lg">
+                      <Banknote size={14} />
                     </div>
                     <div>
-                      <span className="text-xs font-black text-slate-900 block">Tiền Mặt Trực Tiếp</span>
-                      <span className="text-[10px] text-slate-500 font-medium">Host thu tại sân</span>
+                      <span className="text-xs font-semibold text-slate-900 block leading-tight">Tiền Mặt Trực Tiếp</span>
+                      <span className="text-[10px] text-slate-400 font-medium">Thu tại sân</span>
                     </div>
                   </div>
-                  <span className="text-sm font-black text-slate-900">
+                  <span className="text-xs font-bold text-slate-800 tabular-nums">
                     {report?.cashPayments || 0} lượt
                   </span>
                 </div>
 
                 {report?.unpaidCount ? (
-                  <div className="text-[11px] text-rose-600 font-bold bg-rose-50 p-2 rounded-xl text-center">
-                    ⚠️ Còn {report.unpaidCount} lượt chưa thanh toán trong tháng
+                  <div className="text-[11px] text-rose-700 font-medium bg-rose-50 border border-rose-100 p-2 rounded-xl text-center">
+                    ⚠️ Còn <b>{report.unpaidCount}</b> lượt chưa thanh toán trong tháng
                   </div>
                 ) : null}
               </div>
             </div>
 
-            {/* Top chiến thần tháng */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-4">
-              <div className="flex items-center justify-between">
+            {/* Top chiến thần năng nổ */}
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <Award size={16} className="text-amber-500" />
-                  <h3 className="text-sm font-black text-slate-950">Top Thành Viên Năng Nổ</h3>
+                  <Trophy size={15} className="text-amber-500" />
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Top Thành Viên Năng Nổ</h3>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400">Tháng {selectedMonth}</span>
+                <span className="text-[10px] font-semibold text-slate-400">Tháng {selectedMonth}</span>
               </div>
-              <div className="space-y-2">
+
+              <div className="space-y-1.5">
                 {report?.topPlayers && report.topPlayers.length > 0 ? (
                   report.topPlayers.slice(0, 4).map((p, idx) => (
                     <div
                       key={p.userId}
-                      className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition"
+                      className="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-50 transition"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-5 text-center text-xs font-black text-slate-400">
-                          #{idx + 1}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-4 text-center text-xs font-bold text-slate-400">
+                          {idx + 1}
                         </span>
-                        <DuckMascot src={p.avatarUrl || '/duck-mascot.png'} size={28} rounded="full" />
-                        <div>
-                          <span className="text-xs font-bold text-slate-900 block truncate max-w-[110px]">
+                        <DuckMascot src={p.avatarUrl || '/duck-mascot.png'} size={24} rounded="full" />
+                        <div className="min-w-0">
+                          <span className="text-xs font-semibold text-slate-900 block truncate max-w-[110px]">
                             {p.fullName}
                           </span>
-                          <span className="text-[10px] font-semibold text-slate-400">
+                          <span className="text-[10px] text-slate-400">
                             {p.membershipType === 'FIXED' ? 'Cố định' : 'Vãng lai'}
                           </span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-xs font-black text-emerald-600 block">{p.winCount}W</span>
-                        <span className="text-[10px] text-slate-400 font-semibold">{p.lossCount}L</span>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-bold text-emerald-700 block tabular-nums">{p.winCount}W</span>
+                        <span className="text-[10px] text-slate-400 tabular-nums">{p.lossCount}L</span>
                       </div>
                     </div>
                   ))
@@ -529,97 +533,94 @@ export const HostOverviewView: React.FC = () => {
             </div>
           </div>
 
-          {/* Detailed Session Summaries Table / Live List */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] overflow-hidden space-y-4 p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Detailed Session Summaries Table / Clean Linear Data Sheet */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
               <div>
-                <h3 className="text-sm sm:text-base font-black text-slate-950">
-                  Lịch Sử & Báo Cáo Từng Ca Đánh ({selectedMonth}/{selectedYear})
+                <h3 className="text-sm font-bold text-slate-950">
+                  Lịch sử ca đánh ({selectedMonth}/{selectedYear})
                 </h3>
-                <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">
-                  Bấm vào ca đánh bất kỳ để mở Host Panel điều hành trực tiếp
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Bấm vào từng ca để mở Host Panel điều hành chi tiết
                 </p>
               </div>
-              <button
-                onClick={() => navigate('/host/create-session')}
-                className="w-full sm:w-auto px-4 py-2.5 bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow-sm text-center"
-              >
-                + Tạo ca mới
-              </button>
+              <div className="text-xs text-slate-500 font-medium self-start sm:self-auto">
+                Tổng cộng: <b className="text-slate-800">{report?.sessionSummaries?.length || 0} ca</b>
+              </div>
             </div>
 
             {report?.sessionSummaries && report.sessionSummaries.length > 0 ? (
-              <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
+              <div className="divide-y divide-slate-100 overflow-x-auto">
                 {report.sessionSummaries.map((s) => {
                   const effStatus = getEffectiveStatus(s)
                   return (
                     <div
                       key={s.sessionId}
                       onClick={() => navigate(`/host/session/${s.sessionId}`)}
-                      className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-slate-50/80 transition cursor-pointer group"
+                      className="p-3.5 sm:p-4 flex items-center justify-between gap-4 hover:bg-slate-50 transition cursor-pointer group"
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-rose-600 transition">
+                          <span className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition">
                             {s.title}
                           </span>
                           <span
-                            className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                            className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${
                               effStatus === 'COMPLETED'
-                                ? 'bg-slate-100 text-slate-700'
+                                ? 'bg-slate-100 text-slate-600'
                                 : effStatus === 'ACTIVE'
-                                ? 'bg-emerald-100 text-emerald-800 animate-pulse'
-                                : 'bg-blue-100 text-blue-800'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200'
                             }`}
                           >
                             {effStatus === 'COMPLETED' ? 'Đã xong' : effStatus === 'ACTIVE' ? 'Đang diễn ra' : 'Sắp tới'}
                           </span>
                         </div>
-                      <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-slate-500 font-medium flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <Calendar size={12} className="text-slate-400" />
-                          {s.startTime ? formatVnDate(s.startTime) : '--'}
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} className="text-slate-400" />
-                          {s.startTime ? formatVnTime(s.startTime) : '--'}
-                        </span>
-                        <span>•</span>
-                        <span>Quân số: <b className="text-slate-800">{s.checkedInPlayers}/{s.totalPlayers}</b></span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-6 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                      <div className="text-left sm:text-right">
-                        <div className="text-[11px] sm:text-xs text-slate-500">
-                          Thu: <b className="text-slate-800">{formatVnd(s.totalRevenue)}</b> | Chi: <b className="text-rose-600">{formatVnd(s.totalExpenses)}</b>
-                        </div>
-                        <div className="text-xs sm:text-sm font-black mt-0.5">
-                          Lãi ròng:{' '}
-                          <span className={(s.netProfit || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
-                            {formatVnd(s.netProfit)}
+                        <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-slate-500 font-medium flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} className="text-slate-400" />
+                            {s.startTime ? formatVnDate(s.startTime) : '--'}
                           </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} className="text-slate-400" />
+                            {s.startTime ? formatVnTime(s.startTime) : '--'}
+                          </span>
+                          <span>•</span>
+                          <span>Quân số: <b className="text-slate-700">{s.checkedInPlayers}/{s.totalPlayers}</b></span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-rose-600 text-white text-[11px] sm:text-xs font-bold group-hover:bg-rose-700 transition shadow-xs shrink-0">
-                        <span>Host Panel</span>
-                        <ArrowUpRight size={13} />
+                      <div className="flex items-center gap-4 shrink-0 text-right">
+                        <div>
+                          <div className="text-[11px] text-slate-500 font-medium">
+                            Thu: <b className="text-slate-700 tabular-nums">{formatVnd(s.totalRevenue)}</b>
+                          </div>
+                          <div className="text-xs font-bold tabular-nums">
+                            Lãi:{' '}
+                            <span className={(s.netProfit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                              {formatVnd(s.netProfit)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-semibold transition group-hover:bg-slate-900 group-hover:text-white">
+                          <span>Chi tiết</span>
+                          <ArrowUpRight size={13} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
               </div>
             ) : (
-              <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-xs text-slate-500 font-bold">Không có ca đánh nào trong tháng {selectedMonth}/{selectedYear}</p>
+              <div className="text-center py-12 bg-white">
+                <p className="text-xs text-slate-500 font-medium">Không có ca đánh nào trong tháng {selectedMonth}/{selectedYear}</p>
                 <button
                   onClick={() => navigate('/host/create-session')}
-                  className="mt-3 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition"
+                  className="mt-3 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition"
                 >
-                  Tạo ca đánh đầu tiên của tháng
+                  Tạo ca đánh đầu tiên
                 </button>
               </div>
             )}

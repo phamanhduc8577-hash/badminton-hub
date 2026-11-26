@@ -101,6 +101,6 @@ describe('HostOverviewView - Đối soát cọc trước đây', () => {
 
     renderView()
     expect(await screen.findByText(/Ca Đấu Đang Diễn Ra/)).toBeInTheDocument()
-    expect(screen.getByText(/Mở Bảng Điều Hành Ca Này/)).toBeInTheDocument()
+    expect(screen.getByText(/Mở điều hành ca/)).toBeInTheDocument()
   })
 })
