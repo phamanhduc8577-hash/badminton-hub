@@ -74,4 +74,33 @@ describe('HostOverviewView - Đối soát cọc trước đây', () => {
     await screen.findByText(/Không có ca đánh nào trong tháng/)
     expect(screen.queryByText(/Đối soát cọc trước đây/i)).not.toBeInTheDocument()
   })
+
+  it('hiển thị Quick-Access live session banner khi có ca trong danh sách', async () => {
+    const monthWithSession = {
+      ...emptyMonth,
+      sessionSummaries: [
+        {
+          sessionId: 99,
+          title: 'Ca Đấu Đang Diễn Ra',
+          status: 'ACTIVE',
+          startTime: '2026-10-15T18:00:00Z',
+          endTime: '2026-10-15T21:00:00Z',
+          totalPlayers: 12,
+          checkedInPlayers: 10,
+          totalRevenue: 600000,
+          totalExpenses: 400000,
+          netProfit: 200000,
+        },
+      ],
+    }
+    ;(api.get as any).mockImplementation((url: string) => {
+      if (url === '/reports/monthly') return Promise.resolve({ data: monthWithSession })
+      if (url === '/reports/reconciliation') return Promise.resolve({ data: [] })
+      return Promise.reject(new Error(`unexpected GET ${url}`))
+    })
+
+    renderView()
+    expect(await screen.findByText(/Ca Đấu Đang Diễn Ra/)).toBeInTheDocument()
+    expect(screen.getByText(/Mở Bảng Điều Hành Ca Này/)).toBeInTheDocument()
+  })
 })

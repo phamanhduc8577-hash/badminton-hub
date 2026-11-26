@@ -14,13 +14,14 @@ import {
   QrCode,
   Banknote,
   Award,
-  Sparkles,
+  Wallet,
   Layers,
   CheckCircle2,
   Clock,
   Zap,
   AlertTriangle,
   ChevronDown,
+  PlayCircle,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { MonthlyReport, ReconciliationEntry } from '../types'
@@ -156,6 +157,7 @@ export const HostOverviewView: React.FC = () => {
       })
       return res.data
     },
+    staleTime: 60_000,
   })
 
   const handlePrevMonth = () => {
@@ -183,6 +185,14 @@ export const HostOverviewView: React.FC = () => {
     if (num === undefined || num === null) return '0 ₫'
     return `${num.toLocaleString('vi-VN')} ₫`
   }
+
+  // Tìm ca đang diễn ra (ACTIVE) hoặc ca sắp tới gần nhất trong tháng
+  const activeOrNextSession = React.useMemo(() => {
+    if (!report?.sessionSummaries || report.sessionSummaries.length === 0) return null
+    const active = report.sessionSummaries.find((s) => getEffectiveStatus(s) === 'ACTIVE')
+    if (active) return active
+    return report.sessionSummaries.find((s) => getEffectiveStatus(s) === 'UPCOMING') || null
+  }, [report])
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -232,20 +242,64 @@ export const HostOverviewView: React.FC = () => {
         </div>
       </div>
 
+      {/* Quick-Access Live Session Alert: Bảng điều hành nhanh cho Host */}
+      {activeOrNextSession && (
+        <div
+          onClick={() => navigate(`/host/session/${activeOrNextSession.sessionId}`)}
+          className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-950 rounded-3xl p-5 sm:p-6 border border-emerald-500/30 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.18)] cursor-pointer group hover:border-emerald-500/60 transition-all duration-300 relative overflow-hidden"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+            <div className="space-y-1.5 text-left">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                </span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
+                  {getEffectiveStatus(activeOrNextSession) === 'ACTIVE' ? 'Ca đang diễn ra' : 'Ca tiếp theo trong tháng'}
+                </span>
+                <span className="text-xs text-slate-400">
+                  • {activeOrNextSession.startTime ? formatVnDate(activeOrNextSession.startTime) : ''}
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-black text-white group-hover:text-emerald-300 transition">
+                {activeOrNextSession.title}
+              </h2>
+              <p className="text-xs text-slate-300 font-medium">
+                Quân số: <b className="text-white font-bold">{activeOrNextSession.checkedInPlayers}/{activeOrNextSession.totalPlayers}</b> • Thu: <b className="text-emerald-400">{formatVnd(activeOrNextSession.totalRevenue)}</b>
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg transition active:scale-95 shrink-0 self-start sm:self-auto">
+              <PlayCircle size={16} />
+              <span>Mở Bảng Điều Hành Ca Này</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Đối soát cọc trước bản sửa lỗi (Q5) — chỉ hiện khi có dữ liệu */}
       <ReconciliationCard formatVnd={formatVnd} />
 
       {isLoading ? (
-        <div className="py-20 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-slate-900 border-t-transparent mb-3" />
-          <p className="text-xs text-slate-500 font-bold">Đang tổng hợp dữ liệu tài chính tháng...</p>
+        <div className="space-y-6 animate-pulse">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white p-5 rounded-3xl border border-slate-200 h-32" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white p-6 rounded-3xl border border-slate-200 h-52" />
+            ))}
+          </div>
         </div>
       ) : (
         <>
           {/* KPI 4 Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Doanh thu */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500">Tổng doanh thu</span>
                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
@@ -263,7 +317,7 @@ export const HostOverviewView: React.FC = () => {
             </div>
 
             {/* Chi phí */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500">Tổng chi phí</span>
                 <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
@@ -283,11 +337,11 @@ export const HostOverviewView: React.FC = () => {
             </div>
 
             {/* Lợi nhuận ròng */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500">Lợi nhuận ròng (Net)</span>
                 <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
-                  <Sparkles size={18} />
+                  <Wallet size={18} />
                 </div>
               </div>
               <div>
@@ -310,7 +364,7 @@ export const HostOverviewView: React.FC = () => {
             </div>
 
             {/* Quy mô ca đánh & Tỷ lệ điểm danh */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500">Tổng ca & Lượt chơi</span>
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
@@ -332,7 +386,7 @@ export const HostOverviewView: React.FC = () => {
           {/* Breakdown Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Phân loại thành viên */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-4">
               <div className="flex items-center gap-2">
                 <Layers size={16} className="text-rose-600" />
                 <h3 className="text-sm font-black text-slate-950">Cơ cấu thành viên tham gia</h3>
@@ -386,7 +440,7 @@ export const HostOverviewView: React.FC = () => {
             </div>
 
             {/* Phương thức thanh toán */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-4">
               <div className="flex items-center gap-2">
                 <QrCode size={16} className="text-emerald-600" />
                 <h3 className="text-sm font-black text-slate-950">Hình thức thanh toán</h3>
@@ -431,7 +485,7 @@ export const HostOverviewView: React.FC = () => {
             </div>
 
             {/* Top chiến thần tháng */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] hover:border-slate-300 transition space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Award size={16} className="text-amber-500" />
@@ -476,7 +530,7 @@ export const HostOverviewView: React.FC = () => {
           </div>
 
           {/* Detailed Session Summaries Table / Live List */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden space-y-4 p-4 sm:p-6">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] overflow-hidden space-y-4 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm sm:text-base font-black text-slate-950">
