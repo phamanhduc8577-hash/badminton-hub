@@ -226,41 +226,41 @@ export const LoyaltyView: React.FC = () => {
         </div>
       )}
 
-      {/* Hero tóm tắt tiến trình (Cắt hết chữ thừa) */}
+      {/* User Progress Profile Card (Linear Style) */}
       {user ? (
-        <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
             <DuckMascot
               src={profile?.avatarUrl || user.avatarUrl || '/duck-mascot.png'}
-              size={50}
-              rounded="2xl"
-              className="shadow-xs border border-slate-200 shrink-0"
+              size={46}
+              rounded="xl"
+              className="border border-slate-200 shrink-0"
             />
             <div className="min-w-0">
               <span className="text-xs font-bold text-slate-900 block truncate">
                 {user.fullName}
               </span>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-2xl sm:text-3xl font-black text-slate-950">
+                <span className="text-2xl font-bold tracking-tight text-slate-950 tabular-nums">
                   {attended}
                 </span>
-                <span className="text-xs text-slate-500 font-semibold">
-                  ca ra sân
+                <span className="text-xs text-slate-500 font-medium">
+                  ca ra sân tích lũy
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200 sm:min-w-[220px]">
+          <div className="sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 sm:min-w-[220px]">
             <div className="flex items-center justify-between sm:justify-end gap-2 text-xs">
-              <span className="font-bold text-slate-900">Mốc {nextMilestone.target} buổi</span>
-              <span className="text-[11px] text-slate-500 font-semibold">
+              <span className="font-semibold text-slate-900">Mốc {nextMilestone.target} buổi</span>
+              <span className="text-[11px] text-slate-500 font-medium">
                 (còn {Math.max(0, nextMilestone.target - attended)} ca)
               </span>
             </div>
-            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden p-0.5 mt-1.5 border border-slate-300">
+            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-1.5 border border-slate-200/80">
               <div
-                className="bg-slate-950 h-full rounded-full transition-all duration-500"
+                className="bg-slate-900 h-full rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, (attended / nextMilestone.target) * 100)}%` }}
               />
             </div>
@@ -373,59 +373,61 @@ export const LoyaltyView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: LỊCH RA SÂN */}
+      {/* TAB 2: LỊCH RA SÂN (Linear Dot-Matrix Calendar) */}
       {activeTab === 'CALENDAR' && (
-        <div className="space-y-4 pt-1">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+        <div className="space-y-4 pt-1 font-sans">
+          {/* Calendar Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
             <div>
-              <h2 className="text-sm sm:text-base font-black text-slate-950">
-                Lịch ra sân {monthNamesVi[month]} {year}
+              <h2 className="text-sm sm:text-base font-bold text-slate-950 flex items-center gap-2">
+                <span>Lịch ra sân {monthNamesVi[month]} {year}</span>
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                  {thisMonthAttendedCount} buổi ra sân
+                </span>
               </h2>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Nhấp vào ngày đã điểm danh để xem thông tin chi tiết ca đánh.
+              </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
-                {thisMonthAttendedCount} buổi
-              </span>
-
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer"
-                  title="Tháng trước"
-                  aria-label="Tháng trước"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentDate(vnMonthStart())}
-                  className="px-2 py-1 text-xs font-bold text-slate-800 hover:text-slate-950 transition cursor-pointer"
-                >
-                  Hôm nay
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer"
-                  title="Tháng sau"
-                  aria-label="Tháng sau"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+            <div className="flex items-center gap-1.5 self-start sm:self-auto bg-slate-50 p-1 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+                className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer"
+                title="Tháng trước"
+                aria-label="Tháng trước"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentDate(vnMonthStart())}
+                className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-950 hover:bg-white rounded-lg transition cursor-pointer"
+              >
+                Hôm nay
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+                className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer"
+                title="Tháng sau"
+                aria-label="Tháng sau"
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
           </div>
 
-          {/* Grid Lịch */}
-          <div className="space-y-1.5">
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-xs font-bold text-slate-500">
-              {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((d, i) => (
+          {/* Linear Calendar Card Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+            {/* Weekday Header */}
+            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70 text-center">
+              {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d, i) => (
                 <div
                   key={d}
-                  className={`py-1.5 rounded-lg text-[11px] font-black ${
-                    i === 0 || i === 6 ? 'text-rose-600 bg-rose-50/50' : 'text-slate-600 bg-slate-50'
+                  className={`py-2 text-[11px] font-bold uppercase tracking-wider ${
+                    i === 6 ? 'text-rose-600 bg-rose-50/30' : 'text-slate-600'
                   }`}
                 >
                   {d}
@@ -433,9 +435,11 @@ export const LoyaltyView: React.FC = () => {
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
-              {Array.from({ length: firstDayIndex }).map((_, idx) => (
-                <div key={`empty-${idx}`} className="h-11 sm:h-14 rounded-xl bg-slate-50/40 border border-slate-100" />
+            {/* Grid 7 Cột với viền Hairline */}
+            <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 bg-slate-100">
+              {/* Ngày trống trước ngày 1 (Thứ Hai làm ngày đầu tuần: (firstDayIndex + 6) % 7) */}
+              {Array.from({ length: (firstDayIndex + 6) % 7 }).map((_, idx) => (
+                <div key={`empty-${idx}`} className="min-h-[58px] sm:min-h-[72px] bg-slate-50/40" />
               ))}
 
               {Array.from({ length: totalDaysInMonth }).map((_, idx) => {
@@ -457,25 +461,45 @@ export const LoyaltyView: React.FC = () => {
                           'aria-label': `Ngày ${dayLabel}: đã ra sân ${dayRecords.length} ca`,
                         }
                       : {})}
-                    className={`h-11 sm:h-14 rounded-xl p-1 sm:p-1.5 flex flex-col justify-between transition border text-left ${
+                    className={`min-h-[58px] sm:min-h-[72px] p-2 flex flex-col justify-between text-left transition-all relative ${
                       isAttended
-                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs cursor-pointer hover:bg-emerald-700'
-                        : isToday
-                        ? 'bg-white border-2 border-slate-950 font-black'
-                        : 'bg-white border-slate-200 text-slate-700'
+                        ? 'bg-emerald-50/40 hover:bg-emerald-100/60 cursor-pointer group'
+                        : 'bg-white hover:bg-slate-50/60'
                     }`}
                   >
+                    {/* Top Row: Số ngày & Badge Hôm nay / Checkin */}
                     <div className="flex items-center justify-between w-full">
-                      <span className={`text-xs font-black ${isAttended ? 'text-white' : 'text-slate-900'}`}>
+                      <span
+                        className={`text-xs font-semibold tabular-nums leading-none ${
+                          isToday
+                            ? 'w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shadow-2xs'
+                            : isAttended
+                            ? 'text-emerald-950 font-bold'
+                            : 'text-slate-700'
+                        }`}
+                      >
                         {dayNum}
                       </span>
-                      {isAttended && <Check size={11} strokeWidth={3.5} className="text-white" />}
+
+                      {isAttended && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 sm:hidden" />
+                      )}
                     </div>
 
-                    {isAttended && (
-                      <span className="text-[9px] font-bold text-emerald-100 truncate hidden sm:block">
-                        {dayRecords[0]?.venueName || 'Đã ra sân'}
-                      </span>
+                    {/* Bottom Status: Linear Badge */}
+                    {isAttended ? (
+                      <div className="mt-1">
+                        <div className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200/80 text-[10px] font-semibold truncate max-w-full">
+                          <Check size={10} strokeWidth={3} className="shrink-0" />
+                          <span className="truncate">{dayRecords[0]?.venueName || 'Đã ra sân'}</span>
+                        </div>
+                        <div className="sm:hidden flex items-center gap-1 text-[9px] font-bold text-emerald-700">
+                          <Check size={9} strokeWidth={3} />
+                          <span>{dayRecords.length} ca</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-4" />
                     )}
                   </CellTag>
                 )
@@ -579,45 +603,51 @@ export const LoyaltyView: React.FC = () => {
         )}
       </BottomSheet>
 
-      {/* Modal chi tiết ngày trên lịch */}
+      {/* Modal chi tiết ngày trên lịch (Linear Sheet) */}
       <BottomSheet
         open={!!selectedDay}
         onClose={() => setSelectedDay(null)}
         title={selectedDay ? `Ngày ${selectedDay.label}` : ''}
-        bodyClassName="space-y-2.5"
+        bodyClassName="space-y-3 font-sans"
       >
-        {selectedDay?.records.map((r, i) => (
-          <div
-            key={`${r.sessionId}-${i}`}
-            className="p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/70 flex items-start justify-between gap-3 text-left"
-          >
-            <div className="min-w-0 space-y-1">
-              <p className="font-black text-sm text-slate-950 leading-snug">{r.sessionTitle || 'Ca đánh CLB'}</p>
-              <p className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
-                <MapPin size={13} className="shrink-0 text-slate-500" />
-                <span className="truncate">{r.venueName || 'Tại sân đấu'}</span>
-              </p>
-              <p className="text-[11px] text-emerald-800 font-bold flex items-center gap-1.5">
-                <Check size={13} strokeWidth={3} className="shrink-0" />
-                <span>
-                  Điểm danh lúc {formatVnTime(r.checkinAt)}
-                </span>
-              </p>
+        <p className="text-xs text-slate-500 font-medium">
+          Danh sách ca bạn đã tham gia và điểm danh trong ngày này:
+        </p>
+        <div className="space-y-2">
+          {selectedDay?.records.map((r, i) => (
+            <div
+              key={`${r.sessionId}-${i}`}
+              className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:border-slate-300 transition flex items-center justify-between gap-3 text-left"
+            >
+              <div className="min-w-0 space-y-1">
+                <p className="font-bold text-sm text-slate-950 leading-snug truncate">{r.sessionTitle || 'Ca đánh CLB'}</p>
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-medium flex-wrap">
+                  <span className="flex items-center gap-1 truncate">
+                    <MapPin size={12} className="shrink-0 text-slate-400" />
+                    <span>{r.venueName || 'Tại sân đấu'}</span>
+                  </span>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+                    <Check size={11} strokeWidth={3} className="shrink-0" />
+                    <span>Check-in: {formatVnTime(r.checkinAt)}</span>
+                  </span>
+                </div>
+              </div>
+              {r.sessionId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDay(null)
+                    navigate(`/sessions/${r.sessionId}`)
+                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-800 hover:bg-slate-900 hover:text-white transition shadow-2xs"
+                >
+                  Xem ca
+                </button>
+              )}
             </div>
-            {r.sessionId && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDay(null)
-                  navigate(`/sessions/${r.sessionId}`)
-                }}
-                className="shrink-0 min-h-11 px-3 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 hover:bg-slate-50 transition"
-              >
-                Xem ca
-              </button>
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </BottomSheet>
     </div>
   )
