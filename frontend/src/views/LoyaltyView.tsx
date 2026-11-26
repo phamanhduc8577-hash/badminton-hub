@@ -385,9 +385,6 @@ export const LoyaltyView: React.FC = () => {
                   {thisMonthAttendedCount} buổi ra sân
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Nhấp vào ngày đã điểm danh để xem thông tin chi tiết ca đánh.
-              </p>
             </div>
 
             <div className="flex items-center gap-1.5 self-start sm:self-auto bg-slate-50 p-1 rounded-xl border border-slate-200">

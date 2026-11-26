@@ -584,16 +584,24 @@ export const SessionListView: React.FC = () => {
       </div>
 
       {/* 3. Main Sessions Grid Feed */}
-      <div className="space-y-6">
+      <div className="space-y-6 pt-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">
-              Danh sách ca
-            </h2>
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-xl bg-slate-900 text-white shadow-2xs">
+              <Calendar size={16} />
+            </span>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight leading-none">
+                Lịch ca đánh
+              </h2>
+              <p className="text-xs text-slate-500 font-medium mt-1">
+                Đăng ký slot thi đấu, giao lưu cầu lông tại các cụm sân
+              </p>
+            </div>
           </div>
 
           {/* Status Filter Tabs - Mobile Responsive Pill Group */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl w-full sm:w-auto overflow-x-auto no-scrollbar shadow-inner touch-pan-x">
+          <div className="flex items-center gap-1.5 p-1.5 bg-slate-200/70 border border-slate-300/80 rounded-2xl w-full sm:w-auto overflow-x-auto no-scrollbar shadow-inner touch-pan-x">
             <button
               onClick={() => setStatusFilter('ALL')}
               className={`min-h-10 px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-black transition flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
@@ -711,12 +719,12 @@ export const SessionListView: React.FC = () => {
                 <div
                   key={session.id}
                   onClick={() => navigate(`/sessions/${session.id}`)}
-                  className={`bg-white rounded-3xl p-5 sm:p-6 cursor-pointer flex flex-col justify-between group relative border transition-all duration-200 ${
+                  className={`bg-white rounded-3xl p-5 sm:p-6 cursor-pointer flex flex-col justify-between group relative transition-all duration-200 border-2 ${
                     effectiveStatus === 'ACTIVE'
-                      ? 'border-emerald-400 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.18)] ring-2 ring-emerald-500/20 hover:shadow-[0_12px_32px_-6px_rgba(16,185,129,0.25)] hover:border-emerald-500'
+                      ? 'border-emerald-500 shadow-[0_10px_30px_-5px_rgba(16,185,129,0.22)] ring-4 ring-emerald-500/10 hover:shadow-[0_16px_36px_-6px_rgba(16,185,129,0.3)] hover:-translate-y-0.5'
                       : effectiveStatus === 'UPCOMING'
-                      ? 'border-slate-200 hover:border-slate-300 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.07)] hover:shadow-[0_12px_30px_-6px_rgba(0,0,0,0.12)]'
-                      : 'border-slate-200/80 bg-slate-50/60 opacity-90 hover:opacity-100 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)]'
+                      ? 'border-slate-300/90 hover:border-slate-900 shadow-[0_8px_25px_-5px_rgba(15,23,42,0.1)] hover:shadow-[0_16px_35px_-6px_rgba(15,23,42,0.16)] hover:-translate-y-0.5'
+                      : 'border-slate-200/90 bg-slate-50/70 opacity-90 hover:opacity-100 shadow-[0_4px_16px_-4px_rgba(15,23,42,0.06)] hover:border-slate-300'
                   }`}
                 >
                   <div className="space-y-3.5">
