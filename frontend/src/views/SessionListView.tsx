@@ -7,7 +7,6 @@ import { useAuthStore } from '../store/useAuthStore'
 import { DuckMascot } from '../components/DuckMascot'
 import { CurrencyInput } from '../components/CurrencyInput'
 import { useToast } from '../components/ToastProvider'
-import { Shuttlecock3D } from '../components/3d/Shuttlecock3D'
 import { durationHours, formatSessionDateTime, parseServerDateTime, serverToDateTimeInput } from '../lib/dateUtils'
 import { getEffectiveSessionStatus, SESSION_STATUS_LABEL } from '../lib/sessionStatus'
 import { getLolRank, getPlayerRankDisplay } from '../lib/ranks'
@@ -330,7 +329,9 @@ export const SessionListView: React.FC = () => {
                   <ChevronRight size={15} />
                 </button>
                 <div className="hidden sm:flex items-center justify-center">
-                  <Shuttlecock3D size={84} showShadow={false} />
+                  <div className="relative p-1.5 rounded-2xl bg-white/10 border border-white/20 shadow-lg backdrop-blur-xs">
+                    <DuckMascot size={64} rounded="xl" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -383,9 +384,33 @@ export const SessionListView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right Column: Floating Signature 3D Shuttlecock */}
-              <div className="lg:col-span-5 flex items-center justify-center relative py-2">
-                <Shuttlecock3D size={145} animated={true} showShadow={true} />
+              {/* Right Column: Mascot Vịt Thể Thao Làng Địa Ngục */}
+              <div className="lg:col-span-5 flex flex-col items-center justify-center relative py-2">
+                <div className="relative group select-none">
+                  {/* Atmospheric Sports Glow */}
+                  <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl transform group-hover:scale-110 transition duration-500" />
+
+                  {/* Decorative Outer Badge Container */}
+                  <div className="relative p-2.5 rounded-3xl bg-gradient-to-b from-white/20 via-white/5 to-transparent border border-white/15 shadow-2xl backdrop-blur-xs">
+                    <DuckMascot
+                      size={135}
+                      rounded="2xl"
+                      alt="Linh vật Cầu Lông Làng Địa Ngục"
+                      className="border-2 border-white/20 shadow-2xl"
+                    />
+
+                    {/* Badge Pill Overlay */}
+                    <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 bg-slate-900/95 text-white text-[11px] font-black px-3.5 py-1 rounded-full border border-white/20 shadow-xl flex items-center gap-1.5 whitespace-nowrap backdrop-blur-md">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>CLB Làng Địa Ngục</span>
+                    </div>
+
+                    {/* Official Pill */}
+                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-lg uppercase tracking-wider border border-emerald-300">
+                      OFFICIAL
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -393,7 +418,7 @@ export const SessionListView: React.FC = () => {
       </div>
 
       {/* 2. Leaderboard Standings Preview - Synchronized with Live Leaderboard */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="p-1.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 shadow-2xs">
@@ -686,12 +711,12 @@ export const SessionListView: React.FC = () => {
                 <div
                   key={session.id}
                   onClick={() => navigate(`/sessions/${session.id}`)}
-                  className={`bg-white rounded-3xl p-5 sm:p-6 cursor-pointer flex flex-col justify-between group relative border transition-all duration-200 hover:shadow-xl ${
+                  className={`bg-white rounded-3xl p-5 sm:p-6 cursor-pointer flex flex-col justify-between group relative border transition-all duration-200 ${
                     effectiveStatus === 'ACTIVE'
-                      ? 'border-emerald-400 shadow-lg shadow-emerald-500/5 ring-2 ring-emerald-500/20'
+                      ? 'border-emerald-400 shadow-[0_4px_24px_-4px_rgba(16,185,129,0.18)] ring-2 ring-emerald-500/20 hover:shadow-[0_12px_32px_-6px_rgba(16,185,129,0.25)] hover:border-emerald-500'
                       : effectiveStatus === 'UPCOMING'
-                      ? 'border-slate-200/90 hover:border-slate-400 shadow-xs'
-                      : 'border-slate-200/80 bg-slate-50/40 opacity-90 hover:opacity-100 shadow-2xs'
+                      ? 'border-slate-200 hover:border-slate-300 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.07)] hover:shadow-[0_12px_30px_-6px_rgba(0,0,0,0.12)]'
+                      : 'border-slate-200/80 bg-slate-50/60 opacity-90 hover:opacity-100 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.04)]'
                   }`}
                 >
                   <div className="space-y-3.5">

@@ -91,7 +91,7 @@ export const Layout: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white text-slate-900 relative font-sans selection:bg-slate-900 selection:text-white">
+    <div className="flex flex-col min-h-screen bg-slate-50/70 text-slate-900 relative font-sans selection:bg-slate-900 selection:text-white">
       {/* High-End Clean Athletic Background */}
       <BadmintonCourtBg />
 
