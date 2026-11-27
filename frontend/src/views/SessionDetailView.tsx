@@ -25,6 +25,7 @@ import {
   Check,
   Loader2,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react'
 
 const getErrorMessage = (err: any, fallback: string): string =>
@@ -60,6 +61,7 @@ export const SessionDetailView: React.FC = () => {
   const [depositQrData, setDepositQrData] = useState<{ qrUrl: string; participant: Participant } | null>(null)
   const [depositQrLoading, setDepositQrLoading] = useState(false)
   const [paymentPending, setPaymentPending] = useState<'VIETQR' | 'CASH' | null>(null)
+  const [reconcilingId, setReconcilingId] = useState<number | null>(null)
 
   // Checkin states
   const [checkinTokenInput, setCheckinTokenInput] = useState('')
@@ -85,8 +87,12 @@ export const SessionDetailView: React.FC = () => {
       const res = await api.get(`/sessions/${id}`)
       return res.data
     },
+    // Tự tải lại mỗi 2.5s khi đang mở Modal quét VietQR cọc/thanh toán để tự động nhảy kết quả
     // Tự tải lại mỗi 15s khi đang chờ Host xác nhận cọc hoặc ca đang diễn ra (điểm danh / thu tiền thay đổi liên tục)
     refetchInterval: (query) => {
+      if (showMemberDepositModal || !!showPaymentQrModal) {
+        return 2500
+      }
       const s = query.state.data
       if (!s) return false
       const status = getEffectiveSessionStatus(s)
@@ -404,6 +410,54 @@ export const SessionDetailView: React.FC = () => {
       setPaymentPending(null)
     }
   }
+
+  // Đối soát tức thì qua SePay API phòng trường hợp Webhook bị trễ
+  const handleReconcilePayment = async (participantId: number) => {
+    if (reconcilingId !== null) return
+    setReconcilingId(participantId)
+    try {
+      const res = await api.post(`/sepay/reconcile/${participantId}`)
+      queryClient.invalidateQueries({ queryKey: ['session', id] })
+      if (res.data?.matched) {
+        showToast('🎉 Đối soát thành công! Hệ thống đã ghi nhận thanh toán SePay.', 'success')
+      } else {
+        showToast(
+          res.data?.message || 'Chưa tìm thấy giao dịch ngân hàng khớp mã. Bạn vui lòng đợi 30s-1p rồi thử lại nhé!',
+          'info'
+        )
+      }
+    } catch (err: any) {
+      showToast(getErrorMessage(err, 'Lỗi kết nối khi đối soát thanh toán. Vui lòng thử lại!'), 'error')
+    } finally {
+      setReconcilingId(null)
+    }
+  }
+
+  // Tự động phát hiện khi chuyển khoản thành công: bắn toast mừng và tự đóng modal QR
+  useEffect(() => {
+    if (!session?.participants) return
+    const me = findMyParticipant(session)
+    if (!me) return
+
+    // 1. Khi đang mở modal Cọc và trạng thái đã chuyển thành PAID
+    if (showMemberDepositModal && me.depositStatus === 'PAID') {
+      showToast('🎉 Đã nhận cọc thành công! Slot của bạn đã được xác nhận.', 'success')
+      const timer = setTimeout(() => {
+        setShowMemberDepositModal(false)
+        setDepositQrData(null)
+      }, 800)
+      return () => clearTimeout(timer)
+    }
+
+    // 2. Khi đang mở modal Thanh toán sân cuối buổi và trạng thái đã chuyển thành PAID
+    if (showPaymentQrModal && me.paymentStatus === 'PAID') {
+      showToast('🎉 Thanh toán thành công! Cảm ơn bạn đã tham gia ca đấu.', 'success')
+      const timer = setTimeout(() => {
+        setShowPaymentQrModal(null)
+      }, 800)
+      return () => clearTimeout(timer)
+    }
+  }, [session?.participants, showMemberDepositModal, showPaymentQrModal])
 
   if (isError && !session) {
     const notFound = (sessionError as any)?.response?.status === 404
@@ -1018,15 +1072,34 @@ export const SessionDetailView: React.FC = () => {
         labelledBy="deposit-qr-title"
         bodyClassName="space-y-4 text-center"
         footer={
-          <button
-            onClick={() => {
-              setShowMemberDepositModal(false)
-              setDepositQrData(null)
-            }}
-            className="w-full min-h-11 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm sm:text-xs shadow-sm active:scale-95 transition"
-          >
-            Dạ vâng, mình đã chuyển khoản cọc rồi! 🏸
-          </button>
+          <div className="space-y-2 w-full">
+            <button
+              onClick={() => handleReconcilePayment(depositQrData!.participant.id)}
+              disabled={reconcilingId !== null}
+              className="w-full min-h-11 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm sm:text-xs shadow-sm flex items-center justify-center gap-2 transition"
+            >
+              {reconcilingId === depositQrData?.participant.id ? (
+                <>
+                  {spinner}
+                  <span>Đang kiểm tra SePay...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  <span>Kiểm tra thanh toán ngay</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setShowMemberDepositModal(false)
+                setDepositQrData(null)
+              }}
+              className="w-full min-h-11 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm sm:text-xs transition"
+            >
+              Đóng cửa sổ
+            </button>
+          </div>
         }
       >
         {depositQrData && (
@@ -1044,15 +1117,15 @@ export const SessionDetailView: React.FC = () => {
             </div>
 
             <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs space-y-1.5">
-              <div className="flex justify-between gap-2 text-amber-950">
+              <div className="flex justify-between gap-2 text-amber-950 items-center">
                 <span className="font-semibold">Nội dung CK:</span>
                 <span className="font-mono font-bold text-slate-950 bg-white px-2 py-0.5 rounded border border-amber-300">
-                  COC SF{depositQrData.participant.id}
+                  COC SF{depositQrData.participant.id}{depositQrData.participant.name ? ` ${depositQrData.participant.name.toUpperCase()}` : ''}
                 </span>
               </div>
               <p className="text-[11px] text-amber-900 leading-relaxed font-medium pt-1 border-t border-amber-200/80">
                 ✨ <b>Host xin cọc {formatMoney(depositQrData.participant.depositAmount ?? session.depositAmount)} cho lần đầu khách iu tham gia nè!</b> 🥰 <br />
-                (Số tiền cọc này sẽ được trừ thẳng vào tiền sân khi bạn đến đánh và từ lần thứ 2 trở đi bạn sẽ được <b>MIỄN CỌC 100%</b> nha!)
+                (Hệ thống tự động duyệt thanh toán trong vài giây sau khi chuyển khoản. Số tiền cọc này sẽ được trừ thẳng vào tiền sân khi bạn đến đánh!)
               </p>
             </div>
           </>
@@ -1298,15 +1371,36 @@ export const SessionDetailView: React.FC = () => {
       <BottomSheet
         open={!!showPaymentQrModal}
         onClose={() => setShowPaymentQrModal(null)}
-        title="Quét VietQR thanh toán"
+        title="Quét VietQR thanh toán tiền sân"
         bodyClassName="space-y-4 text-center"
         footer={
-          <button
-            onClick={() => setShowPaymentQrModal(null)}
-            className="w-full min-h-11 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm sm:text-xs shadow-sm"
-          >
-            Đã chuyển khoản xong
-          </button>
+          <div className="space-y-2 w-full">
+            {isUserParticipant && (
+              <button
+                onClick={() => handleReconcilePayment(isUserParticipant.id)}
+                disabled={reconcilingId !== null}
+                className="w-full min-h-11 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm sm:text-xs shadow-sm flex items-center justify-center gap-2 transition"
+              >
+                {reconcilingId === isUserParticipant.id ? (
+                  <>
+                    {spinner}
+                    <span>Đang kiểm tra SePay...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    <span>Kiểm tra thanh toán ngay</span>
+                  </>
+                )}
+              </button>
+            )}
+            <button
+              onClick={() => setShowPaymentQrModal(null)}
+              className="w-full min-h-11 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm sm:text-xs transition"
+            >
+              Đóng cửa sổ
+            </button>
+          </div>
         }
       >
         {showPaymentQrModal && (
@@ -1314,9 +1408,19 @@ export const SessionDetailView: React.FC = () => {
             <img src={showPaymentQrModal} alt="VietQR Final Payment" className="w-52 h-52 mx-auto object-contain" />
           </div>
         )}
-        <p className="text-xs text-slate-600">
-          Quét mã bằng ứng dụng ngân hàng bất kỳ để thanh toán đúng số tiền.
-        </p>
+        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1 text-slate-700">
+          <p className="font-semibold text-slate-900">
+            Quét mã bằng ứng dụng ngân hàng bất kỳ để thanh toán đúng số tiền.
+          </p>
+          {isUserParticipant && (
+            <p className="font-mono text-[11px] text-indigo-700 bg-white py-1 px-2 rounded border border-indigo-200 font-bold inline-block mt-1">
+              SF{isUserParticipant.id}{isUserParticipant.name ? ` ${isUserParticipant.name.toUpperCase()}` : ''}
+            </p>
+          )}
+          <p className="text-[11px] text-slate-500 pt-1">
+            ⚡ Hệ thống tự động ghi nhận thanh toán SePay và hoàn tất trong vài giây.
+          </p>
+        </div>
       </BottomSheet>
 
       {/* Cash Payment Notice Modal */}

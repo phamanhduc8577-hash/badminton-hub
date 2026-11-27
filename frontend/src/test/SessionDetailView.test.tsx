@@ -185,4 +185,25 @@ describe('SessionDetailView - mobile cho thành viên', () => {
     expect(screen.queryByRole('dialog', { name: /Quét VietQR thanh toán/i })).not.toBeInTheDocument()
     expect(api.get).not.toHaveBeenCalledWith('/sessions/participants/101/payment-qr')
   })
+
+  it('VietQR: mở modal thanh toán hiển thị nội dung CK kèm tên và nút Kiểm tra thanh toán ngay', async () => {
+    ;(api.post as any).mockResolvedValue({ data: {} })
+    ;(api.get as any).mockImplementation((url: string) => {
+      if (url === '/sessions/5') return Promise.resolve({ data: buildSession() })
+      if (url === '/matches/session/5') return Promise.resolve({ data: [] })
+      if (url === '/sessions/participants/101/payment-qr') return Promise.resolve({ data: { qrUrl: 'https://img.vietqr.io/image/test.png' } })
+      return Promise.reject(new Error(`unexpected GET ${url}`))
+    })
+    renderView()
+    fireEvent.click(await screen.findByRole('button', { name: /Quét VietQR chuyển khoản/i }))
+
+    expect(await screen.findByRole('dialog', { name: /Quét VietQR thanh toán/i })).toBeInTheDocument()
+    expect(screen.getByText(/SF101 THÀNH VIÊN/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Kiểm tra thanh toán ngay/i })).toBeInTheDocument()
+
+    // Bấm nút Kiểm tra thanh toán ngay gọi API reconcile
+    ;(api.post as any).mockResolvedValueOnce({ data: { matched: true } })
+    fireEvent.click(screen.getByRole('button', { name: /Kiểm tra thanh toán ngay/i }))
+    expect(api.post).toHaveBeenCalledWith('/sepay/reconcile/101')
+  })
 })

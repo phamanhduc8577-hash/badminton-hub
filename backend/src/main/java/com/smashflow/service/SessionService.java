@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -601,34 +602,73 @@ public class SessionService {
         return "SF" + participantId;
     }
 
+    public static String sanitizeNameForMemo(String rawName) {
+        if (rawName == null || rawName.isBlank()) {
+            return "";
+        }
+        // Thay chữ đ, Đ trước khi chuẩn hóa NFD
+        String replaced = rawName.replace("đ", "d").replace("Đ", "D");
+        String normalized = Normalizer.normalize(replaced, Normalizer.Form.NFD);
+        String withoutAccents = normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        // Chỉ giữ lại chữ cái A-Z và khoảng trắng
+        String asciiOnly = withoutAccents.replaceAll("[^a-zA-Z\\s]", " ").trim().replaceAll("\\s+", " ").toUpperCase();
+        if (asciiOnly.length() > 18) {
+            asciiOnly = asciiOnly.substring(0, 18).trim();
+        }
+        return asciiOnly;
+    }
+
+    public static String getParticipantName(SessionParticipant participant) {
+        if (participant == null) return "";
+        if (participant.getUser() != null && participant.getUser().getFullName() != null && !participant.getUser().getFullName().isBlank()) {
+            return participant.getUser().getFullName();
+        }
+        if (participant.getGuestName() != null && !participant.getGuestName().isBlank()) {
+            return participant.getGuestName();
+        }
+        return "";
+    }
+
     public static String depositMemo(Long participantId) {
         return "COC " + paymentCode(participantId);
+    }
+
+    public static String depositMemo(SessionParticipant participant) {
+        if (participant == null) return "COC SF";
+        String cleanName = sanitizeNameForMemo(getParticipantName(participant));
+        return cleanName.isEmpty() ? depositMemo(participant.getId()) : "COC " + paymentCode(participant.getId()) + " " + cleanName;
     }
 
     public static String finalPaymentMemo(Long participantId) {
         return paymentCode(participantId);
     }
 
+    public static String finalPaymentMemo(SessionParticipant participant) {
+        if (participant == null) return "SF";
+        String cleanName = sanitizeNameForMemo(getParticipantName(participant));
+        return cleanName.isEmpty() ? finalPaymentMemo(participant.getId()) : paymentCode(participant.getId()) + " " + cleanName;
+    }
+
     public String getDepositQrUrl(Long participantId, User viewer) {
         SessionParticipant participant = findParticipantForQr(participantId, viewer);
-        return vietQrService.generateQrUrl(participant.getDepositAmount(), depositMemo(participant.getId()));
+        return vietQrService.generateQrUrl(participant.getDepositAmount(), depositMemo(participant));
     }
 
     public String getDepositSepayQrUrl(Long participantId, User viewer) {
         SessionParticipant participant = findParticipantForQr(participantId, viewer);
-        return vietQrService.generateSepayQrUrl(participant.getDepositAmount(), depositMemo(participant.getId()));
+        return vietQrService.generateSepayQrUrl(participant.getDepositAmount(), depositMemo(participant));
     }
 
     public String getFinalPaymentQrUrl(Long participantId, User viewer) {
         SessionParticipant participant = findParticipantForQr(participantId, viewer);
         BigDecimal remaining = participant.getRemainingPaymentAmount();
-        return vietQrService.generateQrUrl(remaining, finalPaymentMemo(participant.getId()));
+        return vietQrService.generateQrUrl(remaining, finalPaymentMemo(participant));
     }
 
     public String getFinalPaymentSepayQrUrl(Long participantId, User viewer) {
         SessionParticipant participant = findParticipantForQr(participantId, viewer);
         BigDecimal remaining = participant.getRemainingPaymentAmount();
-        return vietQrService.generateSepayQrUrl(remaining, finalPaymentMemo(participant.getId()));
+        return vietQrService.generateSepayQrUrl(remaining, finalPaymentMemo(participant));
     }
 
     /** Chỉ Host hoặc chính chủ lượt đăng ký mới được xem mã QR chuyển khoản. */

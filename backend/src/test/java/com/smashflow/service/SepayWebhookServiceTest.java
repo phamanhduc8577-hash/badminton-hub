@@ -211,6 +211,67 @@ class SepayWebhookServiceTest {
         }
 
         @Test
+        @DisplayName("Tự động duyệt cọc với cú pháp mới kèm tên khách hàng in hoa không dấu 'COC SF101 NGUYEN VAN A'")
+        void autoConfirmsDepositWithCustomerNameInMemo() {
+            Long participantId = 101L;
+            SessionParticipant participant = SessionParticipant.builder()
+                    .id(participantId)
+                    .isGuest(true)
+                    .guestName("Nguyễn Văn A")
+                    .depositAmount(new BigDecimal("50000"))
+                    .depositStatus(DepositStatus.PENDING)
+                    .build();
+
+            when(eventRepository.existsBySepayTransactionId(8890L)).thenReturn(false);
+            when(participantRepository.findByIdForUpdate(participantId)).thenReturn(Optional.of(participant));
+
+            SepayWebhookPayload payload = SepayWebhookPayload.builder()
+                    .id(8890L)
+                    .transferType("in")
+                    .transferAmount(new BigDecimal("50000"))
+                    .content("MBVCB.12345.COC SF101 NGUYEN VAN A CK")
+                    .build();
+
+            SepayWebhookResponse res = service.processWebhook(payload);
+
+            assertTrue(res.isSuccess());
+            assertTrue(res.isMatched());
+            assertEquals("DEPOSIT", res.getPaymentType());
+            assertEquals(DepositStatus.PAID, participant.getDepositStatus());
+        }
+
+        @Test
+        @DisplayName("Tự động duyệt thanh toán tiền sân với cú pháp kèm tên khách 'SF101 NGUYEN VAN A'")
+        void autoConfirmsFinalPaymentWithCustomerNameInMemo() {
+            Long participantId = 101L;
+            SessionParticipant participant = SessionParticipant.builder()
+                    .id(participantId)
+                    .isGuest(true)
+                    .guestName("Nguyễn Văn A")
+                    .finalFee(new BigDecimal("60000"))
+                    .depositAmount(BigDecimal.ZERO)
+                    .paymentStatus(PaymentStatus.UNPAID)
+                    .build();
+
+            when(eventRepository.existsBySepayTransactionId(8891L)).thenReturn(false);
+            when(participantRepository.findByIdForUpdate(participantId)).thenReturn(Optional.of(participant));
+
+            SepayWebhookPayload payload = SepayWebhookPayload.builder()
+                    .id(8891L)
+                    .transferType("in")
+                    .transferAmount(new BigDecimal("60000"))
+                    .content("CT tu 0912345678 toi 0000123 SF101 NGUYEN VAN A TIEN SAN")
+                    .build();
+
+            SepayWebhookResponse res = service.processWebhook(payload);
+
+            assertTrue(res.isSuccess());
+            assertTrue(res.isMatched());
+            assertEquals("FINAL_PAYMENT", res.getPaymentType());
+            assertEquals(PaymentStatus.PAID, participant.getPaymentStatus());
+        }
+
+        @Test
         @DisplayName("Tự động thanh toán tiền sân: Nhận cú pháp 'SF101' với số tiền đủ tiền sân")
         void autoConfirmFinalPayment() {
             Long participantId = 101L;

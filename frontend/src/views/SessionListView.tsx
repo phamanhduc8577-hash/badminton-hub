@@ -428,9 +428,6 @@ export const SessionListView: React.FC = () => {
               <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-none">
                 Top 4 của bảng xếp hạng
               </h3>
-              <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                {leaderboardTab === 'wins' ? 'Top chiến thần gánh team & điểm LP xếp hạng' : 'Top thành viên chuyên cần tham gia nhiều ca nhất'}
-              </p>
             </div>
           </div>
 
@@ -507,7 +504,7 @@ export const SessionListView: React.FC = () => {
                 <div
                   key={entry.id}
                   onClick={() => navigate('/leaderboard')}
-                  className={`p-3 sm:p-3.5 rounded-2xl border transition-all duration-200 flex items-center gap-3 cursor-pointer group hover:scale-[1.02] hover:shadow-md ${
+                  className={`p-2.5 sm:p-3.5 rounded-2xl border transition-all duration-200 flex items-center gap-2 sm:gap-3 cursor-pointer group hover:scale-[1.02] hover:shadow-md min-w-0 h-full ${
                     isFirst
                       ? 'bg-amber-50/40 border-amber-200 hover:border-amber-300'
                       : isSecond
@@ -520,15 +517,15 @@ export const SessionListView: React.FC = () => {
                   {/* Rank Badge */}
                   <div className="shrink-0 relative">
                     {isFirst ? (
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 text-slate-950 flex items-center justify-center font-black text-xs shadow-md shadow-amber-400/30 border border-yellow-200">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 via-yellow-300 to-amber-500 text-slate-950 flex items-center justify-center font-black text-sm shadow-md shadow-amber-400/30 border border-yellow-200">
                         👑
                       </div>
                     ) : isSecond ? (
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-slate-300 via-slate-100 to-slate-400 text-slate-900 flex items-center justify-center font-black text-xs shadow-xs border border-slate-200">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-slate-300 via-slate-100 to-slate-400 text-slate-900 flex items-center justify-center font-black text-sm shadow-xs border border-slate-200">
                         🥈
                       </div>
                     ) : isThird ? (
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-700 via-amber-600 to-yellow-800 text-white flex items-center justify-center font-black text-xs shadow-xs border border-amber-500">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-700 via-amber-600 to-yellow-800 text-white flex items-center justify-center font-black text-sm shadow-xs border border-amber-500">
                         🥉
                       </div>
                     ) : (
@@ -538,40 +535,40 @@ export const SessionListView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 3D Rank Emblem Crest */}
-                  <div className="shrink-0 -my-2">
+                  {/* 3D Rank Emblem Crest - Visible on desktop */}
+                  <div className="hidden sm:block shrink-0 -my-2">
                     <RankEmblem tier={baseTier} size="sm" showGlow={isFirst || isSecond} />
                   </div>
 
                   {/* Player Avatar & Details */}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 flex flex-col justify-center">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <DuckMascot
                         src={entry.avatarUrl || '/duck-mascot.png'}
-                        size={22}
+                        size={20}
                         rounded="full"
-                        className="shrink-0 border border-slate-200 shadow-2xs"
+                        className="hidden sm:inline-block shrink-0 border border-slate-200 shadow-2xs"
                       />
-                      <span className="text-xs font-black text-slate-900 group-hover:text-emerald-700 transition truncate block">
+                      <span className="text-xs sm:text-xs font-black text-slate-900 group-hover:text-emerald-700 transition truncate block flex-1">
                         {entry.fullName}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    <div className="flex items-center gap-1 mt-0.5 flex-nowrap overflow-hidden">
                       {leaderboardTab === 'wins' ? (
                         <>
                           <span
-                            className={`text-[10px] font-bold px-1.5 py-0.2 rounded border leading-tight ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}
+                            className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border leading-tight shrink-0 ${rankDisplay.bgClass} ${rankDisplay.borderClass} ${rankDisplay.textColor}`}
                           >
                             {rankDisplay.name}
                           </span>
-                          <span className="text-[10px] font-semibold text-slate-500 truncate">
+                          <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 truncate shrink-0">
                             {entry.eloScore ?? 0} LP
                           </span>
                         </>
                       ) : (
-                        <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                          {entry.sessionsAttended ?? 0} buổi tham gia
+                        <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 truncate">
+                          {entry.sessionsAttended ?? 0} buổi
                         </span>
                       )}
                     </div>
@@ -594,9 +591,6 @@ export const SessionListView: React.FC = () => {
               <h2 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight leading-none">
                 Lịch ca đánh
               </h2>
-              <p className="text-xs text-slate-500 font-medium mt-1">
-                Đăng ký slot thi đấu, giao lưu cầu lông tại các cụm sân
-              </p>
             </div>
           </div>
 
