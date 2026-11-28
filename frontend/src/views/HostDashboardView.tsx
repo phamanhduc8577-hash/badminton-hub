@@ -849,73 +849,6 @@ export const HostDashboardView: React.FC = () => {
       })
   }
 
-  // Auto Fair-Play Match Suggestion for the current court (Gender-Balanced Double/Single)
-  const handleAutoSuggestFairMatch = (courtName: string) => {
-    const assignedInOtherCourters = new Set<string>()
-    Object.entries(courtDrafts).forEach(([cName, d]) => {
-      if (cName !== courtName) {
-        if (d.teamAP1) assignedInOtherCourters.add(d.teamAP1)
-        if (d.teamAP2) assignedInOtherCourters.add(d.teamAP2)
-        if (d.teamBP1) assignedInOtherCourters.add(d.teamBP1)
-        if (d.teamBP2) assignedInOtherCourters.add(d.teamBP2)
-      }
-    })
-
-    const pool = [...rosterUsers]
-      .filter((u) => !assignedInOtherCourters.has(String(u.userId || u.id)))
-      .sort((a, b) => {
-        const setsA = playerStatsMap[String(a.userId || a.id)]?.totalSets || 0
-        const setsB = playerStatsMap[String(b.userId || b.id)]?.totalSets || 0
-        if (setsA !== setsB) return setsA - setsB
-        return (a.eloScore || 0) - (b.eloScore || 0)
-      })
-
-    if (pool.length < 2) {
-      showToast('Không đủ người chơi rảnh để tự động xếp cặp!', 'error')
-      return
-    }
-
-    const uid = (u: Participant) => String(u.userId || u.id)
-    const males = pool.filter((u) => u.gender !== 'FEMALE')
-    const females = pool.filter((u) => u.gender === 'FEMALE')
-
-    let p1 = ''
-    let p2 = ''
-    let p3 = ''
-    let p4 = ''
-
-    // Priority 1: Men's Doubles (Nam-Nam vs Nam-Nam) if at least 4 males
-    if (males.length >= 4 && (females.length < 2 || males[0] === pool[0])) {
-      p1 = uid(males[0]); p2 = uid(males[3]); p3 = uid(males[1]); p4 = uid(males[2])
-    }
-    // Priority 2: Mixed Doubles (Nam-Nữ vs Nam-Nữ) if at least 2 males & 2 females
-    else if (males.length >= 2 && females.length >= 2) {
-      p1 = uid(males[0]); p2 = uid(females[0]); p3 = uid(males[1]); p4 = uid(females[1])
-    }
-    // Priority 3: Women's Doubles (Nữ-Nữ vs Nữ-Nữ) if at least 4 females
-    else if (females.length >= 4) {
-      p1 = uid(females[0]); p2 = uid(females[3]); p3 = uid(females[1]); p4 = uid(females[2])
-    }
-    // Priority 4: Men's Doubles fallback if 4 males available
-    else if (males.length >= 4) {
-      p1 = uid(males[0]); p2 = uid(males[3]); p3 = uid(males[1]); p4 = uid(males[2])
-    }
-    // Priority 5: Single Match with same gender if possible
-    else if (males.length >= 2) {
-      p1 = uid(males[0]); p3 = uid(males[1])
-    } else if (females.length >= 2) {
-      p1 = uid(females[0]); p3 = uid(females[1])
-    }
-    // Fallback: 4 players general double (or 2 players single) if unbalanced pool
-    else if (pool.length >= 4) {
-      p1 = uid(pool[0]); p2 = uid(pool[3]); p3 = uid(pool[1]); p4 = uid(pool[2])
-    } else {
-      p1 = uid(pool[0]); p3 = uid(pool[1])
-    }
-
-    assignDraftToCourt(courtName, { teamAP1: p1, teamAP2: p2, teamBP1: p3, teamBP2: p4 })
-  }
-
   // Hành động từ thẻ / menu "⋯"
   const openEditBill = (p: HostParticipant) => {
     const block = editBillBlockReason(p)
@@ -1659,13 +1592,6 @@ export const HostDashboardView: React.FC = () => {
                     <Swords size={18} className="text-slate-950" />
                     <span>Sàn đấu: {currentCourtName}</span>
                   </h2>
-                  <button
-                    onClick={() => handleAutoSuggestFairMatch(currentCourtName)}
-                    className="min-h-11 px-3.5 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-xl text-sm sm:text-xs shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 shrink-0"
-                  >
-                    <Sparkles size={14} className="text-amber-400" />
-                    <span>Ghép kèo công bằng</span>
-                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">

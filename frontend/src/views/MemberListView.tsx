@@ -398,63 +398,71 @@ export const MemberListView: React.FC = () => {
                   </span>
                 )}
               </button>
-              <button
-                onClick={handleOptimizeAvatars}
-                disabled={optimizeAvatarsMutation.isPending}
-                title="Thu nhỏ ảnh đại diện cũ để giảm băng thông"
-                className="min-h-9 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed shadow-2xs"
-              >
-                {optimizeAvatarsMutation.isPending ? 'Đang xử lý...' : 'Tối ưu ảnh đại diện'}
-              </button>
             </div>
           )}
         </div>
 
         {/* Quà cần trao: chỉ Host thấy */}
         {user?.role === 'HOST' && pendingHandovers.length > 0 && (
-          <div className="rounded-2xl p-4 sm:p-5 space-y-3 border border-amber-200/80 bg-amber-50/50">
-            <div className="flex items-center justify-between pb-2 border-b border-amber-200/80">
+          <div className="rounded-2xl p-4 sm:p-5 space-y-3.5 border border-amber-200/90 bg-gradient-to-b from-amber-50/70 to-amber-50/40 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-amber-200/80 gap-1.5">
               <div className="flex items-center gap-2">
-                <Gift size={15} className="text-amber-600" />
-                <h2 className="text-xs font-bold text-slate-900">Quà cần trao tận tay</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-rose-500 text-white font-black">
+                <span className="p-1 rounded-lg bg-amber-100 text-amber-700">
+                  <Gift size={16} />
+                </span>
+                <h2 className="text-sm font-black text-slate-900 tracking-tight">Quà cần trao tận tay</h2>
+                <span className="px-2 py-0.5 rounded-full text-[11px] bg-rose-600 text-white font-black shadow-xs">
                   {pendingHandovers.length}
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500 font-medium">
+              <span className="text-xs text-slate-500 font-medium">
                 Bấm "Đã trao" sau khi đưa quà cho thành viên
               </span>
             </div>
 
-            <div className="divide-y divide-amber-100">
+            <div className="space-y-2.5">
               {pendingHandovers.map((h) => (
-                <div key={h.rewardId} className="py-2.5 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  key={h.rewardId}
+                  className="p-3 sm:p-3.5 rounded-xl bg-white/95 border border-amber-200/70 shadow-2xs hover:shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                >
+                  {/* Cột 1: Thông tin thành viên */}
+                  <div className="flex items-center gap-3 min-w-0">
                     <DuckMascot
                       src={h.avatarUrl || '/duck-mascot.png'}
-                      size={32}
+                      size={36}
                       rounded="xl"
-                      className="border border-slate-200 shrink-0"
+                      className="border border-slate-200 shrink-0 shadow-2xs"
                     />
                     <div className="min-w-0">
-                      <span className="font-bold text-slate-900 text-xs block truncate">{h.fullName}</span>
-                      <span className="text-[10px] text-slate-500">
-                        {h.phone ? `${h.phone} • ` : ''}đã đi {h.sessionsAttended} buổi
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-slate-900 text-sm truncate">{h.fullName}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-0.5">
+                        {h.phone && <span>{h.phone}</span>}
+                        {h.phone && <span>•</span>}
+                        <span className="font-semibold text-slate-700">Đã đi {h.sessionsAttended} buổi</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5">
-                    <div className="text-right">
-                      <span className="text-xs font-black text-slate-900 block">{h.rewardName}</span>
-                      <span className="text-[10px] text-amber-700 font-bold">Mốc {h.milestoneSessions} buổi</span>
+                  {/* Cột 2: Phần quà & Nút hành động */}
+                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                    <div className="sm:text-right min-w-0">
+                      <span className="text-xs sm:text-sm font-black text-slate-950 block truncate">
+                        {h.rewardName}
+                      </span>
+                      <span className="inline-block text-[10px] font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-md mt-0.5 border border-amber-200/60">
+                        Mốc {h.milestoneSessions} buổi
+                      </span>
                     </div>
+
                     <button
                       onClick={() => confirmHandoverMutation.mutate(h.rewardId)}
                       disabled={confirmHandoverMutation.isPending}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-xl flex items-center gap-1 shadow-sm active:scale-95 transition disabled:opacity-60 cursor-pointer"
+                      className="min-h-9 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl flex items-center gap-1.5 shadow-sm active:scale-95 transition disabled:opacity-60 cursor-pointer shrink-0"
                     >
-                      <CheckCircle2 size={13} />
+                      <CheckCircle2 size={14} />
                       <span>Đã trao</span>
                     </button>
                   </div>
